@@ -1,0 +1,22 @@
+Name:                   wai-logger-prefork
+Version:                0.1.0
+Author:                 Kazu Yamamoto <kazu@iij.ad.jp>
+Maintainer:             Kazu Yamamoto <kazu@iij.ad.jp>
+License:                BSD3
+License-File:           LICENSE
+Synopsis:               A logging system for preforked WAI apps
+Description:            A logging system for preforked WAI apps
+Category:               Web, Yesod
+Cabal-Version:          >= 1.6
+Build-Type:             Simple
+library
+  GHC-Options:          -Wall -fno-warn-unused-do-bind
+  Exposed-Modules:      Network.Wai.Logger.Prefork
+  Other-Modules:        Network.Wai.Logger.Prefork.File
+                        Network.Wai.Logger.Prefork.Stdout
+                        Network.Wai.Logger.Prefork.Types
+  Build-Depends:        base >= 4 && < 5, unix, bytestring,
+                        wai, fast-logger, wai-logger, http-types
+Source-Repository head
+  Type:                 git
+  Location:             git://github.com/kazu-yamamoto/logger.git
