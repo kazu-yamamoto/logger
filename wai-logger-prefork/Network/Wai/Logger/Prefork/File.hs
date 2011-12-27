@@ -53,8 +53,8 @@ open spec = do
 
 reopen :: FileLogSpec -> HandleRef -> IO ()
 reopen spec (HandleRef ref) = do
-    hdl <- open spec
-    oldhdl <- atomicModifyIORef ref (\oh -> (hdl,oh))
+    oldhdl <- readIORef ref
+    open spec >>= writeIORef ref
     hClose oldhdl
 
 ----------------------------------------------------------------

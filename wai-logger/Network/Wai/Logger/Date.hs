@@ -45,7 +45,7 @@ getDate (DateRef ref) = do
         return $ zonedDate cache
     else do
         newCache <- newDate newEt
-        !_ <- atomicModifyIORef ref (\_ -> (newCache, ()))
+        writeIORef ref newCache
         return $ zonedDate newCache
 
 newDate :: TIME -> IO DateCache
