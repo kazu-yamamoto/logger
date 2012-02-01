@@ -19,10 +19,13 @@ import qualified Data.ByteString as BS
 import Data.ByteString.Internal (ByteString(..), c2w)
 import Data.List
 import Data.Maybe
+import Data.Typeable
 import Foreign
 import GHC.Base
 import GHC.IO.Buffer
 import qualified GHC.IO.BufferedIO as Buffered
+import qualified GHC.IO.Device as RawIO
+import GHC.IO.FD
 import GHC.IO.Handle.Internals
 import GHC.IO.Handle.Text
 import GHC.IO.Handle.Types
@@ -52,7 +55,9 @@ hPutLogStr :: Handle -> [LogStr] -> IO ()
 hPutLogStr handle bss =
   wantWritableHandle "hPutLogStr" handle $ \h_ -> bufsWrite h_ bss
 
-bufsWrite :: Handle__-> [LogStr] -> IO ()
+-- based on GHC.IO.Handle.Text
+
+bufsWrite :: Handle__ -> [LogStr] -> IO ()
 bufsWrite h_@Handle__{..} bss = do
     old_buf@Buffer{
         bufRaw = old_raw
@@ -66,7 +71,13 @@ bufsWrite h_@Handle__{..} bss = do
     else do
         old_buf' <- Buffered.flushWriteBuffer haDevice old_buf
         writeIORef haByteBuffer old_buf'
-        bufsWrite h_ bss
+        if size > len then
+            bufsWrite h_ bss
+        else allocaBytes size $ \ptr -> do
+            go ptr bss
+            let Just fd = cast haDevice :: Maybe FD
+            RawIO.writeNonBlocking fd ptr size
+            return ()
   where
     len = foldl' (\x y -> x + getLength y) 0 bss
     getLength (LB s) = BS.length s
