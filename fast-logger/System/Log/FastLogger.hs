@@ -1,4 +1,4 @@
-{-# LANGUAGE DoAndIfThenElse, NoImplicitPrelude, RecordWildCards #-}
+{-# LANGUAGE NoImplicitPrelude, RecordWildCards #-}
 
 -- | Fast logging system to copy log data directly to Handle buffer.
 
@@ -68,12 +68,12 @@ bufsWrite h_@Handle__{..} bss = do
         withRawBuffer old_raw $ \ptr ->
             go (ptr `plusPtr` w)  bss
         writeIORef haByteBuffer old_buf{ bufR = w + len }
-    else do
+     else do
         old_buf' <- Buffered.flushWriteBuffer haDevice old_buf
         writeIORef haByteBuffer old_buf'
         if size > len then
             bufsWrite h_ bss
-        else allocaBytes size $ \ptr -> do
+         else allocaBytes size $ \ptr -> do
             go ptr bss
             let Just fd = cast haDevice :: Maybe FD
             RawIO.writeNonBlocking fd ptr size

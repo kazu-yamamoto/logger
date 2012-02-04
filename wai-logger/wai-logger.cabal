@@ -10,7 +10,10 @@ Category:               Web, Yesod
 Cabal-Version:          >= 1.6
 Build-Type:             Simple
 library
-  GHC-Options:          -Wall -fno-warn-unused-do-bind
+  if impl(ghc >= 6.12)
+    GHC-Options:        -Wall -fno-warn-unused-do-bind
+  else
+    GHC-Options:        -Wall
   Exposed-Modules:      Network.Wai.Logger
                         Network.Wai.Logger.Date
                         Network.Wai.Logger.Format
