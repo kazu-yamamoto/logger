@@ -1,4 +1,4 @@
-{-# LANGUAGE DoAndIfThenElse, BangPatterns #-}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 
 module Network.Wai.Logger.Date (
@@ -43,7 +43,7 @@ getDate (DateRef ref) = do
     let oldEt = unixTime cache
     if oldEt == newEt then
         return $ zonedDate cache
-    else do
+     else do
         newCache <- newDate newEt
         writeIORef ref newCache
         return $ zonedDate newCache
