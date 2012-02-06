@@ -1,5 +1,3 @@
-{-# LANGUAGE DoAndIfThenElse #-}
-
 module Network.Wai.Logger.Prefork.File where
 
 import Control.Applicative
@@ -85,7 +83,7 @@ fileLoggerController spec pids = forever $ do
         siz <- fromIntegral . fileSize <$> getFileStatus file
         if siz > log_file_size spec then
             return True
-        else
+          else
             return False
     sendSignal pid = signalProcess sigUSR1 pid `catch` ignore
     handler :: SomeException -> IO Bool
