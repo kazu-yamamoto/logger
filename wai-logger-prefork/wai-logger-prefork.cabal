@@ -9,14 +9,20 @@ Description:            A logging system for preforked WAI apps
 Category:               Web, Yesod
 Cabal-Version:          >= 1.6
 Build-Type:             Simple
-library
+
+Library
   GHC-Options:          -Wall -fno-warn-unused-do-bind
   Exposed-Modules:      Network.Wai.Logger.Prefork
   Other-Modules:        Network.Wai.Logger.Prefork.File
-                        Network.Wai.Logger.Prefork.Stdout
                         Network.Wai.Logger.Prefork.Types
-  Build-Depends:        base >= 4 && < 5, unix, bytestring,
-                        wai, fast-logger, wai-logger, http-types
+  Build-Depends:        base >= 4 && < 5
+                      , bytestring
+                      , fast-logger
+                      , http-types
+                      , unix
+                      , wai
+                      , wai-logger
+
 Source-Repository head
   Type:                 git
-  Location:             git://github.com/kazu-yamamoto/logger.git
+  Location:             git clone git://github.com/kazu-yamamoto/logger.git
