@@ -68,18 +68,18 @@ module Network.Wai.Logger (
     ApacheLogger
   , stdoutApacheLoggerInit
   , module Network.Wai.Logger.Format
-  , module Network.Wai.Logger.Date
   , module Network.Wai.Logger.Utils
+  , module System.Log.FastLogger.Date
   ) where
 
 import Control.Applicative
 import Network.HTTP.Types
 import Network.Wai
-import Network.Wai.Logger.Date
 import Network.Wai.Logger.Format
 import Network.Wai.Logger.Utils
 import System.IO
 import System.Log.FastLogger
+import System.Log.FastLogger.Date
 
 -- | Apache style logger for WAI
 type ApacheLogger = Request -> Status -> Maybe Integer -> IO ()
