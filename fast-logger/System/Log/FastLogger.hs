@@ -4,12 +4,13 @@
 
 module System.Log.FastLogger (
   -- * Initialization
-    initHandle
+    mkLogger
   -- * Logging
   , LogStr(..)
-  , hPutLogStr
-  -- * Builder
-  , hPutBuilder
+  , Logger
+  , loggerPutStr
+  , loggerPutBuilder
+  , loggerDateRef
   -- * File rotation
   , module System.Log.FastLogger.File
   ) where
@@ -34,11 +35,26 @@ import GHC.Num
 import GHC.Real
 import System.IO
 import System.Log.FastLogger.File
+import System.Log.FastLogger.Date
 
-{-| Setting a proper buffering to 'Handle'.
+data Logger = Logger
+    { loggerPutStr :: [LogStr] -> IO ()
+    , loggerDateRef :: DateRef
+    }
+
+{-| Creates a @Logger@ from the given handle.
 -}
-initHandle :: Handle -> IO ()
-initHandle hdl = hSetBuffering hdl (BlockBuffering (Just 4096))
+mkLogger :: Bool -- ^ automatically flush on each write?
+         -> Handle
+         -> IO Logger
+mkLogger autoFlush hdl = do
+  hSetBuffering hdl (BlockBuffering (Just 4096))
+  dateref <- dateInit
+  let put strs
+        | autoFlush = hPutLogStr hdl strs >> hFlush hdl
+        | otherwise = hPutLogStr hdl strs
+  return (Logger put dateref)
+
 
 {-| A date type to contain 'String' and 'ByteString'.
     This data is exported so that format can be defined.
@@ -109,5 +125,5 @@ copy' dst (x:xs) = do
     'initHandle' must be called once beforehand if this function is used.
     This would replace 'hPutLogStr' someday.
 -}
-hPutBuilder :: Handle -> Builder -> IO ()
-hPutBuilder hdl = BS.hPut hdl . toByteString
+loggerPutBuilder :: Logger -> Builder -> IO ()
+loggerPutBuilder logger = loggerPutStr logger . return . LB . toByteString
