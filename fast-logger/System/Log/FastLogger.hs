@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude, RecordWildCards #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 -- | Fast logging system to copy log data directly to Handle buffer.
 
@@ -6,11 +7,13 @@ module System.Log.FastLogger (
   -- * Initialization
     mkLogger
   -- * Logging
-  , LogStr(..)
   , Logger
   , loggerPutStr
   , loggerPutBuilder
   , loggerDateRef
+  -- * Strings
+  , LogStr(..)
+  , ToLogStr(..)
   -- * File rotation
   , module System.Log.FastLogger.File
   ) where
@@ -37,6 +40,12 @@ import System.IO
 import System.Log.FastLogger.File
 import System.Log.FastLogger.Date
 
+import qualified Data.Text as TS
+import qualified Data.Text.Encoding as TE
+import qualified Data.Text.Lazy as TL
+import qualified Data.ByteString as S
+import qualified Data.ByteString.Lazy as L
+
 data Logger = Logger
     { loggerPutStr :: [LogStr] -> IO ()
     , loggerDateRef :: DateRef
@@ -62,6 +71,13 @@ mkLogger autoFlush hdl = do
     it can be written directly to 'Handle' buffer.
 -}
 data LogStr = LS !String | LB !ByteString
+
+class ToLogStr a where toLogStr :: a -> LogStr
+instance ToLogStr [Char] where toLogStr = LS
+instance ToLogStr ByteString where toLogStr = LB
+instance ToLogStr L.ByteString where toLogStr = LB . S.concat . L.toChunks
+instance ToLogStr TS.Text where toLogStr = LB . TE.encodeUtf8
+instance ToLogStr TL.Text where toLogStr = LB . TE.encodeUtf8 . TL.toStrict
 
 {-| The 'hPut' function to copy a list of 'LogStr' to the buffer
     of 'Handle' directly.
