@@ -14,10 +14,14 @@ module System.Log.FastLogger (
   -- * Strings
   , LogStr(..)
   , ToLogStr(..)
+  -- * MonadLogging
+  , MonadLogging(..)
+  , LogLevel(..)
   -- * File rotation
   , module System.Log.FastLogger.File
   ) where
 
+import qualified Prelude
 import Blaze.ByteString.Builder
 import qualified Data.ByteString as BS
 import Data.ByteString.Internal (ByteString(..), c2w)
@@ -40,11 +44,36 @@ import System.IO
 import System.Log.FastLogger.File
 import System.Log.FastLogger.Date
 
+import Language.Haskell.TH.Syntax (Loc)
+
 import qualified Data.Text as TS
 import qualified Data.Text.Encoding as TE
 import qualified Data.Text.Lazy as TL
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as L
+
+import Data.Monoid (Monoid)
+
+import Data.Functor.Identity (Identity)
+import Control.Monad.ST (ST)
+import qualified Control.Monad.ST.Lazy as Lazy (ST)
+
+import Control.Monad.Trans.Identity ( IdentityT)
+import Control.Monad.Trans.List     ( ListT    )
+import Control.Monad.Trans.Maybe    ( MaybeT   )
+import Control.Monad.Trans.Error    ( ErrorT, Error)
+import Control.Monad.Trans.Reader   ( ReaderT  )
+import Control.Monad.Trans.Cont     ( ContT  )
+import Control.Monad.Trans.State    ( StateT   )
+import Control.Monad.Trans.Writer   ( WriterT  )
+import Control.Monad.Trans.RWS      ( RWST     )
+import Control.Monad.Trans.Resource ( ResourceT)
+
+import qualified Control.Monad.Trans.RWS.Strict    as Strict ( RWST   )
+import qualified Control.Monad.Trans.State.Strict  as Strict ( StateT )
+import qualified Control.Monad.Trans.Writer.Strict as Strict ( WriterT )
+
+import Control.Monad.Trans.Class (MonadTrans, lift)
 
 data Logger = Logger
     { loggerPutStr :: [LogStr] -> IO ()
@@ -143,3 +172,31 @@ copy' dst (x:xs) = do
 -}
 loggerPutBuilder :: Logger -> Builder -> IO ()
 loggerPutBuilder logger = loggerPutStr logger . return . LB . toByteString
+
+data LogLevel = LevelDebug | LevelInfo | LevelWarn | LevelError | LevelOther TS.Text
+    deriving (Eq, Prelude.Show, Prelude.Read, Ord)
+
+class Monad m => MonadLogging m where
+    monadLoggingLog :: ToLogStr msg => Loc -> LogLevel -> msg -> m ()
+
+instance MonadLogging IO          where monadLoggingLog _ _ _ = return ()
+instance MonadLogging Identity    where monadLoggingLog _ _ _ = return ()
+instance MonadLogging (ST s)      where monadLoggingLog _ _ _ = return ()
+instance MonadLogging (Lazy.ST s) where monadLoggingLog _ _ _ = return ()
+
+liftLog :: (MonadTrans t, MonadLogging m, ToLogStr msg) => Loc -> LogLevel -> msg -> t m ()
+liftLog a b c = lift $ monadLoggingLog a b c
+
+instance MonadLogging m => MonadLogging (IdentityT m) where monadLoggingLog = liftLog
+instance MonadLogging m => MonadLogging (ListT m) where monadLoggingLog = liftLog
+instance MonadLogging m => MonadLogging (MaybeT m) where monadLoggingLog = liftLog
+instance (MonadLogging m, Error e) => MonadLogging (ErrorT e m) where monadLoggingLog = liftLog
+instance MonadLogging m => MonadLogging (ReaderT r m) where monadLoggingLog = liftLog
+instance MonadLogging m => MonadLogging (ContT r m) where monadLoggingLog = liftLog
+instance MonadLogging m => MonadLogging (StateT s m) where monadLoggingLog = liftLog
+instance (MonadLogging m, Monoid w) => MonadLogging (WriterT w m) where monadLoggingLog = liftLog
+instance (MonadLogging m, Monoid w) => MonadLogging (RWST r w s m) where monadLoggingLog = liftLog
+instance MonadLogging m => MonadLogging (ResourceT m) where monadLoggingLog = liftLog
+instance MonadLogging m => MonadLogging (Strict.StateT s m) where monadLoggingLog = liftLog
+instance (MonadLogging m, Monoid w) => MonadLogging (Strict.WriterT w m) where monadLoggingLog = liftLog
+instance (MonadLogging m, Monoid w) => MonadLogging (Strict.RWST r w s m) where monadLoggingLog = liftLog
