@@ -219,7 +219,7 @@ instance (MonadLogging m, Monoid w) => MonadLogging (Strict.RWST r w s m) where 
 
 logTH :: LogLevel -> Q Exp
 logTH level =
-    [|\t -> monadLoggingLog $(qLocation >>= liftLoc) $(lift level) (t :: Text)|]
+    [|monadLoggingLog $(qLocation >>= liftLoc) $(lift level) . (id :: Text -> Text)|]
   where
     liftLoc :: Loc -> Q Exp
     liftLoc (Loc a b c d e) = [|Loc $(lift a) $(lift b) $(lift c) $(lift d) $(lift e)|]
