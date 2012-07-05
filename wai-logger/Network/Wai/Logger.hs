@@ -86,11 +86,11 @@ type ApacheLogger = Request -> Status -> Maybe Integer -> IO ()
 
 -- | Obtaining Apache style logger to stdout
 stdoutApacheLoggerInit :: IPAddrSource -> IO ApacheLogger
-stdoutApacheLoggerInit ipsrc = stdoutLogger ipsrc <$> dateInit
+stdoutApacheLoggerInit ipsrc = stdoutLogger ipsrc <$> dateInit <*> mkLogger False stdout
 
-stdoutLogger :: IPAddrSource -> DateRef -> ApacheLogger
-stdoutLogger ipsrc dateref req status msiz =
-    getDate dateref >>= hPutLogStr stdout . logmsg
+stdoutLogger :: IPAddrSource -> DateRef -> Logger -> ApacheLogger
+stdoutLogger ipsrc dateref logger req status msiz =
+    getDate dateref >>= loggerPutStr logger . logmsg
   where
     logmsg date = apacheFormat ipsrc date req status msiz
 
