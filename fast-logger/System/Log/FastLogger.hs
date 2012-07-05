@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude, RecordWildCards #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 -- | Fast logging system to copy log data directly to Handle buffer.
 
@@ -17,6 +18,12 @@ module System.Log.FastLogger (
   -- * MonadLogging
   , MonadLogging(..)
   , LogLevel(..)
+  -- * TH logging
+  , logDebug
+  , logInfo
+  , logWarn
+  , logError
+  , logOther
   -- * File rotation
   , module System.Log.FastLogger.File
   ) where
@@ -44,7 +51,8 @@ import System.IO
 import System.Log.FastLogger.File
 import System.Log.FastLogger.Date
 
-import Language.Haskell.TH.Syntax (Loc)
+import Language.Haskell.TH.Syntax (Loc (Loc), Lift (lift), Q, Exp, qLocation)
+import Data.Text (Text)
 
 import qualified Data.Text as TS
 import qualified Data.Text.Encoding as TE
@@ -73,7 +81,8 @@ import qualified Control.Monad.Trans.RWS.Strict    as Strict ( RWST   )
 import qualified Control.Monad.Trans.State.Strict  as Strict ( StateT )
 import qualified Control.Monad.Trans.Writer.Strict as Strict ( WriterT )
 
-import Control.Monad.Trans.Class (MonadTrans, lift)
+import Control.Monad.Trans.Class (MonadTrans)
+import qualified Control.Monad.Trans.Class as Trans
 
 data Logger = Logger
     { loggerPutStr :: [LogStr] -> IO ()
@@ -176,6 +185,13 @@ loggerPutBuilder logger = loggerPutStr logger . return . LB . toByteString
 data LogLevel = LevelDebug | LevelInfo | LevelWarn | LevelError | LevelOther TS.Text
     deriving (Eq, Prelude.Show, Prelude.Read, Ord)
 
+instance Lift LogLevel where
+    lift LevelDebug = [|LevelDebug|]
+    lift LevelInfo = [|LevelInfo|]
+    lift LevelWarn = [|LevelWarn|]
+    lift LevelError = [|LevelError|]
+    lift (LevelOther x) = [|LevelOther $ TS.pack $(lift $ TS.unpack x)|]
+
 class Monad m => MonadLogging m where
     monadLoggingLog :: ToLogStr msg => Loc -> LogLevel -> msg -> m ()
 
@@ -185,7 +201,7 @@ instance MonadLogging (ST s)      where monadLoggingLog _ _ _ = return ()
 instance MonadLogging (Lazy.ST s) where monadLoggingLog _ _ _ = return ()
 
 liftLog :: (MonadTrans t, MonadLogging m, ToLogStr msg) => Loc -> LogLevel -> msg -> t m ()
-liftLog a b c = lift $ monadLoggingLog a b c
+liftLog a b c = Trans.lift $ monadLoggingLog a b c
 
 instance MonadLogging m => MonadLogging (IdentityT m) where monadLoggingLog = liftLog
 instance MonadLogging m => MonadLogging (ListT m) where monadLoggingLog = liftLog
@@ -200,3 +216,32 @@ instance MonadLogging m => MonadLogging (ResourceT m) where monadLoggingLog = li
 instance MonadLogging m => MonadLogging (Strict.StateT s m) where monadLoggingLog = liftLog
 instance (MonadLogging m, Monoid w) => MonadLogging (Strict.WriterT w m) where monadLoggingLog = liftLog
 instance (MonadLogging m, Monoid w) => MonadLogging (Strict.RWST r w s m) where monadLoggingLog = liftLog
+
+logTH :: LogLevel -> Q Exp
+logTH level =
+    [|monadLoggingLog $(qLocation >>= liftLoc) $(lift level)|]
+  where
+    liftLoc :: Loc -> Q Exp
+    liftLoc (Loc a b c d e) = [|Loc $(lift a) $(lift b) $(lift c) $(lift d) $(lift e)|]
+
+-- | Generates a function that takes a 'Text' and logs a 'LevelDebug' message. Usage:
+--
+-- > $(logDebug) "This is a debug log message"
+logDebug :: Q Exp
+logDebug = logTH LevelDebug
+
+-- | See 'logDebug'
+logInfo :: Q Exp
+logInfo = logTH LevelInfo
+-- | See 'logDebug'
+logWarn :: Q Exp
+logWarn = logTH LevelWarn
+-- | See 'logDebug'
+logError :: Q Exp
+logError = logTH LevelError
+
+-- | Generates a function that takes a 'Text' and logs a 'LevelOther' message. Usage:
+--
+-- > $(logOther "My new level") "This is a log message"
+logOther :: Text -> Q Exp
+logOther = logTH . LevelOther
