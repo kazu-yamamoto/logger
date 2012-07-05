@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Control.Monad.Logger
-    ( -- * MonadLogging
-      MonadLogging(..)
+    ( -- * MonadLogger
+      MonadLogger(..)
     , LogLevel(..)
     -- * TH logging
     , logDebug
@@ -50,34 +50,34 @@ instance Lift LogLevel where
     lift LevelError = [|LevelError|]
     lift (LevelOther x) = [|LevelOther $ pack $(lift $ unpack x)|]
 
-class Monad m => MonadLogging m where
-    monadLoggingLog :: ToLogStr msg => Loc -> LogLevel -> msg -> m ()
+class Monad m => MonadLogger m where
+    monadLoggerLog :: ToLogStr msg => Loc -> LogLevel -> msg -> m ()
 
-instance MonadLogging IO          where monadLoggingLog _ _ _ = return ()
-instance MonadLogging Identity    where monadLoggingLog _ _ _ = return ()
-instance MonadLogging (ST s)      where monadLoggingLog _ _ _ = return ()
-instance MonadLogging (Lazy.ST s) where monadLoggingLog _ _ _ = return ()
+instance MonadLogger IO          where monadLoggerLog _ _ _ = return ()
+instance MonadLogger Identity    where monadLoggerLog _ _ _ = return ()
+instance MonadLogger (ST s)      where monadLoggerLog _ _ _ = return ()
+instance MonadLogger (Lazy.ST s) where monadLoggerLog _ _ _ = return ()
 
-liftLog :: (MonadTrans t, MonadLogging m, ToLogStr msg) => Loc -> LogLevel -> msg -> t m ()
-liftLog a b c = Trans.lift $ monadLoggingLog a b c
+liftLog :: (MonadTrans t, MonadLogger m, ToLogStr msg) => Loc -> LogLevel -> msg -> t m ()
+liftLog a b c = Trans.lift $ monadLoggerLog a b c
 
-instance MonadLogging m => MonadLogging (IdentityT m) where monadLoggingLog = liftLog
-instance MonadLogging m => MonadLogging (ListT m) where monadLoggingLog = liftLog
-instance MonadLogging m => MonadLogging (MaybeT m) where monadLoggingLog = liftLog
-instance (MonadLogging m, Error e) => MonadLogging (ErrorT e m) where monadLoggingLog = liftLog
-instance MonadLogging m => MonadLogging (ReaderT r m) where monadLoggingLog = liftLog
-instance MonadLogging m => MonadLogging (ContT r m) where monadLoggingLog = liftLog
-instance MonadLogging m => MonadLogging (StateT s m) where monadLoggingLog = liftLog
-instance (MonadLogging m, Monoid w) => MonadLogging (WriterT w m) where monadLoggingLog = liftLog
-instance (MonadLogging m, Monoid w) => MonadLogging (RWST r w s m) where monadLoggingLog = liftLog
-instance MonadLogging m => MonadLogging (ResourceT m) where monadLoggingLog = liftLog
-instance MonadLogging m => MonadLogging (Strict.StateT s m) where monadLoggingLog = liftLog
-instance (MonadLogging m, Monoid w) => MonadLogging (Strict.WriterT w m) where monadLoggingLog = liftLog
-instance (MonadLogging m, Monoid w) => MonadLogging (Strict.RWST r w s m) where monadLoggingLog = liftLog
+instance MonadLogger m => MonadLogger (IdentityT m) where monadLoggerLog = liftLog
+instance MonadLogger m => MonadLogger (ListT m) where monadLoggerLog = liftLog
+instance MonadLogger m => MonadLogger (MaybeT m) where monadLoggerLog = liftLog
+instance (MonadLogger m, Error e) => MonadLogger (ErrorT e m) where monadLoggerLog = liftLog
+instance MonadLogger m => MonadLogger (ReaderT r m) where monadLoggerLog = liftLog
+instance MonadLogger m => MonadLogger (ContT r m) where monadLoggerLog = liftLog
+instance MonadLogger m => MonadLogger (StateT s m) where monadLoggerLog = liftLog
+instance (MonadLogger m, Monoid w) => MonadLogger (WriterT w m) where monadLoggerLog = liftLog
+instance (MonadLogger m, Monoid w) => MonadLogger (RWST r w s m) where monadLoggerLog = liftLog
+instance MonadLogger m => MonadLogger (ResourceT m) where monadLoggerLog = liftLog
+instance MonadLogger m => MonadLogger (Strict.StateT s m) where monadLoggerLog = liftLog
+instance (MonadLogger m, Monoid w) => MonadLogger (Strict.WriterT w m) where monadLoggerLog = liftLog
+instance (MonadLogger m, Monoid w) => MonadLogger (Strict.RWST r w s m) where monadLoggerLog = liftLog
 
 logTH :: LogLevel -> Q Exp
 logTH level =
-    [|monadLoggingLog $(qLocation >>= liftLoc) $(lift level) . (id :: Text -> Text)|]
+    [|monadLoggerLog $(qLocation >>= liftLoc) $(lift level) . (id :: Text -> Text)|]
   where
     liftLoc :: Loc -> Q Exp
     liftLoc (Loc a b c d e) = [|Loc $(lift a) $(lift b) $(lift c) $(lift d) $(lift e)|]
