@@ -1,19 +1,24 @@
 {-# LANGUAGE NoImplicitPrelude, RecordWildCards #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 -- | Fast logging system to copy log data directly to Handle buffer.
 
 module System.Log.FastLogger (
   -- * Initialization
-    initHandle
+    mkLogger
   -- * Logging
+  , Logger
+  , loggerPutStr
+  , loggerPutBuilder
+  , loggerDateRef
+  -- * Strings
   , LogStr(..)
-  , hPutLogStr
-  -- * Builder
-  , hPutBuilder
+  , ToLogStr(..)
   -- * File rotation
   , module System.Log.FastLogger.File
   ) where
 
+import qualified Prelude
 import Blaze.ByteString.Builder
 import qualified Data.ByteString as BS
 import Data.ByteString.Internal (ByteString(..), c2w)
@@ -34,11 +39,32 @@ import GHC.Num
 import GHC.Real
 import System.IO
 import System.Log.FastLogger.File
+import System.Log.FastLogger.Date
 
-{-| Setting a proper buffering to 'Handle'.
+import qualified Data.Text as TS
+import qualified Data.Text.Encoding as TE
+import qualified Data.Text.Lazy as TL
+import qualified Data.ByteString as S
+import qualified Data.ByteString.Lazy as L
+
+data Logger = Logger
+    { loggerPutStr :: [LogStr] -> IO ()
+    , loggerDateRef :: DateRef
+    }
+
+{-| Creates a @Logger@ from the given handle.
 -}
-initHandle :: Handle -> IO ()
-initHandle hdl = hSetBuffering hdl (BlockBuffering (Just 4096))
+mkLogger :: Bool -- ^ automatically flush on each write?
+         -> Handle
+         -> IO Logger
+mkLogger autoFlush hdl = do
+  hSetBuffering hdl (BlockBuffering (Just 4096))
+  dateref <- dateInit
+  let put strs
+        | autoFlush = hPutLogStr hdl strs >> hFlush hdl
+        | otherwise = hPutLogStr hdl strs
+  return (Logger put dateref)
+
 
 {-| A date type to contain 'String' and 'ByteString'.
     This data is exported so that format can be defined.
@@ -46,6 +72,13 @@ initHandle hdl = hSetBuffering hdl (BlockBuffering (Just 4096))
     it can be written directly to 'Handle' buffer.
 -}
 data LogStr = LS !String | LB !ByteString
+
+class ToLogStr a where toLogStr :: a -> LogStr
+instance ToLogStr [Char] where toLogStr = LS
+instance ToLogStr ByteString where toLogStr = LB
+instance ToLogStr L.ByteString where toLogStr = LB . S.concat . L.toChunks
+instance ToLogStr TS.Text where toLogStr = LB . TE.encodeUtf8
+instance ToLogStr TL.Text where toLogStr = LB . TE.encodeUtf8 . TL.toStrict
 
 {-| The 'hPut' function to copy a list of 'LogStr' to the buffer
     of 'Handle' directly.
@@ -109,5 +142,5 @@ copy' dst (x:xs) = do
     'initHandle' must be called once beforehand if this function is used.
     This would replace 'hPutLogStr' someday.
 -}
-hPutBuilder :: Handle -> Builder -> IO ()
-hPutBuilder hdl = BS.hPut hdl . toByteString
+loggerPutBuilder :: Logger -> Builder -> IO ()
+loggerPutBuilder logger = loggerPutStr logger . return . LB . toByteString
