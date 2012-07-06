@@ -1,5 +1,5 @@
 Name:                   wai-logger-prefork
-Version:                0.1.3
+Version:                0.2.0
 Author:                 Kazu Yamamoto <kazu@iij.ad.jp>
 Maintainer:             Kazu Yamamoto <kazu@iij.ad.jp>
 License:                BSD3
@@ -21,7 +21,7 @@ Library
                       , http-types
                       , unix
                       , wai
-                      , wai-logger
+                      , wai-logger >= 0.2 && < 0.3
 
 Source-Repository head
   Type:                 git

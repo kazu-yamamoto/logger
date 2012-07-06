@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP #-}
 
-module Network.Wai.Logger.Date (
+module System.Log.FastLogger.Date (
     ZonedDate
   , DateRef
   , dateInit
