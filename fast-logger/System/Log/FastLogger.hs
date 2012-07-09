@@ -41,7 +41,6 @@ import GHC.IO.Handle.Types
 import GHC.IORef
 import GHC.Num
 import GHC.Real
-import qualified Prelude
 import System.IO
 import System.Log.FastLogger.Date
 import System.Log.FastLogger.File
