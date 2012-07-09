@@ -4,12 +4,12 @@
 -- | Fast logging system to copy log data directly to Handle buffer.
 
 module System.Log.FastLogger (
-  -- * Initialization
-    mkLogger
-  , Logger
+  -- * Logger
+    Logger
   , loggerAutoFlush
   , loggerHandle
   , loggerDateRef
+  , mkLogger
   -- * Logging
   , loggerPutStr
   , loggerPutBuilder
@@ -53,9 +53,16 @@ import qualified Data.Text.Lazy as TL
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as L
 
+-- | Abstract data type for logger.
+-- To obtain inside data or to create a new one from another,
+-- use selectors.
+-- If 'Handle' is associated with a file, 'AppendMode' must be used.
 data Logger = Logger {
+    -- | Selector for autoFlush.
     loggerAutoFlush :: Bool
+    -- | Selector for 'Handle'.
   , loggerHandle    :: Handle
+    -- | Selector for 'DateRef'.
   , loggerDateRef   :: DateRef
   }
 
@@ -63,10 +70,11 @@ logBufSize :: Int
 logBufSize = 4096
 
 -- | Setting a proper buffering to 'Handle'.
+-- You don't have to call this function before you call 'mkLogger'.
 initHandle :: Handle -> IO ()
 initHandle hdl = hSetBuffering hdl (BlockBuffering (Just logBufSize))
 
-{-| Creates a @Logger@ from the given handle.
+{-| Creates a 'Logger' from the given handle.
 -}
 mkLogger :: Bool -- ^ automatically flush on each write?
          -> Handle
@@ -142,8 +150,7 @@ copy' dst (x:xs) = do
     copy' (dst `plusPtr` 1) xs
 
 -- | The 'hPut' function to copy a list of 'LogStr' to the buffer
--- of 'Handle' directly.
--- If 'Handle' is associated with a file, 'AppendMode' must be used.
+-- of 'Handle' of 'Logger' directly.
 loggerPutStr :: Logger -> [LogStr] -> IO ()
 loggerPutStr logger strs
   | autoflush = hPutLogStr hdl strs >> hFlush hdl
@@ -153,12 +160,11 @@ loggerPutStr logger strs
     hdl = loggerHandle logger
 
 -- | The 'hPut' function directory to copy 'Builder' to the buffer.
--- If 'Handle' is associated with a file, 'AppendMode' must be used.
 -- The current implementation is inefficient at this moment.
--- 'initHandle' must be called once beforehand if this function is used.
 -- This would replace 'loggerPutStr' someday.
 loggerPutBuilder :: Logger -> Builder -> IO ()
 loggerPutBuilder logger = loggerPutStr logger . return . LB . toByteString
 
+-- | Flushing the buffer of 'Handle' of 'Logger'.
 loggerFlush :: Logger -> IO ()
 loggerFlush logger = hFlush $ loggerHandle logger
