@@ -7,6 +7,7 @@ module System.Log.FastLogger (
   -- * Logger
     Logger
   , mkLogger
+  , renewLogger
   -- * Logging
   , loggerPutStr
   , loggerPutBuilder
@@ -16,8 +17,6 @@ module System.Log.FastLogger (
   , ToLogStr(..)
   -- * Misc functions
   , loggerDate
-  , loggerHandle
-  , initHandle
   -- * File rotation
   , module System.Log.FastLogger.File
   ) where
@@ -52,14 +51,10 @@ import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as L
 
 -- | Abstract data type for logger.
--- To obtain inside data or to create a new one from another,
--- use selectors.
 -- If 'Handle' is associated with a file, 'AppendMode' must be used.
 data Logger = Logger {
-    -- | Selector for autoFlush.
-    loggerAutoFlush :: Bool
     -- | Selector for 'Handle'.
-  , loggerHandle    :: Handle
+    loggerHandle    :: Handle
     -- | Selector for 'DateRef'.
   , loggerDateRef   :: DateRef
   }
@@ -67,25 +62,35 @@ data Logger = Logger {
 logBufSize :: Int
 logBufSize = 4096
 
--- | Setting a proper buffering to 'Handle'.
--- You don't have to call this function before you call 'mkLogger'.
-initHandle :: Handle -> IO ()
-initHandle hdl = hSetBuffering hdl (BlockBuffering (Just logBufSize))
-
-{-| Creates a 'Logger' from the given handle.
--}
-mkLogger :: Bool -- ^ automatically flush on each write?
+-- | Creates a 'Logger' from the given handle.
+mkLogger :: Bool -- ^ automatically flush on each loggerPut?
          -> Handle
          -> IO Logger
 mkLogger autoFlush hdl = do
-    initHandle hdl
-    Logger autoFlush hdl <$> dateInit
+    if autoFlush then
+        hSetBuffering hdl LineBuffering
+      else
+        hSetBuffering hdl (BlockBuffering (Just logBufSize))
+    Logger hdl <$> dateInit
 
-{-| A date type to contain 'String' and 'ByteString'.
-    This data is exported so that format can be defined.
-    This would be replaced with 'Builder' someday when
-    it can be written directly to 'Handle' buffer.
--}
+-- | Creates a new 'Logger' from old one by replacing 'Handle'
+-- The 'Handle' inside the old 'Logger' is closed.
+renewLogger :: Logger -> Handle -> IO Logger
+renewLogger logger newhdl = do
+    let oldhdl = loggerHandle logger
+    buffering <- hGetBuffering oldhdl
+    hFlush oldhdl
+    hClose oldhdl
+    case buffering of
+        b@(BlockBuffering _) -> hSetBuffering newhdl b
+        LineBuffering        -> hSetBuffering newhdl LineBuffering
+        _                    -> return ()
+    return $ logger { loggerHandle = newhdl }
+
+-- | A date type to contain 'String' and 'ByteString'.
+-- This data is exported so that format can be defined.
+-- This would be replaced with 'Builder' someday when
+-- it can be written directly to 'Handle' buffer.
 data LogStr = LS !String | LB !ByteString
 
 class ToLogStr a where toLogStr :: a -> LogStr
@@ -150,12 +155,7 @@ copy' dst (x:xs) = do
 -- | The 'hPut' function to copy a list of 'LogStr' to the buffer
 -- of 'Handle' of 'Logger' directly.
 loggerPutStr :: Logger -> [LogStr] -> IO ()
-loggerPutStr logger strs
-  | autoflush = hPutLogStr hdl strs >> hFlush hdl
-  | otherwise = hPutLogStr hdl strs
-  where
-    autoflush = loggerAutoFlush logger
-    hdl = loggerHandle logger
+loggerPutStr logger strs = hPutLogStr (loggerHandle logger) strs
 
 -- | The 'hPut' function directory to copy 'Builder' to the buffer.
 -- The current implementation is inefficient at this moment.
@@ -167,5 +167,6 @@ loggerPutBuilder logger = loggerPutStr logger . return . LB . toByteString
 loggerFlush :: Logger -> IO ()
 loggerFlush logger = hFlush $ loggerHandle logger
 
+-- | Obtaining date string from 'Logger'.
 loggerDate :: Logger -> IO ZonedDate
 loggerDate logger = getDate $ loggerDateRef logger

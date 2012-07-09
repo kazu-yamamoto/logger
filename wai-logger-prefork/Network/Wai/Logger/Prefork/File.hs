@@ -40,19 +40,12 @@ fileLoggerInit ipsrc spec = do
  just use BlockBuffering.
 -}
 open :: FileLogSpec -> IO Handle
-open spec = do
-    hdl <- openFile (log_file spec) AppendMode
-    initHandle hdl
-    return hdl
+open spec = openFile (log_file spec) AppendMode
 
 reopen :: FileLogSpec -> LoggerRef -> IO ()
 reopen spec logref = do
     oldlogger <- getLogger logref
-    loggerFlush oldlogger
-    let oldhdl = loggerHandle oldlogger
-    hClose oldhdl
-    newhdl <- open spec
-    let newlogger = oldlogger { loggerHandle = newhdl }
+    newlogger <- open spec >>= renewLogger oldlogger
     setLogger logref newlogger
 
 ----------------------------------------------------------------
