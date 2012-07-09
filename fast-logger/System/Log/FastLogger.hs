@@ -122,7 +122,7 @@ bufsWrite h_@Handle__{..} bss = do
          else allocaBytes size $ \ptr -> do
             go ptr bss
             let Just fd = cast haDevice :: Maybe FD
-            RawIO.writeNonBlocking fd ptr size
+            _ <- RawIO.writeNonBlocking fd ptr size
             return ()
   where
     len = foldl' (\x y -> x + getLength y) 0 bss
@@ -140,7 +140,7 @@ bufsWrite h_@Handle__{..} bss = do
 copy :: Ptr Word8 -> ByteString -> IO (Ptr Word8)
 copy dst (PS ptr off len) = withForeignPtr ptr $ \s -> do
     let src = s `plusPtr` off
-    memcpy dst src (fromIntegral len)
+    _ <- memcpy dst src (fromIntegral len)
     return (dst `plusPtr` len)
 
 copy' :: Ptr Word8 -> String -> IO (Ptr Word8)
