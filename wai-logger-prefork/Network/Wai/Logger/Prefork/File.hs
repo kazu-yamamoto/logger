@@ -29,8 +29,8 @@ fileLoggerInit ipsrc spec = do
     hdl <- open spec
     logger <- mkLogger False hdl
     logref <- LoggerRef <$> newIORef logger
-    forkIO $ fileFlusher logref
-    installHandler sigUSR1 (Catch $ reopen spec logref) Nothing
+    _ <- forkIO $ fileFlusher logref
+    _ <- installHandler sigUSR1 (Catch $ reopen spec logref) Nothing
     return $ fileLogger ipsrc logref
 
 {-
