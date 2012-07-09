@@ -6,20 +6,25 @@
 module System.Log.FastLogger (
   -- * Initialization
     mkLogger
-  -- * Logging
   , Logger
+  , loggerAutoFlush
+  , loggerHandle
+  , loggerDateRef
+  -- * Logging
   , loggerPutStr
   , loggerPutBuilder
-  , loggerDateRef
+  , loggerFlush
   -- * Strings
   , LogStr(..)
   , ToLogStr(..)
   -- * File rotation
   , module System.Log.FastLogger.File
+  -- * Low level functions
+  , initHandle
   ) where
 
-import qualified Prelude
 import Blaze.ByteString.Builder
+import Control.Applicative
 import qualified Data.ByteString as BS
 import Data.ByteString.Internal (ByteString(..), c2w)
 import Data.List
@@ -37,9 +42,10 @@ import GHC.IO.Handle.Types
 import GHC.IORef
 import GHC.Num
 import GHC.Real
+import qualified Prelude
 import System.IO
-import System.Log.FastLogger.File
 import System.Log.FastLogger.Date
+import System.Log.FastLogger.File
 
 import qualified Data.Text as TS
 import qualified Data.Text.Encoding as TE
@@ -47,10 +53,18 @@ import qualified Data.Text.Lazy as TL
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as L
 
-data Logger = Logger
-    { loggerPutStr :: [LogStr] -> IO ()
-    , loggerDateRef :: DateRef
-    }
+data Logger = Logger {
+    loggerAutoFlush :: Bool
+  , loggerHandle    :: Handle
+  , loggerDateRef   :: DateRef
+  }
+
+logBufSize :: Int
+logBufSize = 4096
+
+-- | Setting a proper buffering to 'Handle'.
+initHandle :: Handle -> IO ()
+initHandle hdl = hSetBuffering hdl (BlockBuffering (Just logBufSize))
 
 {-| Creates a @Logger@ from the given handle.
 -}
@@ -58,13 +72,8 @@ mkLogger :: Bool -- ^ automatically flush on each write?
          -> Handle
          -> IO Logger
 mkLogger autoFlush hdl = do
-  hSetBuffering hdl (BlockBuffering (Just 4096))
-  dateref <- dateInit
-  let put strs
-        | autoFlush = hPutLogStr hdl strs >> hFlush hdl
-        | otherwise = hPutLogStr hdl strs
-  return (Logger put dateref)
-
+    initHandle hdl
+    Logger autoFlush hdl <$> dateInit
 
 {-| A date type to contain 'String' and 'ByteString'.
     This data is exported so that format can be defined.
@@ -80,10 +89,6 @@ instance ToLogStr L.ByteString where toLogStr = LB . S.concat . L.toChunks
 instance ToLogStr TS.Text where toLogStr = LB . TE.encodeUtf8
 instance ToLogStr TL.Text where toLogStr = LB . TE.encodeUtf8 . TL.toStrict
 
-{-| The 'hPut' function to copy a list of 'LogStr' to the buffer
-    of 'Handle' directly.
-    If 'Handle' is associated with a file, 'AppendMode' must be used.
--}
 hPutLogStr :: Handle -> [LogStr] -> IO ()
 hPutLogStr handle bss =
   wantWritableHandle "hPutLogStr" handle $ \h_ -> bufsWrite h_ bss
@@ -136,11 +141,24 @@ copy' dst (x:xs) = do
     poke dst (c2w x)
     copy' (dst `plusPtr` 1) xs
 
-{-| The 'hPut' function directory to copy 'Builder' to the buffer.
-    If 'Handle' is associated with a file, 'AppendMode' must be used.
-    The current implementation is inefficient at this moment.
-    'initHandle' must be called once beforehand if this function is used.
-    This would replace 'hPutLogStr' someday.
--}
+-- | The 'hPut' function to copy a list of 'LogStr' to the buffer
+-- of 'Handle' directly.
+-- If 'Handle' is associated with a file, 'AppendMode' must be used.
+loggerPutStr :: Logger -> [LogStr] -> IO ()
+loggerPutStr logger strs
+  | autoflush = hPutLogStr hdl strs >> hFlush hdl
+  | otherwise = hPutLogStr hdl strs
+  where
+    autoflush = loggerAutoFlush logger
+    hdl = loggerHandle logger
+
+-- | The 'hPut' function directory to copy 'Builder' to the buffer.
+-- If 'Handle' is associated with a file, 'AppendMode' must be used.
+-- The current implementation is inefficient at this moment.
+-- 'initHandle' must be called once beforehand if this function is used.
+-- This would replace 'loggerPutStr' someday.
 loggerPutBuilder :: Logger -> Builder -> IO ()
 loggerPutBuilder logger = loggerPutStr logger . return . LB . toByteString
+
+loggerFlush :: Logger -> IO ()
+loggerFlush logger = hFlush $ loggerHandle logger

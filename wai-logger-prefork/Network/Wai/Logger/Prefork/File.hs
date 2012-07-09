@@ -14,26 +14,24 @@ import System.Posix
 
 ----------------------------------------------------------------
 
-logBufSize :: Int
-logBufSize = 4096
+newtype LoggerRef = LoggerRef (IORef Logger)
 
-----------------------------------------------------------------
+getLogger :: LoggerRef -> IO Logger
+getLogger (LoggerRef ref) = readIORef ref
 
-newtype HandleRef = HandleRef (IORef Handle)
-
-getHandle :: HandleRef -> IO Handle
-getHandle (HandleRef ref) = readIORef ref
+setLogger :: LoggerRef -> Logger -> IO ()
+setLogger (LoggerRef ref) logger = writeIORef ref logger
 
 ----------------------------------------------------------------
 
 fileLoggerInit :: IPAddrSource -> FileLogSpec -> IO ApacheLogger
 fileLoggerInit ipsrc spec = do
     hdl <- open spec
-    hdlref <- HandleRef <$> newIORef hdl
-    forkIO $ fileFlusher hdlref
-    dateref <- dateInit
-    installHandler sigUSR1 (Catch $ reopen spec hdlref) Nothing
-    return $ fileLogger ipsrc dateref hdlref
+    logger <- mkLogger False hdl
+    logref <- LoggerRef <$> newIORef logger
+    forkIO $ fileFlusher logref
+    installHandler sigUSR1 (Catch $ reopen spec logref) Nothing
+    return $ fileLogger ipsrc logref
 
 {-
  For BlockBuffering, hPut flushes the buffer before writing
@@ -43,30 +41,32 @@ fileLoggerInit ipsrc spec = do
 -}
 open :: FileLogSpec -> IO Handle
 open spec = do
-    hdl <- openFile file AppendMode
-    hSetBuffering hdl (BlockBuffering (Just logBufSize))
+    hdl <- openFile (log_file spec) AppendMode
+    initHandle hdl
     return hdl
-  where
-    file = log_file spec
 
-reopen :: FileLogSpec -> HandleRef -> IO ()
-reopen spec (HandleRef ref) = do
-    oldhdl <- readIORef ref
-    open spec >>= writeIORef ref
+reopen :: FileLogSpec -> LoggerRef -> IO ()
+reopen spec logref = do
+    oldlogger <- getLogger logref
+    loggerFlush oldlogger
+    let oldhdl = loggerHandle oldlogger
     hClose oldhdl
+    newhdl <- open spec
+    let newlogger = oldlogger { loggerHandle = newhdl }
+    setLogger logref newlogger
 
 ----------------------------------------------------------------
 
-fileLogger :: IPAddrSource -> DateRef -> HandleRef -> ApacheLogger
-fileLogger ipsrc dateref hdlref req status msiz = do
-    date <- getDate dateref
-    hdl <- getHandle hdlref
-    hPutLogStr hdl $ apacheFormat ipsrc date req status msiz
+fileLogger :: IPAddrSource -> LoggerRef -> ApacheLogger
+fileLogger ipsrc logref req status msiz = do
+    logger <- getLogger logref
+    date <- getDate $ loggerDateRef logger
+    loggerPutStr logger $ apacheFormat ipsrc date req status msiz
 
-fileFlusher :: HandleRef -> IO ()
-fileFlusher hdlref = forever $ do
+fileFlusher :: LoggerRef -> IO ()
+fileFlusher logref = forever $ do
     threadDelay 10000000
-    getHandle hdlref >>= hFlush
+    getLogger logref >>= loggerFlush
 
 ----------------------------------------------------------------
 
