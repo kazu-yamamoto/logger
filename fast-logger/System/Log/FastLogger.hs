@@ -6,9 +6,6 @@
 module System.Log.FastLogger (
   -- * Logger
     Logger
-  , loggerAutoFlush
-  , loggerHandle
-  , loggerDateRef
   , mkLogger
   -- * Logging
   , loggerPutStr
@@ -17,10 +14,12 @@ module System.Log.FastLogger (
   -- * Strings
   , LogStr(..)
   , ToLogStr(..)
+  -- * Misc functions
+  , loggerDate
+  , loggerHandle
+  , initHandle
   -- * File rotation
   , module System.Log.FastLogger.File
-  -- * Low level functions
-  , initHandle
   ) where
 
 import Blaze.ByteString.Builder
@@ -168,3 +167,6 @@ loggerPutBuilder logger = loggerPutStr logger . return . LB . toByteString
 -- | Flushing the buffer of 'Handle' of 'Logger'.
 loggerFlush :: Logger -> IO ()
 loggerFlush logger = hFlush $ loggerHandle logger
+
+loggerDate :: Logger -> IO ZonedDate
+loggerDate logger = getDate $ loggerDateRef logger

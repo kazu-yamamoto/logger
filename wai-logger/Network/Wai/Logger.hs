@@ -2,7 +2,7 @@
 
 -- | Logging system for WAI applications.
 --
--- High level sample code:
+-- Sample code:
 --
 -- > {-# LANGUAGE OverloadedStrings #-}
 -- > module Main where
@@ -31,38 +31,6 @@
 -- >         [("Content-Type", "text/plain")
 -- >         ,("Content-Length", pack (show len))]
 -- >         $ fromByteString "PONG"
---
--- Low level sample code:
---
--- > {-# LANGUAGE OverloadedStrings #-}
--- > module Main where
--- >
--- > import Blaze.ByteString.Builder (fromByteString)
--- > import Control.Monad.IO.Class (liftIO)
--- > import Data.ByteString.Char8
--- > import Network.HTTP.Types (status200)
--- > import Network.Wai
--- > import Network.Wai.Handler.Warp
--- > import Network.Wai.Logger
--- > import System.IO
--- > import System.Log.FastLogger
--- >
--- > main :: IO ()
--- > main = do
--- >     dref <- dateInit
--- >     run 3000 $ logapp dref
--- >
--- > logapp :: DateRef -> Application
--- > logapp dref req = do
--- >     date <- liftIO $ getDate dref
--- >     let status = status200
--- >         len = 4
--- >     liftIO $ hPutLogStr stdout $ apacheFormat FromSocket date req status (Just len)
--- >     liftIO $ hFlush stdout
--- >     return $ ResponseBuilder status
--- >         [("Content-Type", "text/plain")
--- >         ,("Content-Length", pack (show len))]
--- >         $ fromByteString "PONG"
 
 module Network.Wai.Logger (
     ApacheLogger
@@ -86,11 +54,11 @@ type ApacheLogger = Request -> Status -> Maybe Integer -> IO ()
 
 -- | Obtaining Apache style logger to stdout
 stdoutApacheLoggerInit :: IPAddrSource -> IO ApacheLogger
-stdoutApacheLoggerInit ipsrc = stdoutLogger ipsrc <$> dateInit <*> mkLogger False stdout
+stdoutApacheLoggerInit ipsrc = stdoutLogger ipsrc <$> mkLogger False stdout
 
-stdoutLogger :: IPAddrSource -> DateRef -> Logger -> ApacheLogger
-stdoutLogger ipsrc dateref logger req status msiz =
-    getDate dateref >>= loggerPutStr logger . logmsg
+stdoutLogger :: IPAddrSource -> Logger -> ApacheLogger
+stdoutLogger ipsrc logger req status msiz = do
+    date <- loggerDate logger
+    loggerPutStr logger $ logmsg date
   where
     logmsg date = apacheFormat ipsrc date req status msiz
-

@@ -60,7 +60,7 @@ reopen spec logref = do
 fileLogger :: IPAddrSource -> LoggerRef -> ApacheLogger
 fileLogger ipsrc logref req status msiz = do
     logger <- getLogger logref
-    date <- getDate $ loggerDateRef logger
+    date <- loggerDate logger
     loggerPutStr logger $ apacheFormat ipsrc date req status msiz
 
 fileFlusher :: LoggerRef -> IO ()
