@@ -9,7 +9,7 @@ module Network.Wai.Logger.Format (
 
 import Blaze.ByteString.Builder
 import Blaze.ByteString.Builder.Char8
-import Data.ByteString.Char8 ()
+import Data.ByteString.Char8 (ByteString)
 import Data.CaseInsensitive
 import Data.List
 import Data.Maybe
@@ -79,7 +79,7 @@ apacheFormatBuilder ipsrc tmstr req status msize =
     bs = fromByteString
     (+++) = mappend
 
-lookupRequestField' :: CI Ascii -> Request -> Ascii
+lookupRequestField' :: CI ByteString -> Request -> ByteString
 lookupRequestField' k req = fromMaybe "" . lookup k $ requestHeaders req
 
 getSourceIP :: IPAddrSource -> Request -> LogStr
@@ -90,7 +90,7 @@ getSourceIP' :: IPAddrSource -> Request -> Builder
 getSourceIP' FromSocket = fromString . showSockAddr . remoteHost
 getSourceIP' FromHeader = fromByteString . getSource
 
-getSource :: Request -> Ascii
+getSource :: Request -> ByteString
 getSource req = addr
   where
     maddr = find (\x -> fst x `elem` ["x-real-ip", "x-forwarded-for"]) hdrs
