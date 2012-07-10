@@ -51,7 +51,6 @@ import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as L
 
 -- | Abstract data type for logger.
--- If 'Handle' is associated with a file, 'AppendMode' must be used.
 data Logger = Logger {
     -- | Selector for 'Handle'.
     loggerHandle    :: Handle
@@ -64,7 +63,7 @@ logBufSize = 4096
 
 -- | Creates a 'Logger' from the given handle.
 mkLogger :: Bool -- ^ automatically flush on each loggerPut?
-         -> Handle
+         -> Handle -- ^ If 'Handle' is associated with a file, 'AppendMode' must be used.
          -> IO Logger
 mkLogger autoFlush hdl = do
     if autoFlush then
@@ -73,8 +72,10 @@ mkLogger autoFlush hdl = do
         hSetBuffering hdl (BlockBuffering (Just logBufSize))
     Logger hdl <$> dateInit
 
--- | Creates a new 'Logger' from old one by replacing 'Handle'
--- The 'Handle' inside the old 'Logger' is closed.
+-- | Creates a new 'Logger' from old one by replacing 'Handle'.
+-- The new 'Handle' automatically inherits the file mode of
+-- the old one.
+-- The old 'Handle' is automatically closed.
 renewLogger :: Logger -> Handle -> IO Logger
 renewLogger logger newhdl = do
     let oldhdl = loggerHandle logger
