@@ -23,6 +23,7 @@ module System.Log.FastLogger (
 
 import Blaze.ByteString.Builder
 import Control.Applicative
+import Control.Monad
 import qualified Data.ByteString as BS
 import Data.ByteString.Internal (ByteString(..), c2w)
 import Data.List
@@ -52,25 +53,24 @@ import qualified Data.ByteString.Lazy as L
 
 -- | Abstract data type for logger.
 data Logger = Logger {
-    -- | Selector for 'Handle'.
-    loggerHandle    :: Handle
-    -- | Selector for 'DateRef'.
+    loggerAutoFlush :: Bool
+  , loggerHandle    :: Handle
   , loggerDateRef   :: DateRef
   }
 
 logBufSize :: Int
 logBufSize = 4096
 
+initHandle :: Handle -> IO ()
+initHandle hdl = hSetBuffering hdl (BlockBuffering (Just logBufSize))
+
 -- | Creates a 'Logger' from the given handle.
 mkLogger :: Bool -- ^ automatically flush on each loggerPut?
          -> Handle -- ^ If 'Handle' is associated with a file, 'AppendMode' must be used.
          -> IO Logger
 mkLogger autoFlush hdl = do
-    if autoFlush then
-        hSetBuffering hdl LineBuffering
-      else
-        hSetBuffering hdl (BlockBuffering (Just logBufSize))
-    Logger hdl <$> dateInit
+    initHandle hdl
+    Logger autoFlush hdl <$> dateInit
 
 -- | Creates a new 'Logger' from old one by replacing 'Handle'.
 -- The new 'Handle' automatically inherits the file mode of
@@ -79,13 +79,9 @@ mkLogger autoFlush hdl = do
 renewLogger :: Logger -> Handle -> IO Logger
 renewLogger logger newhdl = do
     let oldhdl = loggerHandle logger
-    buffering <- hGetBuffering oldhdl
     hFlush oldhdl
     hClose oldhdl
-    case buffering of
-        b@(BlockBuffering _) -> hSetBuffering newhdl b
-        LineBuffering        -> hSetBuffering newhdl LineBuffering
-        _                    -> return ()
+    initHandle newhdl
     return $ logger { loggerHandle = newhdl }
 
 -- | A date type to contain 'String' and 'ByteString'.
@@ -156,13 +152,23 @@ copy' dst (x:xs) = do
 -- | The 'hPut' function to copy a list of 'LogStr' to the buffer
 -- of 'Handle' of 'Logger' directly.
 loggerPutStr :: Logger -> [LogStr] -> IO ()
-loggerPutStr logger strs = hPutLogStr (loggerHandle logger) strs
+loggerPutStr logger strs = do
+    hPutLogStr hdl strs
+    when autoFlush $ hFlush hdl
+  where
+    hdl = loggerHandle logger
+    autoFlush = loggerAutoFlush logger
 
 -- | The 'hPut' function directory to copy 'Builder' to the buffer.
 -- The current implementation is inefficient at this moment.
 -- This would replace 'loggerPutStr' someday.
 loggerPutBuilder :: Logger -> Builder -> IO ()
-loggerPutBuilder logger = loggerPutStr logger . return . LB . toByteString
+loggerPutBuilder logger builder = do
+    loggerPutStr logger . return . LB . toByteString $ builder
+    when autoFlush $ hFlush hdl
+  where
+    hdl = loggerHandle logger
+    autoFlush = loggerAutoFlush logger
 
 -- | Flushing the buffer of 'Handle' of 'Logger'.
 loggerFlush :: Logger -> IO ()
