@@ -65,7 +65,7 @@ initHandle :: Handle -> IO ()
 initHandle hdl = hSetBuffering hdl (BlockBuffering (Just logBufSize))
 
 -- | Creates a 'Logger' from the given handle.
-mkLogger :: Bool -- ^ automatically flush on each loggerPut?
+mkLogger :: Bool -- ^ Automatically flush on each loggerPut?
          -> Handle -- ^ If 'Handle' is associated with a file, 'AppendMode' must be used.
          -> IO Logger
 mkLogger autoFlush hdl = do
