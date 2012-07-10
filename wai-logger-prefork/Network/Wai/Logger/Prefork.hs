@@ -21,7 +21,7 @@ logCheck (LogFile spec) = check spec
 
 logInit :: IPAddrSource -> LogType -> IO ApacheLogger
 logInit _ LogNone            = noLoggerInit
-logInit ipsrc LogStdout      = stdoutApacheLoggerInit ipsrc
+logInit ipsrc LogStdout      = stdoutApacheLoggerInit ipsrc True
 logInit ipsrc (LogFile spec) = fileLoggerInit ipsrc spec
 
 noLoggerInit :: IO ApacheLogger
