@@ -24,13 +24,13 @@ setLogger (LoggerRef ref) logger = writeIORef ref logger
 
 ----------------------------------------------------------------
 
-fileLoggerInit :: IPAddrSource -> FileLogSpec -> IO ApacheLogger
-fileLoggerInit ipsrc spec = do
+fileLoggerInit :: IPAddrSource -> FileLogSpec -> Signal -> IO ApacheLogger
+fileLoggerInit ipsrc spec signal = do
     hdl <- open spec
     logger <- mkLogger False hdl
     logref <- LoggerRef <$> newIORef logger
-    _ <- forkIO $ fileFlusher logref
-    _ <- installHandler sigUSR1 (Catch $ reopen spec logref) Nothing
+    void . forkIO $ fileFlusher logref
+    void $ installHandler signal (Catch $ reopen spec logref) Nothing
     return $ fileLogger ipsrc logref
 
 {-
@@ -63,8 +63,8 @@ fileFlusher logref = forever $ do
 
 ----------------------------------------------------------------
 
-fileLoggerController :: FileLogSpec -> LogController
-fileLoggerController spec pids = forever $ do
+fileLoggerController :: FileLogSpec -> Signal -> LogController
+fileLoggerController spec signal pids = forever $ do
     isOver <- over
     when isOver $ do
         rotate spec
@@ -78,7 +78,7 @@ fileLoggerController spec pids = forever $ do
             return True
           else
             return False
-    sendSignal pid = signalProcess sigUSR1 pid `catch` ignore
+    sendSignal pid = signalProcess signal pid `catch` ignore
     handler :: SomeException -> IO Bool
     handler _ = return False
     ignore :: SomeException -> IO ()
