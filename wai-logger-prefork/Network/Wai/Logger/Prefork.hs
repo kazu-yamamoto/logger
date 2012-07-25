@@ -5,6 +5,7 @@ module Network.Wai.Logger.Prefork (
   , LogController
   , LogType(..)
   , FileLogSpec(..)
+  , LogFlusher
   ) where
 
 import Control.Concurrent
@@ -23,15 +24,21 @@ logCheck (LogFile spec _) = check spec
 
 -- |
 -- Creating 'ApacheLogger' according to 'LogType'.
-logInit :: IPAddrSource -> LogType -> IO ApacheLogger
-logInit _ LogNone                   = noLoggerInit
-logInit ipsrc LogStdout             = stdoutApacheLoggerInit ipsrc True
+logInit :: IPAddrSource -> LogType -> IO (ApacheLogger, LogFlusher)
+logInit _     LogNone               = noLoggerInit
+logInit ipsrc LogStdout             = stdoutLoggerInit ipsrc
 logInit ipsrc (LogFile spec signal) = fileLoggerInit ipsrc spec signal
 
-noLoggerInit :: IO ApacheLogger
-noLoggerInit = return noLogger
+noLoggerInit :: IO (ApacheLogger, LogFlusher)
+noLoggerInit = return (noLogger, noFlusher)
   where
     noLogger _ _ _ = return ()
+    noFlusher = return ()
+
+stdoutLoggerInit :: IPAddrSource -> IO (ApacheLogger, LogFlusher)
+stdoutLoggerInit ipsrc = do
+    lgr <- stdoutApacheLoggerInit ipsrc True
+    return (lgr, return ())
 
 -- |
 -- Creating a log controller against child processes.

@@ -20,25 +20,22 @@ getLogger :: LoggerRef -> IO Logger
 getLogger (LoggerRef ref) = readIORef ref
 
 setLogger :: LoggerRef -> Logger -> IO ()
-setLogger (LoggerRef ref) logger = writeIORef ref logger
+setLogger (LoggerRef ref) = writeIORef ref
 
 ----------------------------------------------------------------
 
-fileLoggerInit :: IPAddrSource -> FileLogSpec -> Signal -> IO ApacheLogger
+type LogFlusher = IO ()
+
+fileLoggerInit :: IPAddrSource -> FileLogSpec -> Signal
+               -> IO (ApacheLogger, LogFlusher)
 fileLoggerInit ipsrc spec signal = do
     hdl <- open spec
     logger <- mkLogger False hdl
     logref <- LoggerRef <$> newIORef logger
     void . forkIO $ fileFlusher logref
     void $ installHandler signal (Catch $ reopen spec logref) Nothing
-    return $ fileLogger ipsrc logref
+    return (fileLogger ipsrc logref, fileFlusher' logref)
 
-{-
- For BlockBuffering, hPut flushes the buffer before writing
- the target string. In other words, hPut does not split
- the target string. So, to implment multiple line buffering,
- just use BlockBuffering.
--}
 open :: FileLogSpec -> IO Handle
 open spec = openFile (log_file spec) AppendMode
 
@@ -59,7 +56,10 @@ fileLogger ipsrc logref req status msiz = do
 fileFlusher :: LoggerRef -> IO ()
 fileFlusher logref = forever $ do
     threadDelay 10000000
-    getLogger logref >>= loggerFlush
+    fileFlusher' logref
+
+fileFlusher' :: LoggerRef -> IO ()
+fileFlusher' logref = getLogger logref >>= loggerFlush
 
 ----------------------------------------------------------------
 
