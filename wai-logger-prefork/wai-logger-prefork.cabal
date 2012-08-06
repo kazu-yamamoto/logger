@@ -1,5 +1,5 @@
 Name:                   wai-logger-prefork
-Version:                0.2.0
+Version:                0.2.1
 Author:                 Kazu Yamamoto <kazu@iij.ad.jp>
 Maintainer:             Kazu Yamamoto <kazu@iij.ad.jp>
 License:                BSD3
