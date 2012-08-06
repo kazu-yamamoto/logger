@@ -19,9 +19,8 @@ library
                       , bytestring
                       , directory
                       , filepath
-                      , old-locale
                       , text
-                      , time
+                      , unix-time
   if os(windows)
     cpp-options: -DWINDOWS
   else
