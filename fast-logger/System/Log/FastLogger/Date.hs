@@ -1,10 +1,10 @@
 {-# LANGUAGE CPP, OverloadedStrings #-}
 
 module System.Log.FastLogger.Date (
-    ZonedDate
-  , WebDate
-  , DateRef
+    DateRef
   , dateInit
+  , ZonedDate
+  , WebDate
   , getDate
   , getWebDate
   ) where
@@ -24,6 +24,7 @@ import System.Posix (EpochTime, epochTime)
 
 -- | A type for zoned date.
 type ZonedDate = ByteString
+-- | A type for web date defined in RFC 2616.
 type WebDate = ByteString
 
 data DateCache = DateCache {
@@ -40,7 +41,7 @@ getDate :: DateRef -> IO ZonedDate
 getDate dref = get zonedDate dref
 
 -- | Getting 'WebDate' from the cache.
-getWebDate :: DateRef -> IO ZonedDate
+getWebDate :: DateRef -> IO WebDate
 getWebDate dref = get webDate dref
 
 get :: (DateCache -> a) -> DateRef -> IO a
