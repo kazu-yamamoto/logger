@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, OverloadedStrings #-}
 
 module System.Log.FastLogger.Date (
     ZonedDate
@@ -27,13 +27,9 @@ import System.Posix (EpochTime, epochTime)
 type ZonedDate = ByteString
 
 data DateCache = DateCache {
-#if WINDOWS
-    unixTime :: !UTCTime
-#else
-    unixTime :: !EpochTime
-#endif
+    timeKey  :: !TIME
   , zonedDate :: !ZonedDate
-  }
+  } deriving (Eq, Show)
 
 -- | Reference to the 'ZonedDate' cache.
 newtype DateRef = DateRef (IORef DateCache)
@@ -43,7 +39,7 @@ getDate :: DateRef -> IO ZonedDate
 getDate (DateRef ref) = do
     newEt <- GETTIME
     cache <- readIORef ref
-    let oldEt = unixTime cache
+    let oldEt = timeKey cache
     if oldEt == newEt then
         return $ zonedDate cache
       else do
@@ -55,12 +51,12 @@ newDate :: TIME -> IO DateCache
 #if WINDOWS
 newDate et = DateCache et . format <$> toZonedTime et
   where
-    toZonedTime = utcToLocalZonedTime
     format = BS.pack . formatTime defaultTimeLocale "%d/%b/%Y:%T %z"
+    toZonedTime = utcToLocalZonedTime
 #else
-newDate et = return $ DateCache et zdate
+newDate et = return $ DateCache et $ toZonedTime et
   where
-    zdate = formatUnixTimeGMT webDateFormat $ fromEpochTime et
+    toZonedTime = formatUnixTime "%d/%b/%Y:%T %z" . fromEpochTime
 #endif
 
 -- | Initializing the 'ZonedDate' cache.
