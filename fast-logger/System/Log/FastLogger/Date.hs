@@ -59,7 +59,8 @@ newDate :: TIME -> DateCache
 newDate et = DateCache et zDate wDate
   where
     ut = fromEpochTime et
-    zDate = formatUnixTime "%d/%b/%Y:%T %z" ut
+    apatcheFormat = "%d/%b/%Y:%T %z"
+    zDate = formatUnixTime apatcheFormat ut
     wDate = formatUnixTimeGMT webDateFormat ut
 
 -- | Initializing the 'ZonedDate' cache.
