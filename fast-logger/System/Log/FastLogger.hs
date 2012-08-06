@@ -17,7 +17,6 @@ module System.Log.FastLogger (
   , ToLogStr(..)
   -- * Misc functions
   , loggerDate
-  , loggerWebDate
   -- * File rotation
   , module System.Log.FastLogger.File
   ) where
@@ -175,10 +174,6 @@ loggerPutBuilder logger builder = do
 loggerFlush :: Logger -> IO ()
 loggerFlush logger = hFlush $ loggerHandle logger
 
--- | Obtaining 'ZonedDate' from 'Logger'.
+-- | Obtaining date string from 'Logger'.
 loggerDate :: Logger -> IO ZonedDate
 loggerDate logger = getDate $ loggerDateRef logger
-
--- | Obtaining 'WebDate' from 'Logger'.
-loggerWebDate :: Logger -> IO ZonedDate
-loggerWebDate logger = getWebDate $ loggerDateRef logger
