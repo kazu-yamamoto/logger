@@ -21,11 +21,11 @@ library
                       , filepath
                       , text
   if os(windows)
-    cpp-options: -DWINDOWS
-    build-depends:      old-locale
+    Cpp-Options:        -DWINDOWS
+    Build-Depends:      old-locale
                       , time
   else
-    build-depends:      unix
+    Build-Depends:      unix
                       , unix-time
 Source-Repository head
   Type:                 git
