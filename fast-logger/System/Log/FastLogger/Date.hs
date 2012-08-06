@@ -9,16 +9,16 @@ module System.Log.FastLogger.Date (
 
 import Control.Applicative
 import Data.ByteString (ByteString)
-import qualified Data.ByteString.Char8 as BS
 import Data.IORef
+#if WINDOWS
+import qualified Data.ByteString.Char8 as BS
 import Data.Time
 import System.Locale
-#if WINDOWS
 #define TIME UTCTime
 #define GETTIME getCurrentTime
 #else
+import Data.UnixTime
 import System.Posix (EpochTime, epochTime)
-import Data.Time.Clock.POSIX
 #define TIME EpochTime
 #define GETTIME epochTime
 #endif
@@ -27,7 +27,11 @@ import Data.Time.Clock.POSIX
 type ZonedDate = ByteString
 
 data DateCache = DateCache {
-    unixTime :: !TIME
+#if WINDOWS
+    unixTime :: !UTCTime
+#else
+    unixTime :: !EpochTime
+#endif
   , zonedDate :: !ZonedDate
   }
 
@@ -48,15 +52,16 @@ getDate (DateRef ref) = do
         return $ zonedDate newCache
 
 newDate :: TIME -> IO DateCache
+#if WINDOWS
 newDate et = DateCache et . format <$> toZonedTime et
   where
-    toZonedTime = utcToLocalZonedTime . toUTC
-#if WINDOWS
-    toUTC = id
-#else
-    toUTC = posixSecondsToUTCTime . realToFrac
-#endif
+    toZonedTime = utcToLocalZonedTime
     format = BS.pack . formatTime defaultTimeLocale "%d/%b/%Y:%T %z"
+#else
+newDate et = return $ DateCache et zdate
+  where
+    zdate = formatUnixTimeGMT webDateFormat $ fromEpochTime et
+#endif
 
 -- | Initializing the 'ZonedDate' cache.
 dateInit :: IO DateRef

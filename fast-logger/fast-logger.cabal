@@ -19,13 +19,14 @@ library
                       , bytestring
                       , directory
                       , filepath
-                      , old-locale
                       , text
-                      , time
   if os(windows)
     cpp-options: -DWINDOWS
+    build-depends:      old-locale
+                      , time
   else
-    build-depends: unix
+    build-depends:      unix
+                      , unix-time
 Source-Repository head
   Type:                 git
   Location:             git://github.com/kazu-yamamoto/logger.git
