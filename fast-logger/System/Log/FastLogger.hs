@@ -1,5 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude, RecordWildCards #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances, BangPatterns #-}
 
 -- | Fast logging system to copy log data directly to Handle buffer.
 
@@ -22,14 +22,16 @@ module System.Log.FastLogger (
   ) where
 
 import Blaze.ByteString.Builder
+import Blaze.ByteString.Builder.Char8 (fromString)
 import Control.Applicative
 import Control.Monad
 import qualified Data.ByteString as BS
 import Data.ByteString.Internal (ByteString(..), c2w)
 import Data.List
 import Data.Maybe
+import Data.Monoid
 import Data.Typeable
-import Foreign
+import Foreign hiding (void)
 import GHC.Base
 import GHC.IO.Buffer
 import qualified GHC.IO.BufferedIO as Buffered
@@ -119,13 +121,11 @@ bufsWrite h_@Handle__{..} bss = do
         writeIORef haByteBuffer old_buf'
         if size > len then
             bufsWrite h_ bss
-         else allocaBytes size $ \ptr -> do
-            go ptr bss
+          else do
             let Just fd = cast haDevice :: Maybe FD
-            _ <- RawIO.writeNonBlocking fd ptr size
-            return ()
+            writeWithBuilder fd bss
   where
-    len = foldl' (\x y -> x + getLength y) 0 bss
+    len = foldl' (\ !x !y -> x + getLength y) 0 bss
     getLength (LB s) = BS.length s
     getLength (LS s) = length s
     go :: Ptr Word8 -> [LogStr] -> IO ()
@@ -137,11 +137,21 @@ bufsWrite h_@Handle__{..} bss = do
       dst' <- copy' dst s
       go dst' ss
 
+writeWithBuilder :: FD -> [LogStr] -> IO ()
+writeWithBuilder fd bss = toByteStringIOWith 4096 write builder
+  where
+    write !(PS fp o l) = withForeignPtr fp $ \p -> do
+        void $ RawIO.writeNonBlocking fd (p `plusPtr` o) l
+    builder = foldr mappend mempty $ map toBuilder bss
+    toBuilder (LB s) = fromByteString s
+    toBuilder (LS s) = fromString s
+
 copy :: Ptr Word8 -> ByteString -> IO (Ptr Word8)
 copy dst (PS ptr off len) = withForeignPtr ptr $ \s -> do
-    let src = s `plusPtr` off
+    let !src = s `plusPtr` off
     _ <- memcpy dst src (fromIntegral len)
-    return (dst `plusPtr` len)
+    let !res = dst `plusPtr` len
+    return res
 
 copy' :: Ptr Word8 -> String -> IO (Ptr Word8)
 copy' dst [] = return dst
