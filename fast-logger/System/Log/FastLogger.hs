@@ -8,6 +8,7 @@ module System.Log.FastLogger (
     Logger
   , mkLogger
   , renewLogger
+  , rmLogger
   -- * Logging
   , loggerPutStr
   , loggerPutBuilder
@@ -85,6 +86,10 @@ renewLogger logger newhdl = do
     hClose oldhdl
     initHandle newhdl
     return $ logger { loggerHandle = newhdl }
+
+-- | Destroy a 'Logger' by closing internal 'Handle'.
+rmLogger :: Logger -> IO ()
+rmLogger (Logger _ hdl _) = hClose hdl
 
 -- | A date type to contain 'String' and 'ByteString'.
 -- This data is exported so that format can be defined.

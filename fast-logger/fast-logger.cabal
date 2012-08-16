@@ -7,9 +7,10 @@ License-File:           LICENSE
 Synopsis:               A fast logging system
 Description:            A fast logging system
 Category:               System
-Cabal-Version:          >= 1.6
+Cabal-Version:          >= 1.8
 Build-Type:             Simple
-library
+
+Library
   GHC-Options:          -Wall
   Exposed-Modules:      System.Log.FastLogger
                         System.Log.FastLogger.File
@@ -27,6 +28,20 @@ library
   else
     Build-Depends:      unix
                       , unix-time
+
+Test-Suite spec
+    Main-Is:         Spec.hs
+    Hs-Source-Dirs:  test
+    Type:            exitcode-stdio-1.0
+
+    Ghc-Options:     -Wall
+    Build-Depends:   base >= 4 && < 5
+                   , HUnit
+                   , QuickCheck
+                   , bytestring
+                   , fast-logger
+                   , hspec
+
 Source-Repository head
   Type:                 git
   Location:             git://github.com/kazu-yamamoto/logger.git
