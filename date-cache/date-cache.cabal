@@ -1,0 +1,22 @@
+Name:                   date-cache
+Version:                0.0.0
+Author:                 Kazu Yamamoto <kazu@iij.ad.jp>
+Maintainer:             Kazu Yamamoto <kazu@iij.ad.jp>
+License:                BSD3
+License-File:           LICENSE
+Synopsis:               Date cacher
+Description:            Formatting time is slow. This package provides
+                        mechanisms to cache formatted date
+Category:               System
+Cabal-Version:          >= 1.8
+Build-Type:             Simple
+
+Library
+  GHC-Options:          -Wall
+  Exposed-Modules:      System.Date.Cache
+  Build-Depends:        base >= 4 && < 5
+                      , bytestring
+
+Source-Repository head
+  Type:                 git
+  Location:             git://github.com/kazu-yamamoto/logger.git
