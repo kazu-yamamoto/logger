@@ -2,63 +2,35 @@
 
 module System.Log.FastLogger.Date (
     ZonedDate
-  , DateRef
-  , dateInit
-  , getDate
+  , zonedDateCacheConf
   ) where
 
-import Control.Applicative
-import Data.ByteString (ByteString)
-import Data.IORef
+import Data.ByteString
+import System.Date.Cache
 #if WINDOWS
 import qualified Data.ByteString.Char8 as BS
 import Data.Time
 import System.Locale
-#define TIME UTCTime
-#define GETTIME getCurrentTime
 #else
 import Data.UnixTime
 import System.Posix (EpochTime, epochTime)
-#define TIME EpochTime
-#define GETTIME epochTime
 #endif
 
 -- | A type for zoned date.
 type ZonedDate = ByteString
 
-data DateCache = DateCache {
-    timeKey  :: !TIME
-  , zonedDate :: !ZonedDate
-  } deriving (Eq, Show)
-
--- | Reference to the 'ZonedDate' cache.
-newtype DateRef = DateRef (IORef DateCache)
-
--- | Getting 'ZonedDate' from the 'ZonedDate' cache.
-getDate :: DateRef -> IO ZonedDate
-getDate (DateRef ref) = do
-    newEt <- GETTIME
-    cache <- readIORef ref
-    let oldEt = timeKey cache
-    if oldEt == newEt then
-        return $ zonedDate cache
-      else do
-        newCache <- newDate newEt
-        writeIORef ref newCache
-        return $ zonedDate newCache
-
-newDate :: TIME -> IO DateCache
 #if WINDOWS
-newDate et = DateCache et . format <$> toZonedTime et
-  where
-    format = BS.pack . formatTime defaultTimeLocale "%d/%b/%Y:%T %z"
-    toZonedTime = utcToLocalZonedTime
+zonedDateCacheConf :: DateCacheConf UTCTime
+zonedDateCacheConf = DateCacheConf {
+    getTime = getCurrentTime
+  , formatDate ut = do
+      zt <- utcToLocalZonedTime ut
+      return $ BS.pack $ formatTime defaultTimeLocale "%d/%b/%Y:%T %z" zt
+  }
 #else
-newDate et = return $ DateCache et $ toZonedTime et
-  where
-    toZonedTime = formatUnixTime "%d/%b/%Y:%T %z" . fromEpochTime
+zonedDateCacheConf :: DateCacheConf EpochTime
+zonedDateCacheConf = DateCacheConf {
+    getTime = epochTime
+  , formatDate = return . formatUnixTime "%d/%b/%Y:%T %z" . fromEpochTime
+  }
 #endif
-
--- | Initializing the 'ZonedDate' cache.
-dateInit :: IO DateRef
-dateInit = DateRef <$> (GETTIME >>= newDate >>= newIORef)

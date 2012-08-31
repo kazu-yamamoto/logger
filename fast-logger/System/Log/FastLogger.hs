@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude, RecordWildCards #-}
 {-# LANGUAGE FlexibleInstances, BangPatterns #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -- | Fast logging system to copy log data directly to Handle buffer.
 
@@ -7,6 +8,7 @@ module System.Log.FastLogger (
   -- * Logger
     Logger
   , mkLogger
+  , mkLogger2
   , renewLogger
   , rmLogger
   -- * Logging
@@ -16,15 +18,15 @@ module System.Log.FastLogger (
   -- * Strings
   , LogStr(..)
   , ToLogStr(..)
-  -- * Misc functions
+  -- * Date
   , loggerDate
+  , module System.Log.FastLogger.Date
   -- * File rotation
   , module System.Log.FastLogger.File
   ) where
 
 import Blaze.ByteString.Builder
 import Blaze.ByteString.Builder.Char8 (fromString)
-import Control.Applicative
 import Control.Monad
 import qualified Data.ByteString as BS
 import Data.ByteString.Internal (ByteString(..), c2w)
@@ -44,6 +46,7 @@ import GHC.IO.Handle.Types
 import GHC.IORef
 import GHC.Num
 import GHC.Real
+import System.Date.Cache
 import System.IO
 import System.Log.FastLogger.Date
 import System.Log.FastLogger.File
@@ -56,9 +59,10 @@ import qualified Data.ByteString.Lazy as L
 
 -- | Abstract data type for logger.
 data Logger = Logger {
-    loggerAutoFlush :: Bool
-  , loggerHandle    :: Handle
-  , loggerDateRef   :: DateRef
+    loggerAutoFlush  :: Bool
+  , loggerHandle     :: Handle
+  , loggerDateGetter :: DateCacheGetter
+  , loggerDateCloser :: DateCacheCloser
   }
 
 logBufSize :: Int
@@ -68,12 +72,21 @@ initHandle :: Handle -> IO ()
 initHandle hdl = hSetBuffering hdl (BlockBuffering (Just logBufSize))
 
 -- | Creates a 'Logger' from the given handle.
+-- ('ondemandDateCacher' 'zonedDateCacheConf') is used as a Date getter.
 mkLogger :: Bool -- ^ Automatically flush on each loggerPut?
          -> Handle -- ^ If 'Handle' is associated with a file, 'AppendMode' must be used.
          -> IO Logger
-mkLogger autoFlush hdl = do
+mkLogger autoFlush hdl =
+    ondemandDateCacher zonedDateCacheConf >>= mkLogger2 autoFlush hdl
+
+-- | Creates a 'Logger' from the given handle.
+mkLogger2 :: Bool -- ^ Automatically flush on each loggerPut?
+          -> Handle -- ^ If 'Handle' is associated with a file, 'AppendMode' must be used.
+          -> (DateCacheGetter, DateCacheCloser) -- ^ Date getter/closer. E.g. ('clockDateCacher' 'zonedDateCacheConf')           
+          -> IO Logger
+mkLogger2 autoFlush hdl (getter,closer) = do
     initHandle hdl
-    Logger autoFlush hdl <$> dateInit
+    return $ Logger autoFlush hdl getter closer
 
 -- | Creates a new 'Logger' from old one by replacing 'Handle'.
 -- The new 'Handle' automatically inherits the file mode of
@@ -89,7 +102,7 @@ renewLogger logger newhdl = do
 
 -- | Destroy a 'Logger' by closing internal 'Handle'.
 rmLogger :: Logger -> IO ()
-rmLogger (Logger _ hdl _) = hClose hdl
+rmLogger lgr = hClose (loggerHandle lgr) >> loggerDateCloser lgr
 
 -- | A date type to contain 'String' and 'ByteString'.
 -- This data is exported so that format can be defined.
@@ -191,4 +204,4 @@ loggerFlush logger = hFlush $ loggerHandle logger
 
 -- | Obtaining date string from 'Logger'.
 loggerDate :: Logger -> IO ZonedDate
-loggerDate logger = getDate $ loggerDateRef logger
+loggerDate logger = loggerDateGetter logger
