@@ -33,6 +33,7 @@
 module Network.Wai.Logger (
     ApacheLogger
   , stdoutApacheLoggerInit
+  , stdoutApacheLoggerInit2
   , module Network.Wai.Logger.Format
   , module Network.Wai.Logger.Utils
   ) where
@@ -42,6 +43,7 @@ import Network.HTTP.Types
 import Network.Wai
 import Network.Wai.Logger.Format
 import Network.Wai.Logger.Utils
+import System.Date.Cache
 import System.IO
 import System.Log.FastLogger
 
@@ -54,6 +56,14 @@ stdoutApacheLoggerInit :: IPAddrSource
                        -> IO ApacheLogger
 stdoutApacheLoggerInit ipsrc autoFlash =
     stdoutLogger ipsrc <$> mkLogger autoFlash stdout
+
+-- | Obtaining Apache style logger to stdout
+stdoutApacheLoggerInit2 :: IPAddrSource
+                        -> Bool -- ^ Automatically flush on each logging?
+                        -> (DateCacheGetter, DateCacheCloser)
+                        -> IO ApacheLogger
+stdoutApacheLoggerInit2 ipsrc autoFlash dc =
+    stdoutLogger ipsrc <$> mkLogger2 autoFlash stdout dc
 
 stdoutLogger :: IPAddrSource -> Logger -> ApacheLogger
 stdoutLogger ipsrc logger req status msiz = do

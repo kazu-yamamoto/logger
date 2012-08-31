@@ -1,5 +1,5 @@
 Name:                   wai-logger
-Version:                0.2.0
+Version:                0.3.0
 Author:                 Kazu Yamamoto <kazu@iij.ad.jp>
 Maintainer:             Kazu Yamamoto <kazu@iij.ad.jp>
 License:                BSD3
@@ -19,7 +19,8 @@ library
                       , byteorder
                       , bytestring
                       , case-insensitive
-                      , fast-logger >= 0.2
+                      , date-cache >= 0.3
+                      , fast-logger >= 0.3
                       , http-types
                       , network
                       , wai

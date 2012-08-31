@@ -18,7 +18,6 @@ import Network.HTTP.Types
 import Network.Wai
 import Network.Wai.Logger.Utils
 import System.Log.FastLogger
-import System.Log.FastLogger.Date
 
 {-| Source from which the IP source address of the client is obtained.
 -}
