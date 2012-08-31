@@ -8,6 +8,7 @@ import Data.IORef
 import Network.Wai.Logger
 import Network.Wai.Logger.Prefork.Types
 import Prelude hiding (catch)
+import System.Date.Cache
 import System.IO
 import System.Log.FastLogger
 import System.Posix
@@ -30,7 +31,8 @@ fileLoggerInit :: IPAddrSource -> FileLogSpec -> Signal
                -> IO (ApacheLogger, LogFlusher)
 fileLoggerInit ipsrc spec signal = do
     hdl <- open spec
-    logger <- mkLogger False hdl
+    dc <- clockDateCacher zonedDateCacheConf
+    logger <- mkLogger2 False hdl dc
     logref <- LoggerRef <$> newIORef logger
     void . forkIO $ fileFlusher logref
     void $ installHandler signal (Catch $ reopen spec logref) Nothing

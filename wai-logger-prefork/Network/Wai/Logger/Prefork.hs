@@ -13,6 +13,7 @@ import Control.Monad
 import Network.Wai.Logger
 import Network.Wai.Logger.Prefork.File
 import Network.Wai.Logger.Prefork.Types
+import System.Date.Cache
 import System.Log.FastLogger
 
 -- |
@@ -30,15 +31,16 @@ logInit ipsrc LogStdout             = stdoutLoggerInit ipsrc
 logInit ipsrc (LogFile spec signal) = fileLoggerInit ipsrc spec signal
 
 noLoggerInit :: IO (ApacheLogger, LogFlusher)
-noLoggerInit = return (noLogger, noFlusher)
+noLoggerInit = return $! (noLogger, noFlusher)
   where
     noLogger _ _ _ = return ()
     noFlusher = return ()
 
 stdoutLoggerInit :: IPAddrSource -> IO (ApacheLogger, LogFlusher)
 stdoutLoggerInit ipsrc = do
-    lgr <- stdoutApacheLoggerInit ipsrc True
-    return (lgr, return ())
+    dc <- clockDateCacher zonedDateCacheConf
+    lgr <- stdoutApacheLoggerInit2 ipsrc True dc
+    return $! (lgr, return ())
 
 -- |
 -- Creating a log controller against child processes.
