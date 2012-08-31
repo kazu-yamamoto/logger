@@ -37,8 +37,6 @@ Test-Suite spec
 
     Ghc-Options:     -Wall
     Build-Depends:   base >= 4 && < 5
-                   , HUnit
-                   , QuickCheck
                    , bytestring
                    , fast-logger
                    , hspec
