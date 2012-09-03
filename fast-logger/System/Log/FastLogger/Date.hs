@@ -23,7 +23,7 @@ type ZonedDate = ByteString
 zonedDateCacheConf :: DateCacheConf UTCTime
 zonedDateCacheConf = DateCacheConf {
     getTime = getCurrentTime
-  , formatDate ut = do
+  , formatDate = \ut -> do
       zt <- utcToLocalZonedTime ut
       return $ BS.pack $ formatTime defaultTimeLocale "%d/%b/%Y:%T %z" zt
   }
