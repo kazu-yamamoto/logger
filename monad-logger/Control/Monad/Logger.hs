@@ -1,8 +1,10 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE CPP #-}
 module Control.Monad.Logger
     ( -- * MonadLogger
       MonadLogger(..)
     , LogLevel(..)
+    , LogSource
     -- * TH logging
     , logDebug
     , logInfo
@@ -50,30 +52,34 @@ instance Lift LogLevel where
     lift LevelError = [|LevelError|]
     lift (LevelOther x) = [|LevelOther $ pack $(lift $ unpack x)|]
 
+type LogSource = Text
+
 class Monad m => MonadLogger m where
     monadLoggerLog :: ToLogStr msg => Loc -> LogLevel -> msg -> m ()
+
+    monadLoggerLogSource :: ToLogStr msg => Loc -> LogSource -> LogLevel -> msg -> m ()
+    monadLoggerLogSource loc _ level msg = monadLoggerLog loc level msg
 
 instance MonadLogger IO          where monadLoggerLog _ _ _ = return ()
 instance MonadLogger Identity    where monadLoggerLog _ _ _ = return ()
 instance MonadLogger (ST s)      where monadLoggerLog _ _ _ = return ()
 instance MonadLogger (Lazy.ST s) where monadLoggerLog _ _ _ = return ()
 
-liftLog :: (MonadTrans t, MonadLogger m, ToLogStr msg) => Loc -> LogLevel -> msg -> t m ()
-liftLog a b c = Trans.lift $ monadLoggerLog a b c
-
-instance MonadLogger m => MonadLogger (IdentityT m) where monadLoggerLog = liftLog
-instance MonadLogger m => MonadLogger (ListT m) where monadLoggerLog = liftLog
-instance MonadLogger m => MonadLogger (MaybeT m) where monadLoggerLog = liftLog
-instance (MonadLogger m, Error e) => MonadLogger (ErrorT e m) where monadLoggerLog = liftLog
-instance MonadLogger m => MonadLogger (ReaderT r m) where monadLoggerLog = liftLog
-instance MonadLogger m => MonadLogger (ContT r m) where monadLoggerLog = liftLog
-instance MonadLogger m => MonadLogger (StateT s m) where monadLoggerLog = liftLog
-instance (MonadLogger m, Monoid w) => MonadLogger (WriterT w m) where monadLoggerLog = liftLog
-instance (MonadLogger m, Monoid w) => MonadLogger (RWST r w s m) where monadLoggerLog = liftLog
-instance MonadLogger m => MonadLogger (ResourceT m) where monadLoggerLog = liftLog
-instance MonadLogger m => MonadLogger (Strict.StateT s m) where monadLoggerLog = liftLog
-instance (MonadLogger m, Monoid w) => MonadLogger (Strict.WriterT w m) where monadLoggerLog = liftLog
-instance (MonadLogger m, Monoid w) => MonadLogger (Strict.RWST r w s m) where monadLoggerLog = liftLog
+#define DEF monadLoggerLog a b c = Trans.lift $ monadLoggerLog a b c; monadLoggerLogSource a b c d = Trans.lift $ monadLoggerLogSource a b c d
+instance MonadLogger m => MonadLogger (IdentityT m) where DEF
+instance MonadLogger m => MonadLogger (ListT m) where DEF
+instance MonadLogger m => MonadLogger (MaybeT m) where DEF
+instance (MonadLogger m, Error e) => MonadLogger (ErrorT e m) where DEF
+instance MonadLogger m => MonadLogger (ReaderT r m) where DEF
+instance MonadLogger m => MonadLogger (ContT r m) where DEF
+instance MonadLogger m => MonadLogger (StateT s m) where DEF
+instance (MonadLogger m, Monoid w) => MonadLogger (WriterT w m) where DEF
+instance (MonadLogger m, Monoid w) => MonadLogger (RWST r w s m) where DEF
+instance MonadLogger m => MonadLogger (ResourceT m) where DEF
+instance MonadLogger m => MonadLogger (Strict.StateT s m) where DEF
+instance (MonadLogger m, Monoid w) => MonadLogger (Strict.WriterT w m) where DEF
+instance (MonadLogger m, Monoid w) => MonadLogger (Strict.RWST r w s m) where DEF
+#undef DEF
 
 logTH :: LogLevel -> Q Exp
 logTH level =
