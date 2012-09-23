@@ -11,6 +11,12 @@ module Control.Monad.Logger
     , logWarn
     , logError
     , logOther
+    -- * TH logging with source
+    , logDebugS
+    , logInfoS
+    , logWarnS
+    , logErrorS
+    , logOtherS
     ) where
 
 import Language.Haskell.TH.Syntax (Lift (lift), Q, Exp, Loc (Loc), qLocation)
@@ -84,9 +90,6 @@ instance (MonadLogger m, Monoid w) => MonadLogger (Strict.RWST r w s m) where DE
 logTH :: LogLevel -> Q Exp
 logTH level =
     [|monadLoggerLog $(qLocation >>= liftLoc) $(lift level) . (id :: Text -> Text)|]
-  where
-    liftLoc :: Loc -> Q Exp
-    liftLoc (Loc a b c d e) = [|Loc $(lift a) $(lift b) $(lift c) $(lift d) $(lift e)|]
 
 -- | Generates a function that takes a 'Text' and logs a 'LevelDebug' message. Usage:
 --
@@ -109,3 +112,28 @@ logError = logTH LevelError
 -- > $(logOther "My new level") "This is a log message"
 logOther :: Text -> Q Exp
 logOther = logTH . LevelOther
+
+liftLoc :: Loc -> Q Exp
+liftLoc (Loc a b c d e) = [|Loc $(lift a) $(lift b) $(lift c) $(lift d) $(lift e)|]
+
+-- | Generates a function that takes a 'LogSource' and 'Text' and logs a 'LevelDebug' message. Usage:
+--
+-- > $logDebug "SomeSource" "This is a debug log message"
+logDebugS :: Q Exp
+logDebugS = [|\a b -> monadLoggerLogSource $(qLocation >>= liftLoc) a LevelDebug (b :: Text)|]
+
+-- | See 'logDebugS'
+logInfoS :: Q Exp
+logInfoS = [|\a b -> monadLoggerLogSource $(qLocation >>= liftLoc) a LevelInfo (b :: Text)|]
+-- | See 'logDebugS'
+logWarnS :: Q Exp
+logWarnS = [|\a b -> monadLoggerLogSource $(qLocation >>= liftLoc) a LevelWarn (b :: Text)|]
+-- | See 'logDebugS'
+logErrorS :: Q Exp
+logErrorS = [|\a b -> monadLoggerLogSource $(qLocation >>= liftLoc) a LevelError (b :: Text)|]
+
+-- | Generates a function that takes a 'LogSource', a level name and a 'Text' and logs a 'LevelOther' message. Usage:
+--
+-- > $logOther "SomeSource" "My new level" "This is a log message"
+logOtherS :: Q Exp
+logOtherS = [|\src level msg -> monadLoggerLogSource $(qLocation >>= liftLoc) src (LevelOther level) (msg :: Text)|]
