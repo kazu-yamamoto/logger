@@ -27,8 +27,8 @@ module Control.Monad.Logger
     , logOtherS
     ) where
 
-import Language.Haskell.TH.Syntax (Lift (lift), Q, Exp, Loc (Loc), qLocation)
-import System.Log.FastLogger (ToLogStr (toLogStr), LogStr)
+import Language.Haskell.TH.Syntax (Lift (lift), Q, Exp, Loc (..), qLocation)
+import System.Log.FastLogger (ToLogStr (toLogStr), LogStr (..))
 
 import Data.Monoid (Monoid)
 
@@ -40,6 +40,8 @@ import Data.Functor.Identity (Identity)
 import Control.Monad.ST (ST)
 import qualified Control.Monad.ST.Lazy as Lazy (ST)
 import qualified Control.Monad.Trans.Class as Trans
+
+import System.IO (stdout, stderr, Handle)
 
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Control.Monad.Trans.Resource (MonadResource (liftResourceT), MonadThrow (monadThrow))
@@ -60,10 +62,10 @@ import qualified Control.Monad.Trans.RWS.Strict    as Strict ( RWST   )
 import qualified Control.Monad.Trans.State.Strict  as Strict ( StateT )
 import qualified Control.Monad.Trans.Writer.Strict as Strict ( WriterT )
 
-import Control.Monad.Trans.Class (MonadTrans)
-import qualified Control.Monad.Trans.Class as Trans
-
 import Data.Text (Text, pack, unpack, empty)
+import qualified Data.Text as T
+import qualified Data.ByteString.Char8 as S8
+import Data.Text.Encoding (encodeUtf8)
 
 import Control.Monad.Cont.Class   ( MonadCont (..) )
 import Control.Monad.Error.Class  ( MonadError (..) )
@@ -206,26 +208,61 @@ instance MonadTransControl LoggingT where
 
 instance MonadBaseControl b m => MonadBaseControl b (LoggingT m) where
      newtype StM (LoggingT m) a = StMT (StM m a)
-     liftBaseWith f = LoggingT $ \reader ->
+     liftBaseWith f = LoggingT $ \reader' ->
          liftBaseWith $ \runInBase ->
-             f $ liftM StMT . runInBase . (\(LoggingT r) -> r reader)
+             f $ liftM StMT . runInBase . (\(LoggingT r) -> r reader')
      restoreM (StMT base) = LoggingT $ const $ restoreM base
 
 instance MonadIO m => MonadLogger (LoggingT m) where
     monadLoggerLog a b c = monadLoggerLogSource a empty b c
     monadLoggerLogSource a b c d = LoggingT $ \f -> liftIO $ f a b c (toLogStr d)
 
+defaultOutput :: Handle
+              -> Loc
+              -> LogSource
+              -> LogLevel
+              -> LogStr
+              -> IO ()
+defaultOutput h loc src level msg =
+    S8.hPutStrLn h $ S8.concat bs
+  where
+    bs =
+        [ S8.pack "["
+        , case level of
+            LevelOther t -> encodeUtf8 t
+            _ -> encodeUtf8 $ pack $ drop 5 $ show level
+        , if T.null src
+            then S8.empty
+            else encodeUtf8 $ '#' `T.cons` src
+        , S8.pack "] "
+        , case msg of
+            LS s -> encodeUtf8 $ pack s
+            LB b -> b
+        , S8.pack " @("
+        , encodeUtf8 $ pack fileLocStr
+        , S8.pack ")\n"
+        ]
+
+    -- taken from file-location package
+    -- turn the TH Loc loaction information into a human readable string
+    -- leaving out the loc_end parameter
+    fileLocStr = (loc_package loc) ++ ':' : (loc_module loc) ++
+      ' ' : (loc_filename loc) ++ ':' : (line loc) ++ ':' : (char loc)
+      where
+        line = show . fst . loc_start
+        char = show . snd . loc_start
+
 -- | Run a block using a @MonadLogger@ instance which prints to stderr.
 --
 -- Since 0.2.2
 runStderrLoggingT :: MonadIO m => LoggingT m a -> m a
-runStderrLoggingT = error ""
+runStderrLoggingT = (`runLoggingT` defaultOutput stderr)
 
 -- | Run a block using a @MonadLogger@ instance which prints to stdout.
 --
 -- Since 0.2.2
 runStdoutLoggingT :: MonadIO m => LoggingT m a -> m a
-runStdoutLoggingT = error ""
+runStdoutLoggingT = (`runLoggingT` defaultOutput stdout)
 
 instance MonadCont m => MonadCont (LoggingT m) where
   callCC f = LoggingT $ \i -> callCC $ \c -> runLoggingT (f (LoggingT . const . c)) i
