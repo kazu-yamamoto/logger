@@ -185,7 +185,7 @@ logOtherS = [|\src level msg -> monadLoggerLogSource $(qLocation >>= liftLoc) sr
 newtype LoggingT m a = LoggingT { runLoggingT :: (Loc -> LogSource -> LogLevel -> LogStr -> IO ()) -> m a }
 
 instance Monad m => Functor (LoggingT m) where
-    fmap f (LoggingT m) = LoggingT (liftM f . m)
+    fmap = liftM
 
 instance Monad m => Applicative (LoggingT m) where
     pure = return
