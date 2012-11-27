@@ -1,10 +1,18 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Control.Monad.Logger
     ( -- * MonadLogger
       MonadLogger(..)
     , LogLevel(..)
     , LogSource
+    -- * Helper transformer
+    , LoggingT (..)
+    , runStderrLoggingT
+    , runStdoutLoggingT
     -- * TH logging
     , logDebug
     , logInfo
@@ -20,13 +28,21 @@ module Control.Monad.Logger
     ) where
 
 import Language.Haskell.TH.Syntax (Lift (lift), Q, Exp, Loc (Loc), qLocation)
-import System.Log.FastLogger (ToLogStr)
+import System.Log.FastLogger (ToLogStr (toLogStr), LogStr)
 
 import Data.Monoid (Monoid)
 
+import Control.Applicative (Applicative (..))
+import Control.Monad (liftM, ap)
+import Control.Monad.Base (MonadBase (liftBase))
+import Control.Monad.Trans.Control (MonadBaseControl (..), MonadTransControl (..))
 import Data.Functor.Identity (Identity)
 import Control.Monad.ST (ST)
 import qualified Control.Monad.ST.Lazy as Lazy (ST)
+import qualified Control.Monad.Trans.Class as Trans
+
+import Control.Monad.IO.Class (MonadIO (liftIO))
+import Control.Monad.Trans.Resource (MonadResource (liftResourceT), MonadThrow (monadThrow))
 
 import Control.Monad.Trans.Identity ( IdentityT)
 import Control.Monad.Trans.List     ( ListT    )
@@ -47,7 +63,14 @@ import qualified Control.Monad.Trans.Writer.Strict as Strict ( WriterT )
 import Control.Monad.Trans.Class (MonadTrans)
 import qualified Control.Monad.Trans.Class as Trans
 
-import Data.Text (Text, pack, unpack)
+import Data.Text (Text, pack, unpack, empty)
+
+import Control.Monad.Cont.Class   ( MonadCont (..) )
+import Control.Monad.Error.Class  ( MonadError (..) )
+import Control.Monad.RWS.Class    ( MonadRWS )
+import Control.Monad.Reader.Class ( MonadReader (..) )
+import Control.Monad.State.Class  ( MonadState (..) )
+import Control.Monad.Writer.Class ( MonadWriter (..) )
 
 data LogLevel = LevelDebug | LevelInfo | LevelWarn | LevelError | LevelOther Text
     deriving (Eq, Prelude.Show, Prelude.Read, Ord)
@@ -139,3 +162,92 @@ logErrorS = [|\a b -> monadLoggerLogSource $(qLocation >>= liftLoc) a LevelError
 -- > $logOther "SomeSource" "My new level" "This is a log message"
 logOtherS :: Q Exp
 logOtherS = [|\src level msg -> monadLoggerLogSource $(qLocation >>= liftLoc) src (LevelOther level) (msg :: Text)|]
+
+-- | Monad transformer that adds a new logging function.
+--
+-- Since 0.2.2
+newtype LoggingT m a = LoggingT { runLoggingT :: (Loc -> LogSource -> LogLevel -> LogStr -> IO ()) -> m a }
+
+instance Monad m => Functor (LoggingT m) where
+    fmap f (LoggingT m) = LoggingT (liftM f . m)
+
+instance Monad m => Applicative (LoggingT m) where
+    pure = return
+    (<*>) = ap
+
+instance Monad m => Monad (LoggingT m) where
+    return = LoggingT . const . return
+    LoggingT ma >>= f = LoggingT $ \r -> do
+        a <- ma r
+        let LoggingT f' = f a
+        f' r
+
+instance MonadIO m => MonadIO (LoggingT m) where
+    liftIO = Trans.lift . liftIO
+
+instance MonadThrow m => MonadThrow (LoggingT m) where
+    monadThrow = Trans.lift . monadThrow
+
+instance MonadResource m => MonadResource (LoggingT m) where
+    liftResourceT = Trans.lift . liftResourceT
+
+instance MonadBase b m => MonadBase b (LoggingT m) where
+    liftBase = Trans.lift . liftBase
+
+instance Trans.MonadTrans LoggingT where
+    lift = LoggingT . const
+
+instance MonadTransControl LoggingT where
+    newtype StT LoggingT a = StReader {unStReader :: a}
+    liftWith f = LoggingT $ \r -> f $ \(LoggingT t) -> liftM StReader $ t r
+    restoreT = LoggingT . const . liftM unStReader
+    {-# INLINE liftWith #-}
+    {-# INLINE restoreT #-}
+
+instance MonadBaseControl b m => MonadBaseControl b (LoggingT m) where
+     newtype StM (LoggingT m) a = StMT (StM m a)
+     liftBaseWith f = LoggingT $ \reader ->
+         liftBaseWith $ \runInBase ->
+             f $ liftM StMT . runInBase . (\(LoggingT r) -> r reader)
+     restoreM (StMT base) = LoggingT $ const $ restoreM base
+
+instance MonadIO m => MonadLogger (LoggingT m) where
+    monadLoggerLog a b c = monadLoggerLogSource a empty b c
+    monadLoggerLogSource a b c d = LoggingT $ \f -> liftIO $ f a b c (toLogStr d)
+
+-- | Run a block using a @MonadLogger@ instance which prints to stderr.
+--
+-- Since 0.2.2
+runStderrLoggingT :: MonadIO m => LoggingT m a -> m a
+runStderrLoggingT = error ""
+
+-- | Run a block using a @MonadLogger@ instance which prints to stdout.
+--
+-- Since 0.2.2
+runStdoutLoggingT :: MonadIO m => LoggingT m a -> m a
+runStdoutLoggingT = error ""
+
+instance MonadCont m => MonadCont (LoggingT m) where
+  callCC f = LoggingT $ \i -> callCC $ \c -> runLoggingT (f (LoggingT . const . c)) i
+
+instance MonadError e m => MonadError e (LoggingT m) where
+  throwError = Trans.lift . throwError
+  catchError r h = LoggingT $ \i -> runLoggingT r i `catchError` \e -> runLoggingT (h e) i
+
+instance MonadRWS r w s m => MonadRWS r w s (LoggingT m)
+
+instance MonadReader r m => MonadReader r (LoggingT m) where
+  ask = Trans.lift ask
+  local = mapLoggingT . local
+
+mapLoggingT :: (m a -> n b) -> LoggingT m a -> LoggingT n b
+mapLoggingT f = LoggingT . (f .) . runLoggingT
+
+instance MonadState s m => MonadState s (LoggingT m) where
+  get = Trans.lift get
+  put = Trans.lift . put
+
+instance MonadWriter w m => MonadWriter w (LoggingT m) where
+  tell   = Trans.lift . tell
+  listen = mapLoggingT listen
+  pass   = mapLoggingT pass
