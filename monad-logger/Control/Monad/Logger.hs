@@ -38,6 +38,7 @@ import Control.Monad.Trans.State    ( StateT   )
 import Control.Monad.Trans.Writer   ( WriterT  )
 import Control.Monad.Trans.RWS      ( RWST     )
 import Control.Monad.Trans.Resource ( ResourceT)
+import Data.Conduit                 ( Pipe     )
 
 import qualified Control.Monad.Trans.RWS.Strict    as Strict ( RWST   )
 import qualified Control.Monad.Trans.State.Strict  as Strict ( StateT )
@@ -82,6 +83,7 @@ instance MonadLogger m => MonadLogger (StateT s m) where DEF
 instance (MonadLogger m, Monoid w) => MonadLogger (WriterT w m) where DEF
 instance (MonadLogger m, Monoid w) => MonadLogger (RWST r w s m) where DEF
 instance MonadLogger m => MonadLogger (ResourceT m) where DEF
+instance MonadLogger m => MonadLogger (Pipe l i o u m) where DEF
 instance MonadLogger m => MonadLogger (Strict.StateT s m) where DEF
 instance (MonadLogger m, Monoid w) => MonadLogger (Strict.WriterT w m) where DEF
 instance (MonadLogger m, Monoid w) => MonadLogger (Strict.RWST r w s m) where DEF
