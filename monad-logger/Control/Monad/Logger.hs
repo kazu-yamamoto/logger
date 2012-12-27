@@ -155,7 +155,13 @@ logOther :: Text -> Q Exp
 logOther = logTH . LevelOther
 
 liftLoc :: Loc -> Q Exp
-liftLoc (Loc a b c d e) = [|Loc $(lift a) $(lift b) $(lift c) $(lift d) $(lift e)|]
+liftLoc (Loc a b c (d1, d2) (e1, e2)) = [|Loc
+    $(lift a)
+    $(lift b)
+    $(lift c)
+    ($(lift d1), $(lift d2))
+    ($(lift e1), $(lift e2))
+    |]
 
 -- | Generates a function that takes a 'LogSource' and 'Text' and logs a 'LevelDebug' message. Usage:
 --
