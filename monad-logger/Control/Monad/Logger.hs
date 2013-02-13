@@ -102,10 +102,7 @@ instance Lift LogLevel where
 type LogSource = Text
 
 class Monad m => MonadLogger m where
-    monadLoggerLog :: ToLogStr msg => Loc -> LogLevel -> msg -> m ()
-
-    monadLoggerLogSource :: ToLogStr msg => Loc -> LogSource -> LogLevel -> msg -> m ()
-    monadLoggerLogSource loc _ level msg = monadLoggerLog loc level msg
+    monadLoggerLog :: ToLogStr msg => Loc -> LogSource -> LogLevel -> msg -> m ()
 
 {-
 instance MonadLogger IO          where monadLoggerLog _ _ _ = return ()
@@ -114,7 +111,7 @@ instance MonadLogger (ST s)      where monadLoggerLog _ _ _ = return ()
 instance MonadLogger (Lazy.ST s) where monadLoggerLog _ _ _ = return ()
 -}
 
-#define DEF monadLoggerLog a b c = Trans.lift $ monadLoggerLog a b c; monadLoggerLogSource a b c d = Trans.lift $ monadLoggerLogSource a b c d
+#define DEF monadLoggerLog a b c d = Trans.lift $ monadLoggerLog a b c d
 instance MonadLogger m => MonadLogger (IdentityT m) where DEF
 instance MonadLogger m => MonadLogger (ListT m) where DEF
 instance MonadLogger m => MonadLogger (MaybeT m) where DEF
@@ -134,7 +131,7 @@ instance (MonadLogger m, Monoid w) => MonadLogger (Strict.RWST r w s m) where DE
 
 logTH :: LogLevel -> Q Exp
 logTH level =
-    [|monadLoggerLog $(qLocation >>= liftLoc) $(lift level) . (id :: Text -> Text)|]
+    [|monadLoggerLog $(qLocation >>= liftLoc) (pack "") $(lift level) . (id :: Text -> Text)|]
 
 -- | Generates a function that takes a 'Text' and logs a 'LevelDebug' message. Usage:
 --
@@ -171,23 +168,23 @@ liftLoc (Loc a b c (d1, d2) (e1, e2)) = [|Loc
 --
 -- > $logDebug "SomeSource" "This is a debug log message"
 logDebugS :: Q Exp
-logDebugS = [|\a b -> monadLoggerLogSource $(qLocation >>= liftLoc) a LevelDebug (b :: Text)|]
+logDebugS = [|\a b -> monadLoggerLog $(qLocation >>= liftLoc) a LevelDebug (b :: Text)|]
 
 -- | See 'logDebugS'
 logInfoS :: Q Exp
-logInfoS = [|\a b -> monadLoggerLogSource $(qLocation >>= liftLoc) a LevelInfo (b :: Text)|]
+logInfoS = [|\a b -> monadLoggerLog $(qLocation >>= liftLoc) a LevelInfo (b :: Text)|]
 -- | See 'logDebugS'
 logWarnS :: Q Exp
-logWarnS = [|\a b -> monadLoggerLogSource $(qLocation >>= liftLoc) a LevelWarn (b :: Text)|]
+logWarnS = [|\a b -> monadLoggerLog $(qLocation >>= liftLoc) a LevelWarn (b :: Text)|]
 -- | See 'logDebugS'
 logErrorS :: Q Exp
-logErrorS = [|\a b -> monadLoggerLogSource $(qLocation >>= liftLoc) a LevelError (b :: Text)|]
+logErrorS = [|\a b -> monadLoggerLog $(qLocation >>= liftLoc) a LevelError (b :: Text)|]
 
 -- | Generates a function that takes a 'LogSource', a level name and a 'Text' and logs a 'LevelOther' message. Usage:
 --
 -- > $logOther "SomeSource" "My new level" "This is a log message"
 logOtherS :: Q Exp
-logOtherS = [|\src level msg -> monadLoggerLogSource $(qLocation >>= liftLoc) src (LevelOther level) (msg :: Text)|]
+logOtherS = [|\src level msg -> monadLoggerLog $(qLocation >>= liftLoc) src (LevelOther level) (msg :: Text)|]
 
 -- | Monad transformer that disables logging.
 --
@@ -235,8 +232,7 @@ instance MonadBaseControl b m => MonadBaseControl b (NoLoggingT m) where
      restoreM (StMT' base) = NoLoggingT $ restoreM base
 
 instance MonadIO m => MonadLogger (NoLoggingT m) where
-    monadLoggerLog a b c = monadLoggerLogSource a empty b c
-    monadLoggerLogSource _ _ _ _ = return ()
+    monadLoggerLog _ _ _ _ = return ()
 
 -- | Monad transformer that adds a new logging function.
 --
@@ -287,8 +283,7 @@ instance MonadBaseControl b m => MonadBaseControl b (LoggingT m) where
      restoreM (StMT base) = LoggingT $ const $ restoreM base
 
 instance MonadIO m => MonadLogger (LoggingT m) where
-    monadLoggerLog a b c = monadLoggerLogSource a empty b c
-    monadLoggerLogSource a b c d = LoggingT $ \f -> liftIO $ f a b c (toLogStr d)
+    monadLoggerLog a b c d = LoggingT $ \f -> liftIO $ f a b c (toLogStr d)
 
 defaultOutput :: Handle
               -> Loc
