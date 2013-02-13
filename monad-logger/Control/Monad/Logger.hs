@@ -27,6 +27,7 @@ module Control.Monad.Logger
     , LoggingT (..)
     , runStderrLoggingT
     , runStdoutLoggingT
+    , NoLoggingT (..)
     -- * TH logging
     , logDebug
     , logInfo
@@ -106,10 +107,12 @@ class Monad m => MonadLogger m where
     monadLoggerLogSource :: ToLogStr msg => Loc -> LogSource -> LogLevel -> msg -> m ()
     monadLoggerLogSource loc _ level msg = monadLoggerLog loc level msg
 
+{-
 instance MonadLogger IO          where monadLoggerLog _ _ _ = return ()
 instance MonadLogger Identity    where monadLoggerLog _ _ _ = return ()
 instance MonadLogger (ST s)      where monadLoggerLog _ _ _ = return ()
 instance MonadLogger (Lazy.ST s) where monadLoggerLog _ _ _ = return ()
+-}
 
 #define DEF monadLoggerLog a b c = Trans.lift $ monadLoggerLog a b c; monadLoggerLogSource a b c d = Trans.lift $ monadLoggerLogSource a b c d
 instance MonadLogger m => MonadLogger (IdentityT m) where DEF
@@ -185,6 +188,55 @@ logErrorS = [|\a b -> monadLoggerLogSource $(qLocation >>= liftLoc) a LevelError
 -- > $logOther "SomeSource" "My new level" "This is a log message"
 logOtherS :: Q Exp
 logOtherS = [|\src level msg -> monadLoggerLogSource $(qLocation >>= liftLoc) src (LevelOther level) (msg :: Text)|]
+
+-- | Monad transformer that disables logging.
+--
+-- Since 0.3.0
+newtype NoLoggingT m a = NoLoggingT { runNoLoggingT :: m a }
+
+instance Monad m => Functor (NoLoggingT m) where
+    fmap = liftM
+
+instance Monad m => Applicative (NoLoggingT m) where
+    pure = return
+    (<*>) = ap
+
+instance Monad m => Monad (NoLoggingT m) where
+    return = NoLoggingT . return
+    NoLoggingT ma >>= f = NoLoggingT $ ma >>= runNoLoggingT . f
+
+instance MonadIO m => MonadIO (NoLoggingT m) where
+    liftIO = Trans.lift . liftIO
+
+instance MonadThrow m => MonadThrow (NoLoggingT m) where
+    monadThrow = Trans.lift . monadThrow
+
+instance MonadResource m => MonadResource (NoLoggingT m) where
+    liftResourceT = Trans.lift . liftResourceT
+
+instance MonadBase b m => MonadBase b (NoLoggingT m) where
+    liftBase = Trans.lift . liftBase
+
+instance Trans.MonadTrans NoLoggingT where
+    lift = NoLoggingT
+
+instance MonadTransControl NoLoggingT where
+    newtype StT NoLoggingT a = StIdent {unStIdent :: a}
+    liftWith f = NoLoggingT $ f $ \(NoLoggingT t) -> liftM StIdent t
+    restoreT = NoLoggingT . liftM unStIdent
+    {-# INLINE liftWith #-}
+    {-# INLINE restoreT #-}
+
+instance MonadBaseControl b m => MonadBaseControl b (NoLoggingT m) where
+     newtype StM (NoLoggingT m) a = StMT' (StM m a)
+     liftBaseWith f = NoLoggingT $
+         liftBaseWith $ \runInBase ->
+             f $ liftM StMT' . runInBase . (\(NoLoggingT r) -> r)
+     restoreM (StMT' base) = NoLoggingT $ restoreM base
+
+instance MonadIO m => MonadLogger (NoLoggingT m) where
+    monadLoggerLog a b c = monadLoggerLogSource a empty b c
+    monadLoggerLogSource _ _ _ _ = return ()
 
 -- | Monad transformer that adds a new logging function.
 --
