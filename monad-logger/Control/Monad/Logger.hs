@@ -7,12 +7,11 @@
 -- |  This module provides the facilities needed for a decoupled logging system.
 --
 -- The 'MonadLogger' class is implemented by monads that give access to a
--- logging facility.  Note that although 'IO', 'Identity' and 'ST' are
--- instances of 'MonadLogger', they will /discard all log messages/.  If you're
--- defining a custom monad, then you may define an instance of 'MonadLogger'
--- that routes the log messages to the appropriate place (e.g., that's what
--- @yesod-core@'s @GHandler@ does).  Otherwise, you may use the 'LoggingT'
--- monad included in this module (see 'runStderrLoggingT').
+-- logging facility.  If you're defining a custom monad, then you may define an
+-- instance of 'MonadLogger' that routes the log messages to the appropriate
+-- place (e.g., that's what @yesod-core@'s @GHandler@ does).  Otherwise, you
+-- may use the 'LoggingT' monad included in this module (see
+-- 'runStderrLoggingT'). To simply discard log message, use 'NoLoggingT'.
 --
 -- As a user of the logging facility, we provide you some convenient Template
 -- Haskell splices that use the 'MonadLogger' class.  They will record their
