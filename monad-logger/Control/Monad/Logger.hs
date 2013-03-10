@@ -39,6 +39,8 @@ module Control.Monad.Logger
     , logWarnS
     , logErrorS
     , logOtherS
+    -- * TH util
+    , liftLoc
     ) where
 
 import Language.Haskell.TH.Syntax (Lift (lift), Q, Exp, Loc (..), qLocation)
@@ -154,6 +156,9 @@ logError = logTH LevelError
 logOther :: Text -> Q Exp
 logOther = logTH . LevelOther
 
+-- | Lift a location into an Exp.
+--
+-- Since 0.3.1
 liftLoc :: Loc -> Q Exp
 liftLoc (Loc a b c (d1, d2) (e1, e2)) = [|Loc
     $(lift a)
