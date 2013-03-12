@@ -192,7 +192,7 @@ logOtherS = [|\src level msg -> monadLoggerLog $(qLocation >>= liftLoc) src (Lev
 
 -- | Monad transformer that disables logging.
 --
--- Since 0.3.0
+-- Since 0.2.4
 newtype NoLoggingT m a = NoLoggingT { runNoLoggingT :: m a }
 
 instance Monad m => Functor (NoLoggingT m) where
