@@ -31,14 +31,14 @@ showIPv6 :: (Word32,Word32,Word32,Word32) -> String
 showIPv6 (w1,w2,w3,w4) =
     printf "%x:%x:%x:%x:%x:%x:%x:%x" s1 s2 s3 s4 s5 s6 s7 s8
   where
-    (s1,s2) = foo w1
-    (s3,s4) = foo w2
-    (s5,s6) = foo w3
-    (s7,s8) = foo w4
-    foo w = (h1,h2)
+    (s1,s2) = split16 w1
+    (s3,s4) = split16 w2
+    (s5,s6) = split16 w3
+    (s7,s8) = split16 w4
+    split16 w = (h1,h2)
       where
-        h1 = w .&. 0x0000ffff
-        h2 = shift w (-16) .&. 0x0000ffff
+        h1 = shift w (-16) .&. 0x0000ffff
+        h2 = w .&. 0x0000ffff
 {-|
   Convert 'SockAddr' to 'NumericAddress'. If the address is
   an IPv4-embedded IPv6 address, the IPv4 is extracted.
