@@ -6,7 +6,7 @@ License:                BSD3
 License-File:           LICENSE
 Synopsis:               Date cacher
 Description:            Formatting time is slow. This package provides
-                        mechanisms to cache formatted date
+                        mechanisms to cache formatted date.
 Category:               System
 Cabal-Version:          >= 1.8
 Build-Type:             Simple
