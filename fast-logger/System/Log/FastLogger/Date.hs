@@ -31,6 +31,6 @@ zonedDateCacheConf = DateCacheConf {
 zonedDateCacheConf :: DateCacheConf EpochTime
 zonedDateCacheConf = DateCacheConf {
     getTime = epochTime
-  , formatDate = return . formatUnixTime "%d/%b/%Y:%T %z" . fromEpochTime
+  , formatDate = formatUnixTime "%d/%b/%Y:%T %z" . fromEpochTime
   }
 #endif
