@@ -41,6 +41,18 @@ module Control.Monad.Logger
     , logOtherS
     -- * TH util
     , liftLoc
+    -- * Non-TH logging
+    , logDebugN
+    , logInfoN
+    , logWarnN
+    , logErrorN
+    , logOtherN
+    -- * Non-TH logging with source
+    , logDebugNS
+    , logInfoNS
+    , logWarnNS
+    , logErrorNS
+    , logOtherNS
     ) where
 
 import Language.Haskell.TH.Syntax (Lift (lift), Q, Exp, Loc (..), qLocation)
@@ -360,3 +372,46 @@ instance MonadWriter w m => MonadWriter w (LoggingT m) where
   tell   = Trans.lift . tell
   listen = mapLoggingT listen
   pass   = mapLoggingT pass
+
+defaultLoc :: Loc
+defaultLoc = Loc "<unknown>" "<unknown>" "<unknown>" (0,0) (0,0)
+
+logDebugN :: MonadLogger m => Text -> m ()
+logDebugN msg =
+    monadLoggerLog defaultLoc "" LevelDebug msg
+
+logInfoN :: MonadLogger m => Text -> m ()
+logInfoN msg =
+    monadLoggerLog defaultLoc "" LevelInfo msg
+
+logWarnN :: MonadLogger m => Text -> m ()
+logWarnN msg =
+    monadLoggerLog defaultLoc "" LevelWarn msg
+
+logErrorN :: MonadLogger m => Text -> m ()
+logErrorN msg =
+    monadLoggerLog defaultLoc "" LevelError msg
+
+logOtherN :: MonadLogger m => LogLevel -> Text -> m ()
+logOtherN level msg =
+    monadLoggerLog defaultLoc "" level msg
+
+logDebugNS :: MonadLogger m => Text -> Text -> m ()
+logDebugNS src msg =
+    monadLoggerLog defaultLoc src LevelDebug msg
+
+logInfoNS :: MonadLogger m => Text -> Text -> m ()
+logInfoNS src msg =
+    monadLoggerLog defaultLoc src LevelInfo msg
+
+logWarnNS :: MonadLogger m => Text -> Text -> m ()
+logWarnNS src msg =
+    monadLoggerLog defaultLoc src LevelWarn msg
+
+logErrorNS :: MonadLogger m => Text -> Text -> m ()
+logErrorNS src msg =
+    monadLoggerLog defaultLoc src LevelError msg
+
+logOtherNS :: MonadLogger m => Text -> LogLevel -> Text -> m ()
+logOtherNS src level msg =
+    monadLoggerLog defaultLoc src level msg
