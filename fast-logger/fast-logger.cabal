@@ -28,7 +28,7 @@ Library
                       , time
   else
     Build-Depends:      unix
-                      , unix-time
+                      , unix-time >= 0.2
 
 Test-Suite spec
     Main-Is:         Spec.hs
