@@ -64,9 +64,6 @@ import Control.Applicative (Applicative (..))
 import Control.Monad (liftM, ap)
 import Control.Monad.Base (MonadBase (liftBase))
 import Control.Monad.Trans.Control (MonadBaseControl (..), MonadTransControl (..))
-import Data.Functor.Identity (Identity)
-import Control.Monad.ST (ST)
-import qualified Control.Monad.ST.Lazy as Lazy (ST)
 import qualified Control.Monad.Trans.Class as Trans
 
 import System.IO (stdout, stderr, Handle)
@@ -90,7 +87,7 @@ import qualified Control.Monad.Trans.RWS.Strict    as Strict ( RWST   )
 import qualified Control.Monad.Trans.State.Strict  as Strict ( StateT )
 import qualified Control.Monad.Trans.Writer.Strict as Strict ( WriterT )
 
-import Data.Text (Text, pack, unpack, empty)
+import Data.Text (Text, pack, unpack)
 import qualified Data.Text as T
 import qualified Data.ByteString.Char8 as S8
 import Data.Text.Encoding (encodeUtf8)
