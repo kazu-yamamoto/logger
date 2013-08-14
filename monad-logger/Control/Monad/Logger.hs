@@ -91,6 +91,7 @@ import qualified Control.Monad.Trans.RWS.Strict    as Strict ( RWST   )
 import qualified Control.Monad.Trans.State.Strict  as Strict ( StateT )
 import qualified Control.Monad.Trans.Writer.Strict as Strict ( WriterT )
 import Data.Reflection
+import Data.Proxy
 
 import Data.Text (Text, pack, unpack)
 import qualified Data.Text as T
@@ -207,7 +208,7 @@ logOtherS = [|\src level msg -> monadLoggerLog $(qLocation >>= liftLoc) src (Lev
 -- | Monad transformer that disables logging.
 --
 -- Since 0.3.2
-type Logger m = Loc -> LogSource -> LogLevel -> LogStr -> m ()
+newtype Logger m = Logger { runLogger :: Loc -> LogSource -> LogLevel -> LogStr -> m () }
 
 newtype RLoggingT s m a = RLoggingT { runRLoggingT :: m a }
 
@@ -252,7 +253,7 @@ instance MonadBaseControl b m => MonadBaseControl b (RLoggingT s m) where
      restoreM (StMT' base) = RLoggingT $ restoreM base
 
 instance (Monad m, Reifies s (Logger m)) => MonadLogger (RLoggingT s m) where
-    monadLoggerLog a b c d = RLoggingT $ reflect (undefined :: proxy s) a b c (toLogStr d)
+    monadLoggerLog a b c d = RLoggingT $ runLogger (reflect (Proxy :: Proxy s)) a b c (toLogStr d)
 
 instance MonadCont m => MonadCont (RLoggingT s m) where
   callCC f = RLoggingT $ callCC $ \c -> runRLoggingT (f (RLoggingT . c))
@@ -374,13 +375,13 @@ runLoggingT logger act = runRLoggingT $ reify logger (const act)
 
 -- Since 0.2.2
 runStderrLoggingT :: MonadIO m => LoggingT m a -> m a
-runStderrLoggingT = runLoggingT (defaultOutput stderr)
+runStderrLoggingT = runLoggingT (Logger (defaultOutput stderr))
 
 -- | Run a block using a @MonadLogger@ instance which prints to stdout.
 --
 -- Since 0.2.2
 runStdoutLoggingT :: MonadIO m => LoggingT m a -> m a
-runStdoutLoggingT = runLoggingT (defaultOutput stdout)
+runStdoutLoggingT = runLoggingT (Logger (defaultOutput stdout))
 
 defaultLoc :: Loc
 defaultLoc = Loc "<unknown>" "<unknown>" "<unknown>" (0,0) (0,0)
