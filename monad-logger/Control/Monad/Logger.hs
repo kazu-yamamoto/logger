@@ -182,7 +182,7 @@ liftLoc (Loc a b c (d1, d2) (e1, e2)) = [|Loc
 
 -- | Generates a function that takes a 'LogSource' and 'Text' and logs a 'LevelDebug' message. Usage:
 --
--- > $logDebug "SomeSource" "This is a debug log message"
+-- > $logDebugS "SomeSource" "This is a debug log message"
 logDebugS :: Q Exp
 logDebugS = [|\a b -> monadLoggerLog $(qLocation >>= liftLoc) a LevelDebug (b :: Text)|]
 
@@ -198,7 +198,7 @@ logErrorS = [|\a b -> monadLoggerLog $(qLocation >>= liftLoc) a LevelError (b ::
 
 -- | Generates a function that takes a 'LogSource', a level name and a 'Text' and logs a 'LevelOther' message. Usage:
 --
--- > $logOther "SomeSource" "My new level" "This is a log message"
+-- > $logOtherS "SomeSource" "My new level" "This is a log message"
 logOtherS :: Q Exp
 logOtherS = [|\src level msg -> monadLoggerLog $(qLocation >>= liftLoc) src (LevelOther level) (msg :: Text)|]
 
