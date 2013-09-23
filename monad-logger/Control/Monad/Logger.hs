@@ -1,8 +1,10 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE UndecidableInstances #-}
 -- |  This module provides the facilities needed for a decoupled logging system.
 --
@@ -26,6 +28,7 @@ module Control.Monad.Logger
     , LoggingT (..)
     , runStderrLoggingT
     , runStdoutLoggingT
+    , withChannelLogger
     , NoLoggingT (..)
     -- * TH logging
     , logDebug
@@ -61,8 +64,12 @@ import System.Log.FastLogger (ToLogStr (toLogStr), LogStr (..))
 import Data.Monoid (Monoid)
 
 import Control.Applicative (Applicative (..))
-import Control.Monad (liftM, ap)
+import Control.Concurrent.STM
+import Control.Concurrent.STM.TBChan
+import Control.Exception.Lifted
+import Control.Monad (liftM, ap, when, void)
 import Control.Monad.Base (MonadBase (liftBase))
+import Control.Monad.Loops (untilM)
 import Control.Monad.Trans.Control (MonadBaseControl (..), MonadTransControl (..))
 import Data.Functor.Identity (Identity)
 import Control.Monad.ST (ST)
@@ -347,6 +354,27 @@ runStderrLoggingT = (`runLoggingT` defaultOutput stderr)
 -- Since 0.2.2
 runStdoutLoggingT :: MonadIO m => LoggingT m a -> m a
 runStdoutLoggingT = (`runLoggingT` defaultOutput stdout)
+
+-- | Within the 'LoggingT' monad, capture all log messages to a bounded
+--   channel of the indicated size, and only actually log them if there is an
+--   exception.
+--
+-- Since 0.3.2
+withChannelLogger :: (MonadBaseControl IO m, MonadIO m)
+                  => Int         -- ^ Number of mesasges to keep
+                  -> LoggingT m a
+                  -> LoggingT m a
+withChannelLogger size action = LoggingT $ \logger -> do
+    chan <- liftIO $ newTBChanIO size
+    runLoggingT action (channelLogger chan logger) `onException` dumpLogs chan
+  where
+    channelLogger chan logger loc src lvl str = atomically $ do
+        full <- isFullTBChan chan
+        when full $ void $ readTBChan chan
+        writeTBChan chan $ logger loc src lvl str
+
+    dumpLogs chan = liftIO $
+        sequence_ =<< atomically (untilM (readTBChan chan) (isEmptyTBChan chan))
 
 instance MonadCont m => MonadCont (LoggingT m) where
   callCC f = LoggingT $ \i -> callCC $ \c -> runLoggingT (f (LoggingT . const . c)) i
