@@ -14,16 +14,17 @@ cabal-version:       >=1.8
 
 library
   exposed-modules:     Control.Monad.Logger
-  build-depends:       base               >= 4         && < 5
+  build-depends:       base                 >= 4         && < 5
                      , template-haskell
                      , transformers
                      , text
                      , stm
                      , stm-chans
                      , lifted-base
-                     , resourcet          >= 0.4       && < 0.5
-                     , conduit            >= 1.0       && < 1.1
-                     , fast-logger        >= 0.2       && < 0.4
+                     , resourcet            >= 0.4       && < 0.5
+                     , conduit              >= 1.0       && < 1.1
+                     , fast-logger          >= 0.2       && < 0.4
+                     , text-locale-encoding >= 0.1       && < 0.2
                      , transformers-base
                      , monad-control
                      , monad-loops
