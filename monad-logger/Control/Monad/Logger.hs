@@ -99,8 +99,9 @@ import qualified Control.Monad.Trans.Writer.Strict as Strict ( WriterT )
 
 import Data.Text (Text, pack, unpack, empty)
 import qualified Data.Text as T
-import qualified Data.ByteString.Char8 as S8
-import Data.Text.Encoding (encodeUtf8)
+import qualified Data.Text.IO.Locale as TIOL (hPutStrLn)
+import Data.Text.Encoding (decodeUtf8With)
+import Data.Text.Encoding.Error (lenientDecode)
 
 import Control.Monad.Cont.Class   ( MonadCont (..) )
 import Control.Monad.Error.Class  ( MonadError (..) )
@@ -315,23 +316,23 @@ defaultOutput :: Handle
               -> LogStr
               -> IO ()
 defaultOutput h loc src level msg =
-    S8.hPutStrLn h $ S8.concat bs
+    TIOL.hPutStrLn h $ T.concat bs
   where
     bs =
-        [ S8.pack "["
+        [ "["
         , case level of
-            LevelOther t -> encodeUtf8 t
-            _ -> encodeUtf8 $ pack $ drop 5 $ show level
+            LevelOther t -> t
+            _ -> pack $ drop 5 $ show level
         , if T.null src
-            then S8.empty
-            else encodeUtf8 $ '#' `T.cons` src
-        , S8.pack "] "
+            then empty
+            else '#' `T.cons` src
+        , "] "
         , case msg of
-            LS s -> encodeUtf8 $ pack s
-            LB b -> b
-        , S8.pack " @("
-        , encodeUtf8 $ pack fileLocStr
-        , S8.pack ")\n"
+            LS s -> pack s
+            LB b -> decodeUtf8With lenientDecode b
+        , " @("
+        , pack fileLocStr
+        , ")\n"
         ]
 
     -- taken from file-location package
