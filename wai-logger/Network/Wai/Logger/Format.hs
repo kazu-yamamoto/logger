@@ -19,6 +19,10 @@ import Network.Wai
 import Network.Wai.Logger.Utils
 import System.Log.FastLogger
 
+-- $setup
+-- >>> :set -XOverloadedStrings
+-- >>> import Network.Wai.Test
+
 {-| Source from which the IP source address of the client is obtained.
 -}
 data IPAddrSource =
@@ -26,11 +30,13 @@ data IPAddrSource =
     FromSocket
   -- | From X-Real-IP: or X-Forwarded-For: in the HTTP header.
   | FromHeader
+  -- | From the peer address if header is not found.
+  | FromFallback
 
 -- | Apache style log format.
 apacheFormat :: IPAddrSource -> ZonedDate -> Request -> Status -> Maybe Integer -> [LogStr]
 apacheFormat ipsrc tmstr req st msize = [
-    getSourceIP ipsrc req
+    getSourceIPLogStr ipsrc req
   , LB " - - ["
   , LB tmstr
   , LB "] \""
@@ -55,7 +61,7 @@ apacheFormat ipsrc tmstr req st msize = [
 -}
 apacheFormatBuilder :: IPAddrSource -> ZonedDate -> Request -> Status -> Maybe Integer -> Builder
 apacheFormatBuilder ipsrc tmstr req status msize =
-      getSourceIP' ipsrc req
+      getSourceIPBuilder ipsrc req
   +++ bs " - - ["
   +++ bs tmstr
   +++ bs "] \""
@@ -81,17 +87,59 @@ apacheFormatBuilder ipsrc tmstr req status msize =
 lookupRequestField' :: CI ByteString -> Request -> ByteString
 lookupRequestField' k req = fromMaybe "" . lookup k $ requestHeaders req
 
-getSourceIP :: IPAddrSource -> Request -> LogStr
-getSourceIP FromSocket = LS . showSockAddr . remoteHost
-getSourceIP FromHeader = LB . getSource
+getSourceIPLogStr :: IPAddrSource -> Request -> LogStr
+getSourceIPLogStr = getSourceIP LS LB
 
-getSourceIP' :: IPAddrSource -> Request -> Builder
-getSourceIP' FromSocket = fromString . showSockAddr . remoteHost
-getSourceIP' FromHeader = fromByteString . getSource
+getSourceIPBuilder :: IPAddrSource -> Request -> Builder
+getSourceIPBuilder = getSourceIP fromString fromByteString
 
-getSource :: Request -> ByteString
+getSourceIP :: (String -> a) -> (ByteString -> a) -> IPAddrSource -> Request -> a
+getSourceIP f _ FromSocket = f . getSourceFromSocket
+getSourceIP _ g FromHeader = g . getSourceFromHeader
+getSourceIP f g FromFallback = either f g . getSourceFromFallback
+
+-- |
+-- >>> getSourceFromSocket defaultRequest
+-- "0.0.0.0"
+getSourceFromSocket :: Request -> String
+getSourceFromSocket = showSockAddr . remoteHost
+
+-- |
+-- >>> getSourceFromHeader defaultRequest { requestHeaders = [ ("X-Real-IP", "127.0.0.1") ] }
+-- "127.0.0.1"
+-- >>> getSourceFromHeader defaultRequest { requestHeaders = [ ("X-Forwarded-For", "127.0.0.1") ] }
+-- "127.0.0.1"
+-- >>> getSourceFromHeader defaultRequest { requestHeaders = [ ("Something", "127.0.0.1") ] }
+-- ""
+-- >>> getSourceFromHeader defaultRequest { requestHeaders = [] }
+-- ""
+getSourceFromHeader :: Request -> ByteString
+getSourceFromHeader = fromMaybe "" . getSource
+
+-- |
+-- >>> getSourceFromFallback defaultRequest { requestHeaders = [ ("X-Real-IP", "127.0.0.1") ] }
+-- Right "127.0.0.1"
+-- >>> getSourceFromFallback defaultRequest { requestHeaders = [ ("X-Forwarded-For", "127.0.0.1") ] }
+-- Right "127.0.0.1"
+-- >>> getSourceFromFallback defaultRequest { requestHeaders = [ ("Something", "127.0.0.1") ] }
+-- Left "0.0.0.0"
+-- >>> getSourceFromFallback defaultRequest { requestHeaders = [] }
+-- Left "0.0.0.0"
+getSourceFromFallback :: Request -> Either String ByteString
+getSourceFromFallback req = maybe (Left $ getSourceFromSocket req) Right $ getSource req
+
+-- |
+-- >>> getSource defaultRequest { requestHeaders = [ ("X-Real-IP", "127.0.0.1") ] }
+-- Just "127.0.0.1"
+-- >>> getSource defaultRequest { requestHeaders = [ ("X-Forwarded-For", "127.0.0.1") ] }
+-- Just "127.0.0.1"
+-- >>> getSource defaultRequest { requestHeaders = [ ("Something", "127.0.0.1") ] }
+-- Nothing
+-- >>> getSource defaultRequest
+-- Nothing
+getSource :: Request -> Maybe ByteString
 getSource req = addr
   where
     maddr = find (\x -> fst x `elem` ["x-real-ip", "x-forwarded-for"]) hdrs
-    addr = maybe "" snd maddr
+    addr = fmap snd maddr
     hdrs = requestHeaders req
