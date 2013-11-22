@@ -7,9 +7,11 @@ License-File:           LICENSE
 Synopsis:               A logging system for WAI
 Description:            A logging system for WAI
 Category:               Web, Yesod
-Cabal-Version:          >= 1.6
+Cabal-Version:          >= 1.10
 Build-Type:             Simple
-library
+
+Library
+  Default-Language:     Haskell2010
   GHC-Options:          -Wall
   Exposed-Modules:      Network.Wai.Logger
                         Network.Wai.Logger.Format
@@ -24,6 +26,17 @@ library
                       , http-types
                       , network
                       , wai
+
+Test-Suite doctest
+  Type:                 exitcode-stdio-1.0
+  Default-Language:     Haskell2010
+  HS-Source-Dirs:       test
+  Ghc-Options:          -Wall
+  Main-Is:              doctests.hs
+  Build-Depends:        base
+                      , doctest
+                      , wai-test
+
 Source-Repository head
   Type:                 git
   Location:             git://github.com/kazu-yamamoto/logger.git
