@@ -2,6 +2,7 @@ module Network.Wai.Logger (
   -- * Types
     IPAddrSource(..)
   , LogType(..)
+  , FileLogSpec(..)
   , ApacheLogger
   , LogFlusher
   , LogRotator
