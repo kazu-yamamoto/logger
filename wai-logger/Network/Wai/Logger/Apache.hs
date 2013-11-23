@@ -87,13 +87,13 @@ getSourceFromHeader = fromMaybe "" . getSource
 
 -- |
 -- >>> getSourceFromFallback defaultRequest { requestHeaders = [ ("X-Real-IP", "127.0.0.1") ] }
--- Right "127.0.0.1"
+-- "127.0.0.1"
 -- >>> getSourceFromFallback defaultRequest { requestHeaders = [ ("X-Forwarded-For", "127.0.0.1") ] }
--- Right "127.0.0.1"
+-- "127.0.0.1"
 -- >>> getSourceFromFallback defaultRequest { requestHeaders = [ ("Something", "127.0.0.1") ] }
--- Left "0.0.0.0"
+-- "0.0.0.0"
 -- >>> getSourceFromFallback defaultRequest { requestHeaders = [] }
--- Left "0.0.0.0"
+-- "0.0.0.0"
 getSourceFromFallback :: Request -> ByteString
 getSourceFromFallback req = fromMaybe (getSourceFromSocket req) $ getSource req
 
