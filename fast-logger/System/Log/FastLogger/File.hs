@@ -6,7 +6,7 @@ import System.FilePath
 
 -- | The spec for logging files
 data FileLogSpec = FileLogSpec {
-    log_file :: String
+    log_file :: FilePath
   , log_file_size :: Integer
   , log_backup_number :: Int
   }
