@@ -1,18 +1,18 @@
 {-# LANGUAGE BangPatterns #-}
 
 module System.Log.FastLogger (
-  -- * LogMsg
-    LogMsg
-  , fromByteString
-  -- * LoggerSet
+  -- * Creating a logger set
+    LoggerSet
   , BufSize
-  , LoggerSet
+  , logOpen
   , newLoggerSet
   , renewLoggerSet
+  -- * Writing a log message
   , pushLogMsg
+  , LogMsg
+  , fromByteString
+  -- * Flushing buffered log messages
   , flushLogMsg
-  -- * Utilities
-  , logOpen
   -- * File rotation
   , module System.Log.FastLogger.File
   ) where
@@ -37,6 +37,7 @@ import System.Posix.Types (Fd)
 ----------------------------------------------------------------
 
 type Buffer = Ptr Word8
+-- | The type for buffer size of each core.
 type BufSize = Int
 
 ----------------------------------------------------------------
@@ -122,6 +123,7 @@ flushLog fd (Logger mbuf size lref) = do
 
 ----------------------------------------------------------------
 
+-- | Opening a log file. FIXME: Windows support.
 logOpen :: FilePath -> IO Fd
 logOpen file = openFd file WriteOnly (Just 0o644) flags
   where
@@ -132,8 +134,13 @@ getBuffer = mallocBytes
 
 ----------------------------------------------------------------
 
+-- | A set of loggers.
+--   The number of loggers is the capabilities of GHC RTS.
+--   You can specify it with \"+RTS -N\<x\>\".
+--   A buffer is prepared for each capability.
 data LoggerSet = LoggerSet (IORef Fd) (Array Int Logger)
 
+-- | Creating a new 'LoggerSet'.
 newLoggerSet :: Fd -> BufSize -> IO LoggerSet
 newLoggerSet fd size = do
     n <- getNumCapabilities
@@ -142,6 +149,7 @@ newLoggerSet fd size = do
     fref <- newIORef fd
     return $ LoggerSet fref arr
 
+-- | Writing a log message to the corresponding buffer.
 pushLogMsg :: LoggerSet -> LogMsg -> IO ()
 pushLogMsg (LoggerSet fref arr) logmsg = do
     (i, _) <- myThreadId >>= threadCapability
@@ -149,6 +157,7 @@ pushLogMsg (LoggerSet fref arr) logmsg = do
     fd <- readIORef fref
     pushLog fd logger logmsg
 
+-- | Flushing log messages in buffers.
 flushLogMsg :: LoggerSet -> IO ()
 flushLogMsg (LoggerSet fref arr) = do
     n <- getNumCapabilities
