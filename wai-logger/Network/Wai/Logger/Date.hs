@@ -29,7 +29,9 @@ import System.Posix (EpochTime, epochTime)
 
 ----------------------------------------------------------------
 
+-- | Getting cached 'ZonedDate'.
 type DateCacheGetter = IO ZonedDate
+-- | Updateing cached 'ZonedDate'. This should be called every second.
 type DateCacheUpdater = IO ()
 
 ----------------------------------------------------------------
@@ -77,8 +79,8 @@ newDate :: DateCacheConf t -> t -> IO (DateCache t)
 newDate setting tm = DateCache tm <$> formatDate setting tm
 
 -- |
--- Date cacher which gets a time and formatted it every second.
--- This returns a getter.
+-- Returning 'DateCacheGetter' and 'DateCacheUpdater'.
+
 clockDateCacher :: IO (DateCacheGetter, DateCacheUpdater)
 clockDateCacher = do
     ref <- getTime zonedDateCacheConf >>= newDate zonedDateCacheConf >>= newIORef

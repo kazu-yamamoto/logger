@@ -1,17 +1,19 @@
 module Network.Wai.Logger (
+  -- * Creating a logger
+    ApacheLogger
+  , initLogger
   -- * Types
-    IPAddrSource(..)
+  , IPAddrSource(..)
   , LogType(..)
   , FileLogSpec(..)
-  , ApacheLogger
   , LogFlusher
   , LogRotator
+  -- * Date cacher
+  , clockDateCacher
+  , ZonedDate
   , DateCacheGetter
   , DateCacheUpdater
-  , ZonedDate
   -- * Utilities
-  , clockDateCacher
-  , initLogger
   , logCheck
   ) where
 
@@ -29,14 +31,28 @@ import Network.Wai.Logger.Date
 
 ----------------------------------------------------------------
 
+-- | Apache style logger.
 type ApacheLogger = Request -> Status -> Maybe Integer -> IO ()
 
+-- | Flushing log messages in the buffers.
+--   This is explicitly called from your program.
+--   Probably, one second and 10 seconds is proper to stdout and
+--   log files, respectively. See an example code in the beginning
+--   of this file.
 type LogFlusher = IO ()
+-- | Rotating log files.
+--   This is explicitly called from your program.
+--   Probably, 10 seconds is proper.
 type LogRotator = IO ()
 
-data LogType = LogNone
-             | LogStdout BufSize
-             | LogFile FileLogSpec BufSize
+-- | Logger Type.
+data LogType = LogNone                     -- ^ No logging.
+             | LogStdout BufSize           -- ^ Logging to stdout.
+                                           --   'BufSize' is a buffer size
+                                           --   for each capability.
+             | LogFile FileLogSpec BufSize -- ^ Logging to a file.
+                                           --   'BufSize' is a buffer size
+                                           --   for each capability.
 
 ----------------------------------------------------------------
 
