@@ -18,8 +18,8 @@ import System.Log.FastLogger
 import System.Posix.Files (getFileStatus, fileSize)
 import System.Posix.IO
 
+import Network.Wai.Logger.Apache
 import Network.Wai.Logger.Date
-import Network.Wai.Logger.Format
 
 ----------------------------------------------------------------
 

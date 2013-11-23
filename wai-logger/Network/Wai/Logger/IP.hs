@@ -1,4 +1,4 @@
-module Network.Wai.Logger.Utils (
+module Network.Wai.Logger.IP (
     NumericAddress, showSockAddr
   ) where
 

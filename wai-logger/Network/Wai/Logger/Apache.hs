@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Network.Wai.Logger.Format (
+module Network.Wai.Logger.Apache (
     IPAddrSource(..)
   , apacheLogMsg
   ) where
@@ -14,7 +14,7 @@ import Data.Monoid
 import Network.HTTP.Types
 import Network.Wai
 import Network.Wai.Logger.Date
-import Network.Wai.Logger.Utils
+import Network.Wai.Logger.IP
 import System.Log.FastLogger
 
 -- $setup
