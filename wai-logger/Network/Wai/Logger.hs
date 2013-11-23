@@ -1,10 +1,15 @@
 module Network.Wai.Logger (
   -- * Types
-    LogType(..)
+    IPAddrSource(..)
+  , LogType(..)
   , ApacheLogger
   , LogFlusher
   , LogRotator
+  , DateCacheGetter
+  , DateCacheUpdater
+  , ZonedDate
   -- * Utilities
+  , clockDateCacher
   , initLogger
   , logCheck
   ) where

@@ -29,7 +29,7 @@ import System.Posix (EpochTime, epochTime)
 
 ----------------------------------------------------------------
 
-type DateCacheGetter = IO ByteString
+type DateCacheGetter = IO ZonedDate
 type DateCacheUpdater = IO ()
 
 ----------------------------------------------------------------
@@ -79,15 +79,15 @@ newDate setting tm = DateCache tm <$> formatDate setting tm
 -- |
 -- Date cacher which gets a time and formatted it every second.
 -- This returns a getter.
-clockDateCacher :: Eq t => DateCacheConf t -> IO (DateCacheGetter, DateCacheUpdater)
-clockDateCacher setting = do
-    ref <- getTime setting >>= newDate setting >>= newIORef
+clockDateCacher :: IO (DateCacheGetter, DateCacheUpdater)
+clockDateCacher = do
+    ref <- getTime zonedDateCacheConf >>= newDate zonedDateCacheConf >>= newIORef
     return $! (getter ref, clock ref)
   where
     getter ref = formattedDate <$> readIORef ref
     clock ref = do
-        tm <- getTime setting
-        date <- formatDate setting tm
+        tm <- getTime zonedDateCacheConf
+        date <- formatDate zonedDateCacheConf tm
         let new = DateCache {
                 timeKey = tm
               , formattedDate = date
