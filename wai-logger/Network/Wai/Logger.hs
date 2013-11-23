@@ -1,6 +1,8 @@
 module Network.Wai.Logger (
-  -- * Creating a logger
+  -- * High level functions
     ApacheLogger
+  , withStdoutLogger
+  -- * Creating a logger
   , initLogger
   -- * Types
   , IPAddrSource(..)
@@ -18,7 +20,8 @@ module Network.Wai.Logger (
   ) where
 
 import Control.Applicative ((<$>))
-import Control.Exception (handle,SomeException(..))
+import Control.Concurrent (forkIO, threadDelay, killThread)
+import Control.Exception (handle, SomeException(..), bracket)
 import Control.Monad (when)
 import Network.HTTP.Types
 import Network.Wai
@@ -28,6 +31,25 @@ import System.Posix.IO
 
 import Network.Wai.Logger.Apache
 import Network.Wai.Logger.Date
+
+----------------------------------------------------------------
+
+-- | Executing a function which takes 'ApacheLogger'.
+--   This 'ApacheLogger' writes log message to stdout.
+--   Each buffer is flushed every second.
+withStdoutLogger :: (ApacheLogger -> IO ()) -> IO ()
+withStdoutLogger app = bracket setup teardown $ \(aplogger, _) ->
+    app aplogger
+  where
+    setup = do
+        (getter, updater) <- clockDateCacher
+        (aplogger, flusher, _) <- initLogger FromFallback (LogStdout 4096) getter
+        t <- forkIO $ do
+            threadDelay 1000000
+            updater
+            flusher
+        return (aplogger, t)
+    teardown (_, t) = killThread t
 
 ----------------------------------------------------------------
 
