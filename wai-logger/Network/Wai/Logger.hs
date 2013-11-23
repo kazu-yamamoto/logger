@@ -1,73 +1,103 @@
-{-# LANGUAGE OverloadedStrings #-}
-
--- | Logging system for WAI applications.
---
--- Sample code:
---
--- > {-# LANGUAGE OverloadedStrings #-}
--- > module Main where
--- >
--- > import Blaze.ByteString.Builder (fromByteString)
--- > import Control.Monad.IO.Class (liftIO)
--- > import Data.ByteString.Char8
--- > import Network.HTTP.Types (status200)
--- > import Network.Wai
--- > import Network.Wai.Handler.Warp
--- > import Network.Wai.Logger
--- >
--- > main :: IO ()
--- > main = do
--- >     aplogger <- stdoutApacheLoggerInit FromSocket True
--- >     run 3000 $ logapp aplogger
--- >
--- > logapp :: ApacheLogger -> Application
--- > logapp aplogger req = do
--- >     let status = status200
--- >         len = 4
--- >     liftIO $ aplogger req status (Just len)
--- >     return $ ResponseBuilder status
--- >         [("Content-Type", "text/plain")
--- >         ,("Content-Length", pack (show len))]
--- >         $ fromByteString "PONG"
-
 module Network.Wai.Logger (
-    ApacheLogger
-  , stdoutApacheLoggerInit
-  , stdoutApacheLoggerInit2
-  , module Network.Wai.Logger.Format
-  , module Network.Wai.Logger.Utils
+  -- * Types
+    LogType(..)
+  , ApacheLogger
+  , LogFlusher
+  , LogRotator
+  -- * Utilities
+  , initLogger
+  , logCheck
   ) where
 
-import Control.Applicative
+import Control.Applicative ((<$>))
+import Control.Exception (handle,SomeException(..))
+import Control.Monad (when)
 import Network.HTTP.Types
 import Network.Wai
-import Network.Wai.Logger.Format
-import Network.Wai.Logger.Utils
-import System.Date.Cache
-import System.IO
 import System.Log.FastLogger
+import System.Posix.Files (getFileStatus, fileSize)
+import System.Posix.IO
 
--- | Apache style logger for WAI
+import Network.Wai.Logger.Date
+import Network.Wai.Logger.Format
+
+----------------------------------------------------------------
+
 type ApacheLogger = Request -> Status -> Maybe Integer -> IO ()
 
--- | Obtaining Apache style logger to stdout
-stdoutApacheLoggerInit :: IPAddrSource
-                       -> Bool -- ^ Automatically flush on each logging?
-                       -> IO ApacheLogger
-stdoutApacheLoggerInit ipsrc autoFlash =
-    stdoutLogger ipsrc <$> mkLogger autoFlash stdout
+type LogFlusher = IO ()
+type LogRotator = IO ()
 
--- | Obtaining Apache style logger to stdout
-stdoutApacheLoggerInit2 :: IPAddrSource
-                        -> Bool -- ^ Automatically flush on each logging?
-                        -> (DateCacheGetter, DateCacheCloser)
-                        -> IO ApacheLogger
-stdoutApacheLoggerInit2 ipsrc autoFlash dc =
-    stdoutLogger ipsrc <$> mkLogger2 autoFlash stdout dc
+data LogType = LogNone
+             | LogStdout BufSize
+             | LogFile FileLogSpec BufSize
 
-stdoutLogger :: IPAddrSource -> Logger -> ApacheLogger
-stdoutLogger ipsrc logger req status msiz = do
-    date <- loggerDate logger
-    loggerPutStr logger $ logmsg date
+----------------------------------------------------------------
+
+-- |
+-- Creating 'ApacheLogger' according to 'LogType'.
+initLogger :: IPAddrSource -> LogType -> DateCacheGetter -> IO (ApacheLogger, LogFlusher, LogRotator)
+initLogger _     LogNone             _       = noLoggerInit
+initLogger ipsrc (LogStdout size)    dateget = stdoutLoggerInit ipsrc size dateget
+initLogger ipsrc (LogFile spec size) dateget = fileLoggerInit ipsrc spec size dateget
+
+----------------------------------------------------------------
+
+noLoggerInit :: IO (ApacheLogger, LogFlusher, LogRotator)
+noLoggerInit = return $! (noLogger, noFlusher, noRotator)
   where
-    logmsg date = apacheFormat ipsrc date req status msiz
+    noLogger _ _ _ = return ()
+    noFlusher = return ()
+    noRotator = return ()
+
+stdoutLoggerInit :: IPAddrSource -> BufSize -> DateCacheGetter
+                 -> IO (ApacheLogger, LogFlusher, LogRotator)
+stdoutLoggerInit ipsrc size dateget = do
+    lgrset <- newLoggerSet stdOutput size
+    let logger = apache lgrset ipsrc dateget
+        flusher = flushLogMsg lgrset
+        noRotater = return ()
+    return $! (logger, flusher, noRotater)
+
+fileLoggerInit :: IPAddrSource -> FileLogSpec -> BufSize -> DateCacheGetter
+               -> IO (ApacheLogger, LogFlusher, LogRotator)
+fileLoggerInit ipsrc spec size dateget = do
+    fd <- logOpen (log_file spec)
+    lgrset <- newLoggerSet fd size
+    let logger = apache lgrset ipsrc dateget
+        flusher = flushLogMsg lgrset
+        rotator = logRotater lgrset spec
+    return $! (logger, flusher, rotator)
+
+----------------------------------------------------------------
+
+apache :: LoggerSet -> IPAddrSource -> DateCacheGetter -> ApacheLogger
+apache lgrset ipsrc dateget req st mlen = do
+    zdata <- dateget
+    pushLogMsg lgrset (apacheLogMsg ipsrc zdata req st mlen)
+
+----------------------------------------------------------------
+
+logRotater :: LoggerSet -> FileLogSpec -> IO ()
+logRotater lgrset spec = do
+    over <- isOver
+    when over $ do
+        rotate spec
+        logOpen (log_file spec) >>= renewLoggerSet lgrset
+  where
+    file = log_file spec
+    isOver = handle (\(SomeException _) -> return False) $ do
+        siz <- fromIntegral . fileSize <$> getFileStatus file
+        if siz > log_file_size spec then
+            return True
+          else
+            return False
+
+----------------------------------------------------------------
+
+-- |
+-- Checking if a log file can be written if 'LogType' is 'LogFile'.
+logCheck :: LogType -> IO ()
+logCheck LogNone          = return ()
+logCheck (LogStdout _)    = return ()
+logCheck (LogFile spec _) = check spec

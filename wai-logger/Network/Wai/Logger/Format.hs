@@ -2,20 +2,18 @@
 
 module Network.Wai.Logger.Format (
     IPAddrSource(..)
-  , apacheFormat
-  -- * Builder
-  , apacheFormatBuilder
+  , apacheLogMsg
   ) where
 
-import Blaze.ByteString.Builder
-import Blaze.ByteString.Builder.Char8
 import Data.ByteString.Char8 (ByteString)
+import qualified Data.ByteString.Char8 as BS
 import Data.CaseInsensitive
 import Data.List
 import Data.Maybe
 import Data.Monoid
 import Network.HTTP.Types
 import Network.Wai
+import Network.Wai.Logger.Date
 import Network.Wai.Logger.Utils
 import System.Log.FastLogger
 
@@ -34,34 +32,9 @@ data IPAddrSource =
   | FromFallback
 
 -- | Apache style log format.
-apacheFormat :: IPAddrSource -> ZonedDate -> Request -> Status -> Maybe Integer -> [LogStr]
-apacheFormat ipsrc tmstr req st msize = [
-    getSourceIPLogStr ipsrc req
-  , LB " - - ["
-  , LB tmstr
-  , LB "] \""
-  , LB $ requestMethod req
-  , LB " "
-  , LB $ rawPathInfo req
-  , LB " "
-  , LS $ show . httpVersion $ req
-  , LB "\" "
-  , LS . show . statusCode $ st
-  , LB " "
-  , LS $ maybe "-" show msize
-  , LB " \""
-  , LB $ lookupRequestField' "referer" req
-  , LB "\" \""
-  , LB $ lookupRequestField' "user-agent" req
-  , LB "\"\n"
-  ]
-
-{-| Apache style log format with 'Builder'. This is experimental.
-    This would replace 'apacheFormat' someday.
--}
-apacheFormatBuilder :: IPAddrSource -> ZonedDate -> Request -> Status -> Maybe Integer -> Builder
-apacheFormatBuilder ipsrc tmstr req status msize =
-      getSourceIPBuilder ipsrc req
+apacheLogMsg :: IPAddrSource -> ZonedDate -> Request -> Status -> Maybe Integer -> LogMsg
+apacheLogMsg ipsrc tmstr req status msize =
+      bs (getSourceIP ipsrc req)
   +++ bs " - - ["
   +++ bs tmstr
   +++ bs "] \""
@@ -80,29 +53,25 @@ apacheFormatBuilder ipsrc tmstr req status msize =
   +++ bs (lookupRequestField' "user-agent" req)
   +++ bs "\"\n"
   where
-    st = fromString
+    st = bs . BS.pack
     bs = fromByteString
     (+++) = mappend
 
 lookupRequestField' :: CI ByteString -> Request -> ByteString
 lookupRequestField' k req = fromMaybe "" . lookup k $ requestHeaders req
 
-getSourceIPLogStr :: IPAddrSource -> Request -> LogStr
-getSourceIPLogStr = getSourceIP LS LB
+-- getSourceIP = getSourceIP fromString fromByteString
 
-getSourceIPBuilder :: IPAddrSource -> Request -> Builder
-getSourceIPBuilder = getSourceIP fromString fromByteString
-
-getSourceIP :: (String -> a) -> (ByteString -> a) -> IPAddrSource -> Request -> a
-getSourceIP f _ FromSocket = f . getSourceFromSocket
-getSourceIP _ g FromHeader = g . getSourceFromHeader
-getSourceIP f g FromFallback = either f g . getSourceFromFallback
+getSourceIP :: IPAddrSource -> Request -> ByteString
+getSourceIP FromSocket   = getSourceFromSocket
+getSourceIP FromHeader   = getSourceFromHeader
+getSourceIP FromFallback = getSourceFromFallback
 
 -- |
 -- >>> getSourceFromSocket defaultRequest
 -- "0.0.0.0"
-getSourceFromSocket :: Request -> String
-getSourceFromSocket = showSockAddr . remoteHost
+getSourceFromSocket :: Request -> ByteString
+getSourceFromSocket = BS.pack . showSockAddr . remoteHost
 
 -- |
 -- >>> getSourceFromHeader defaultRequest { requestHeaders = [ ("X-Real-IP", "127.0.0.1") ] }
@@ -125,8 +94,8 @@ getSourceFromHeader = fromMaybe "" . getSource
 -- Left "0.0.0.0"
 -- >>> getSourceFromFallback defaultRequest { requestHeaders = [] }
 -- Left "0.0.0.0"
-getSourceFromFallback :: Request -> Either String ByteString
-getSourceFromFallback req = maybe (Left $ getSourceFromSocket req) Right $ getSource req
+getSourceFromFallback :: Request -> ByteString
+getSourceFromFallback req = fromMaybe (getSourceFromSocket req) $ getSource req
 
 -- |
 -- >>> getSource defaultRequest { requestHeaders = [ ("X-Real-IP", "127.0.0.1") ] }

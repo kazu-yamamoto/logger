@@ -15,17 +15,19 @@ Library
   GHC-Options:          -Wall
   Exposed-Modules:      Network.Wai.Logger
                         Network.Wai.Logger.Format
+                        Network.Wai.Logger.Date
                         Network.Wai.Logger.Utils
   Build-Depends:        base >= 4 && < 5
                       , blaze-builder
                       , byteorder
                       , bytestring
                       , case-insensitive
-                      , date-cache >= 0.3
                       , fast-logger >= 0.3
                       , http-types
                       , network
                       , wai
+                      , unix
+                      , unix-time
 
 Test-Suite doctest
   Type:                 exitcode-stdio-1.0
