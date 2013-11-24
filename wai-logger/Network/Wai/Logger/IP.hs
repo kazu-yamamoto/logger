@@ -2,11 +2,11 @@ module Network.Wai.Logger.IP (
     NumericAddress, showSockAddr
   ) where
 
-import Data.Bits
-import Data.Word
+import Data.Bits (shift, (.&.))
+import Data.Word (Word32)
 import Network.Socket (SockAddr(..))
-import System.ByteOrder
-import Text.Printf
+import System.ByteOrder (ByteOrder(..), byteOrder)
+import Text.Printf (printf)
 
 {-|
   A type for IP address in numeric string representation.

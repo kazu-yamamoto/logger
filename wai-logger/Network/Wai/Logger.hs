@@ -22,8 +22,8 @@ import Control.Concurrent (forkIO, threadDelay, killThread)
 import Control.Exception (handle, SomeException(..), bracket)
 import Control.Monad (when, void)
 import GHC.IO.FD (stdout)
-import Network.HTTP.Types
-import Network.Wai
+import Network.HTTP.Types (Status)
+import Network.Wai (Request)
 import System.IO (withFile, hFileSize, IOMode(..))
 import System.Log.FastLogger
 

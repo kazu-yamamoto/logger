@@ -7,12 +7,12 @@ module Network.Wai.Logger.Apache (
 
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
-import Data.CaseInsensitive
-import Data.List
-import Data.Maybe
-import Data.Monoid
-import Network.HTTP.Types
-import Network.Wai
+import Data.CaseInsensitive (CI)
+import Data.List (find)
+import Data.Maybe (fromMaybe)
+import Data.Monoid ((<>))
+import Network.HTTP.Types (Status, statusCode)
+import Network.Wai (Request(..))
 import Network.Wai.Logger.Date
 import Network.Wai.Logger.IP
 import System.Log.FastLogger
@@ -35,27 +35,26 @@ data IPAddrSource =
 apacheLogMsg :: IPAddrSource -> ZonedDate -> Request -> Status -> Maybe Integer -> LogMsg
 apacheLogMsg ipsrc tmstr req status msize =
       bs (getSourceIP ipsrc req)
-  +++ bs " - - ["
-  +++ bs tmstr
-  +++ bs "] \""
-  +++ bs (requestMethod req)
-  +++ bs " "
-  +++ bs (rawPathInfo req)
-  +++ bs " "
-  +++ st (show (httpVersion req))
-  +++ bs "\" "
-  +++ st (show (statusCode status))
-  +++ bs " "
-  +++ st (maybe "-" show msize)
-  +++ bs " \""
-  +++ bs (lookupRequestField' "referer" req)
-  +++ bs "\" \""
-  +++ bs (lookupRequestField' "user-agent" req)
-  +++ bs "\"\n"
+  <> bs " - - ["
+  <> bs tmstr
+  <> bs "] \""
+  <> bs (requestMethod req)
+  <> bs " "
+  <> bs (rawPathInfo req)
+  <> bs " "
+  <> st (show (httpVersion req))
+  <> bs "\" "
+  <> st (show (statusCode status))
+  <> bs " "
+  <> st (maybe "-" show msize)
+  <> bs " \""
+  <> bs (lookupRequestField' "referer" req)
+  <> bs "\" \""
+  <> bs (lookupRequestField' "user-agent" req)
+  <> bs "\"\n"
   where
     st = bs . BS.pack
     bs = fromByteString
-    (+++) = mappend
 
 lookupRequestField' :: CI ByteString -> Request -> ByteString
 lookupRequestField' k req = fromMaybe "" . lookup k $ requestHeaders req

@@ -15,15 +15,15 @@ module Network.Wai.Logger.Date (
   , clockDateCacher
   ) where
 
-import Control.Applicative
+import Control.Applicative ((<$>))
 import Data.ByteString (ByteString)
-import Data.IORef
+import Data.IORef (newIORef, readIORef, writeIORef)
 #if WINDOWS
 import qualified Data.ByteString.Char8 as BS
 import Data.Time
 import System.Locale
 #else
-import Data.UnixTime
+import Data.UnixTime (formatUnixTime, fromEpochTime)
 import System.Posix (EpochTime, epochTime)
 #endif
 
