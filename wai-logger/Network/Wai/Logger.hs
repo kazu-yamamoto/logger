@@ -3,13 +3,12 @@ module Network.Wai.Logger (
     ApacheLogger
   , withStdoutLogger
   -- * Creating a logger
+  , ApacheLoggerFunctions(..)
   , initLogger
   -- * Types
   , IPAddrSource(..)
   , LogType(..)
   , FileLogSpec(..)
-  , LogFlusher
-  , LogRotator
   -- * Date cacher
   , clockDateCacher
   , ZonedDate
@@ -19,15 +18,14 @@ module Network.Wai.Logger (
   , logCheck
   ) where
 
-import Control.Applicative ((<$>))
 import Control.Concurrent (forkIO, threadDelay, killThread)
 import Control.Exception (handle, SomeException(..), bracket)
 import Control.Monad (when, void)
+import GHC.IO.FD (stdout)
 import Network.HTTP.Types
 import Network.Wai
+import System.IO (withFile, hFileSize, IOMode(..))
 import System.Log.FastLogger
-import System.Posix.Files (getFileStatus, fileSize)
-import System.Posix.IO
 
 import Network.Wai.Logger.Apache
 import Network.Wai.Logger.Date
@@ -43,14 +41,17 @@ withStdoutLogger app = bracket setup teardown $ \(aplogger, _, _) ->
   where
     setup = do
         (getter, updater) <- clockDateCacher
-        (aplogger, flusher, _) <- initLogger FromFallback (LogStdout 4096) getter
+        apf <- initLogger FromFallback (LogStdout 4096) getter
+        let aplogger = apacheLogger apf
+            flusher = logFlusher apf
+            remover = logRemover apf
         t <- forkIO $ do
             threadDelay 1000000
             updater
             flusher
-        return (aplogger, flusher, t)
-    teardown (_, flusher, t) = do
-        void $ flusher -- why type is not inferred?
+        return (aplogger, remover, t)
+    teardown (_, remover, t) = do
+        void $ remover
         killThread t
 
 ----------------------------------------------------------------
@@ -58,16 +59,21 @@ withStdoutLogger app = bracket setup teardown $ \(aplogger, _, _) ->
 -- | Apache style logger.
 type ApacheLogger = Request -> Status -> Maybe Integer -> IO ()
 
--- | Flushing log messages in the buffers.
---   This is explicitly called from your program.
---   Probably, one second and 10 seconds is proper to stdout and
---   log files, respectively.
---   See the source code of 'withStdoutLogger'.
-type LogFlusher = IO ()
--- | Rotating log files.
---   This is explicitly called from your program.
---   Probably, 10 seconds is proper.
-type LogRotator = IO ()
+data ApacheLoggerFunctions = ApacheLoggerFunctions {
+    apacheLogger :: ApacheLogger
+    -- | Flushing log messages in the buffers.
+    --   This is explicitly called from your program.
+    --   Probably, one second and 10 seconds is proper to stdout and
+    --   log files, respectively.
+    --   See the source code of 'withStdoutLogger'.
+  , logFlusher :: IO ()
+    -- | Rotating log files.
+    --   This is explicitly called from your program.
+    --   Probably, 10 seconds is proper.
+  , logRotator :: IO ()
+    -- | Removing resources relating Apache logger.
+  , logRemover :: IO ()
+  }
 
 -- | Logger Type.
 data LogType = LogNone                     -- ^ No logging.
@@ -82,38 +88,57 @@ data LogType = LogNone                     -- ^ No logging.
 
 -- |
 -- Creating 'ApacheLogger' according to 'LogType'.
-initLogger :: IPAddrSource -> LogType -> DateCacheGetter -> IO (ApacheLogger, LogFlusher, LogRotator)
+initLogger :: IPAddrSource -> LogType -> DateCacheGetter
+           -> IO ApacheLoggerFunctions
 initLogger _     LogNone             _       = noLoggerInit
 initLogger ipsrc (LogStdout size)    dateget = stdoutLoggerInit ipsrc size dateget
 initLogger ipsrc (LogFile spec size) dateget = fileLoggerInit ipsrc spec size dateget
 
 ----------------------------------------------------------------
 
-noLoggerInit :: IO (ApacheLogger, LogFlusher, LogRotator)
-noLoggerInit = return $! (noLogger, noFlusher, noRotator)
+noLoggerInit :: IO ApacheLoggerFunctions
+noLoggerInit = return ApacheLoggerFunctions {
+    apacheLogger = noLogger
+  , logFlusher = noFlusher
+  , logRotator = noRotator
+  , logRemover = noRemover
+  }
   where
     noLogger _ _ _ = return ()
     noFlusher = return ()
     noRotator = return ()
+    noRemover = return ()
 
 stdoutLoggerInit :: IPAddrSource -> BufSize -> DateCacheGetter
-                 -> IO (ApacheLogger, LogFlusher, LogRotator)
+                 -> IO ApacheLoggerFunctions
 stdoutLoggerInit ipsrc size dateget = do
-    lgrset <- newLoggerSet stdOutput size
+    lgrset <- newLoggerSet size stdout
     let logger = apache lgrset ipsrc dateget
         flusher = flushLogMsg lgrset
-        noRotater = return ()
-    return $! (logger, flusher, noRotater)
+        noRotator = return ()
+        remover = rmLoggerSet lgrset
+    return ApacheLoggerFunctions {
+        apacheLogger = logger
+      , logFlusher = flusher
+      , logRotator = noRotator
+      , logRemover = remover
+      }
 
 fileLoggerInit :: IPAddrSource -> FileLogSpec -> BufSize -> DateCacheGetter
-               -> IO (ApacheLogger, LogFlusher, LogRotator)
+               -> IO ApacheLoggerFunctions
 fileLoggerInit ipsrc spec size dateget = do
     fd <- logOpen (log_file spec)
-    lgrset <- newLoggerSet fd size
+    lgrset <- newLoggerSet size fd
     let logger = apache lgrset ipsrc dateget
         flusher = flushLogMsg lgrset
         rotator = logRotater lgrset spec
-    return $! (logger, flusher, rotator)
+        remover = rmLoggerSet lgrset
+    return ApacheLoggerFunctions {
+        apacheLogger = logger
+      , logFlusher = flusher
+      , logRotator = rotator
+      , logRemover = remover
+      }
 
 ----------------------------------------------------------------
 
@@ -133,7 +158,7 @@ logRotater lgrset spec = do
   where
     file = log_file spec
     isOver = handle (\(SomeException _) -> return False) $ do
-        siz <- fromIntegral . fileSize <$> getFileStatus file
+        siz <- withFile file ReadMode hFileSize
         if siz > log_file_size spec then
             return True
           else

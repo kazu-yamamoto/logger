@@ -20,14 +20,13 @@ Library
                       , bytestring
                       , directory
                       , filepath
-                      , unix
 
 Test-Suite spec
     Main-Is:         Spec.hs
     Hs-Source-Dirs:  test
     Type:            exitcode-stdio-1.0
 
-    Ghc-Options:     -Wall
+    Ghc-Options:     -Wall -threaded
     Build-Depends:   base >= 4 && < 5
                    , bytestring
                    , fast-logger

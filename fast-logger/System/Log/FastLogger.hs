@@ -7,6 +7,8 @@ module System.Log.FastLogger (
   , logOpen
   , newLoggerSet
   , renewLoggerSet
+  -- * Removing a logger set
+  , rmLoggerSet
   -- * Writing a log message
   , pushLogMsg
   , LogMsg
@@ -18,21 +20,22 @@ module System.Log.FastLogger (
   ) where
 
 import qualified Blaze.ByteString.Builder as BD
-import Blaze.ByteString.Builder.Internal
-import Blaze.ByteString.Builder.Internal.Types
-import Control.Concurrent
-import Control.Monad
-import Data.Array
+import Blaze.ByteString.Builder.Internal.Types (Builder(..), BuildSignal(..), BufRange(..), runBuildStep, buildStep)
+import Control.Applicative ((<$>))
+import Control.Concurrent (getNumCapabilities, myThreadId, threadCapability, MVar, newMVar, takeMVar, putMVar)
+import Control.Monad (when, replicateM)
+import Data.Array (Array, listArray, (!))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.IORef
-import Data.Monoid
+import Data.Monoid (Monoid, mempty, mappend, (<>))
 import Data.Word (Word8)
-import Foreign.Marshal.Alloc
-import Foreign.Ptr
+import Foreign.Marshal.Alloc (mallocBytes, free)
+import Foreign.Ptr (Ptr, minusPtr, plusPtr)
+import GHC.IO.Device (close)
+import GHC.IO.FD (FD, openFile, writeRawBufferPtr)
+import GHC.IO.IOMode (IOMode(..))
 import System.Log.FastLogger.File
-import System.Posix.IO
-import System.Posix.Types (Fd)
 
 ----------------------------------------------------------------
 
@@ -58,7 +61,7 @@ fromByteString bs = LogMsg (BS.length bs) (BD.fromByteString bs)
 -- | Writting 'LogMsg' using a buffer in blocking mode.
 --   The size of 'LogMsg' must be smaller or equal to
 --   the size of buffer.
-writeLogMsg :: Fd
+writeLogMsg :: FD
             -> Buffer
             -> BufSize
             -> LogMsg
@@ -78,11 +81,11 @@ toBufIOWith buf !size io (Builder build) = do
     !bufRange = BufRange buf (buf `plusPtr` size)
     finalStep !(BufRange p _) = return $ Done p ()
 
-write :: Fd -> Buffer -> Int -> IO ()
+write :: FD -> Buffer -> Int -> IO ()
 write fd buf len' = loop buf (fromIntegral len')
   where
     loop bf !len = do
-        written <- fdWriteBuf fd bf len
+        written <- writeRawBufferPtr "write" fd bf 0 (fromIntegral len)
         when (written < len) $
             loop (bf `plusPtr` fromIntegral written) (len - written)
 
@@ -97,7 +100,7 @@ newLogger size = do
     lref <- newIORef mempty
     return $ Logger mbuf size lref
 
-pushLog :: Fd -> Logger -> LogMsg -> IO ()
+pushLog :: FD -> Logger -> LogMsg -> IO ()
 pushLog fd logger@(Logger  _ size ref) nlogmsg@(LogMsg nlen _) = do
     needFlush <- atomicModifyIORef ref checkBuf
     when needFlush $ do
@@ -108,7 +111,7 @@ pushLog fd logger@(Logger  _ size ref) nlogmsg@(LogMsg nlen _) = do
       | size < olen + nlen = (ologmsg, True)
       | otherwise          = (ologmsg <> nlogmsg, False)
 
-flushLog :: Fd -> Logger -> IO ()
+flushLog :: FD -> Logger -> IO ()
 flushLog fd (Logger mbuf size lref) = do
     logmsg <- atomicModifyIORef lref (\old -> (mempty, old))
     -- If a special buffer is prepared for flusher, this MVar could
@@ -124,10 +127,8 @@ flushLog fd (Logger mbuf size lref) = do
 ----------------------------------------------------------------
 
 -- | Opening a log file. FIXME: Windows support.
-logOpen :: FilePath -> IO Fd
-logOpen file = openFd file WriteOnly (Just 0o644) flags
-  where
-    flags = defaultFileFlags { append = True }
+logOpen :: FilePath -> IO FD
+logOpen file = fst <$> openFile file AppendMode False -- FIXME blocking
 
 getBuffer :: BufSize -> IO Buffer
 getBuffer = mallocBytes
@@ -138,11 +139,11 @@ getBuffer = mallocBytes
 --   The number of loggers is the capabilities of GHC RTS.
 --   You can specify it with \"+RTS -N\<x\>\".
 --   A buffer is prepared for each capability.
-data LoggerSet = LoggerSet (IORef Fd) (Array Int Logger)
+data LoggerSet = LoggerSet (IORef FD) (Array Int Logger)
 
 -- | Creating a new 'LoggerSet'.
-newLoggerSet :: Fd -> BufSize -> IO LoggerSet
-newLoggerSet fd size = do
+newLoggerSet :: BufSize -> FD -> IO LoggerSet
+newLoggerSet size fd = do
     n <- getNumCapabilities
     loggers <- replicateM n $ newLogger size
     let arr = listArray (0,n-1) loggers
@@ -166,8 +167,24 @@ flushLogMsg (LoggerSet fref arr) = do
   where
     flushIt fd i = flushLog fd (arr ! i)
 
--- | Renewing 'Fd' in 'LoggerSet'. Old 'Fd' is closed.
-renewLoggerSet :: LoggerSet -> Fd -> IO ()
+-- | Renewing 'FD' in 'LoggerSet'. Old 'FD' is closed.
+renewLoggerSet :: LoggerSet -> FD -> IO ()
 renewLoggerSet (LoggerSet fref _) newfd = do
     oldfd <- atomicModifyIORef fref (\fd -> (newfd, fd))
-    closeFd oldfd
+    close oldfd
+
+rmLoggerSet :: LoggerSet -> IO ()
+rmLoggerSet (LoggerSet fref arr) = do
+    putStrLn "hey"
+    n <- getNumCapabilities
+    fd <- readIORef fref
+    let nums = [0..n-1]
+    mapM_ (flushIt fd) nums
+    mapM_ freeIt nums
+    close fd
+    putStrLn "closed"
+  where
+    flushIt fd i = flushLog fd (arr ! i)
+    freeIt i = do
+        let (Logger mbuf _ _) = arr ! i
+        takeMVar mbuf >>= free

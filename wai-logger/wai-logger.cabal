@@ -26,7 +26,10 @@ Library
                       , http-types
                       , network
                       , wai
-                      , unix
+  if os(windows)
+      Cpp-Options:      -DWINDOWS
+  else
+      Build-Depends:    unix
                       , unix-time
 
 Test-Suite doctest
