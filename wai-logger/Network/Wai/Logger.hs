@@ -36,7 +36,7 @@ import Network.Wai.Logger.Date
 
 -- | Executing a function which takes 'ApacheLogger'.
 --   This 'ApacheLogger' writes log message to stdout.
---   Each buffer is flushed every second.
+--   Each buffer (4K bytes) is flushed every second.
 withStdoutLogger :: (ApacheLogger -> IO a) -> IO a
 withStdoutLogger app = bracket setup teardown $ \(aplogger, _, _) ->
     app aplogger
