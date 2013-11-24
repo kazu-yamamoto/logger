@@ -19,7 +19,7 @@ module System.Log.FastLogger (
   , module System.Log.FastLogger.File
   ) where
 
-import qualified Blaze.ByteString.Builder as BD
+import qualified Blaze.ByteString.Builder as BB
 import Blaze.ByteString.Builder.Internal.Types (Builder(..), BuildSignal(..), BufRange(..), runBuildStep, buildStep)
 import Control.Applicative ((<$>))
 import Control.Concurrent (getNumCapabilities, myThreadId, threadCapability, MVar, newMVar, takeMVar, putMVar)
@@ -60,12 +60,12 @@ type BufSize = Int
 data LogMsg = LogMsg !Int Builder
 
 instance Monoid LogMsg where
-    mempty = LogMsg 0 (BD.fromByteString BS.empty)
+    mempty = LogMsg 0 (BB.fromByteString BS.empty)
     LogMsg s1 b1 `mappend` LogMsg s2 b2 = LogMsg (s1 + s2) (b1 <> b2)
 
 -- | Creating 'LogMsg'
 fromByteString :: ByteString -> LogMsg
-fromByteString bs = LogMsg (BS.length bs) (BD.fromByteString bs)
+fromByteString bs = LogMsg (BS.length bs) (BB.fromByteString bs)
 
 ----------------------------------------------------------------
 
@@ -115,7 +115,7 @@ pushLog :: FD -> Logger -> LogMsg -> IO ()
 pushLog fd logger@(Logger  _ size ref) nlogmsg@(LogMsg nlen nbuilder)
   | nlen > size = do
       flushLog fd logger
-      BD.toByteStringIO (writeByteString fd) nbuilder
+      BB.toByteStringIO (writeByteString fd) nbuilder
   | otherwise = do
     needFlush <- atomicModifyIORef' ref checkBuf
     when needFlush $ do
