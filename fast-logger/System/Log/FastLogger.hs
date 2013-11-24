@@ -192,6 +192,7 @@ renewLoggerSet (LoggerSet fref _) newfd = do
     oldfd <- atomicModifyIORef' fref (\fd -> (newfd, fd))
     close oldfd
 
+-- | Flushing the buffers, closing 'FD' and freeing the buffers.
 rmLoggerSet :: LoggerSet -> IO ()
 rmLoggerSet (LoggerSet fref arr) = do
     putStrLn "hey"
