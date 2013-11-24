@@ -4,5 +4,8 @@ import Test.DocTest
 
 main :: IO ()
 main = doctest [
-    "Network/Wai/Logger.hs"
+    "-idist/build/autogen/"
+  , "-optP-include"
+  , "-optPdist/build/autogen/cabal_macros.h"
+  , "Network/Wai/Logger.hs"
   ]
