@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, CPP #-}
 
 module Network.Wai.Logger.Apache (
     IPAddrSource(..)
@@ -10,7 +10,11 @@ import qualified Data.ByteString.Char8 as BS
 import Data.CaseInsensitive (CI)
 import Data.List (find)
 import Data.Maybe (fromMaybe)
+#if MIN_VERSION_base(4,5,0)
 import Data.Monoid ((<>))
+#else
+import Data.Monoid (mappend)
+#endif
 import Network.HTTP.Types (Status, statusCode)
 import Network.Wai (Request(..))
 import Network.Wai.Logger.Date
@@ -55,6 +59,9 @@ apacheLogMsg ipsrc tmstr req status msize =
   where
     st = bs . BS.pack
     bs = fromByteString
+#if !MIN_VERSION_base(4,5,0)
+    (<>) = mappend
+#endif
 
 lookupRequestField' :: CI ByteString -> Request -> ByteString
 lookupRequestField' k req = fromMaybe "" . lookup k $ requestHeaders req
