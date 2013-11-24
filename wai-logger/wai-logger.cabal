@@ -1,5 +1,5 @@
 Name:                   wai-logger
-Version:                0.3.1
+Version:                2.0.0
 Author:                 Kazu Yamamoto <kazu@iij.ad.jp>
 Maintainer:             Kazu Yamamoto <kazu@iij.ad.jp>
 License:                BSD3
@@ -22,10 +22,10 @@ Library
                       , byteorder
                       , bytestring
                       , case-insensitive
-                      , fast-logger >= 0.3
+                      , fast-logger >= 2.0.0
                       , http-types
                       , network
-                      , wai
+                      , wai >= 2.0.0
   if os(windows)
       Cpp-Options:      -DWINDOWS
   else
