@@ -32,6 +32,7 @@ import System.Posix (EpochTime, epochTime)
 -- | Getting cached 'ZonedDate'.
 type DateCacheGetter = IO ZonedDate
 -- | Updateing cached 'ZonedDate'. This should be called every second.
+--   See the source code of 'withStdoutLogger'.
 type DateCacheUpdater = IO ()
 
 ----------------------------------------------------------------

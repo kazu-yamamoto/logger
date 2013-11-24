@@ -61,8 +61,8 @@ type ApacheLogger = Request -> Status -> Maybe Integer -> IO ()
 -- | Flushing log messages in the buffers.
 --   This is explicitly called from your program.
 --   Probably, one second and 10 seconds is proper to stdout and
---   log files, respectively. See an example code in the beginning
---   of this file.
+--   log files, respectively.
+--   See the source code of 'withStdoutLogger'.
 type LogFlusher = IO ()
 -- | Rotating log files.
 --   This is explicitly called from your program.
