@@ -25,14 +25,15 @@ import Control.Applicative ((<$>))
 import Control.Concurrent (getNumCapabilities, myThreadId, threadCapability, MVar, newMVar, takeMVar, putMVar)
 import Control.Monad (when, replicateM)
 import Data.Array (Array, listArray, (!))
-import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
+import Data.ByteString.Internal (ByteString(..))
 import Data.IORef
 import Data.Monoid (Monoid, mempty, mappend)
 #if MIN_VERSION_base(4,5,0)
 import Data.Monoid ((<>))
 #endif
 import Data.Word (Word8)
+import Foreign.ForeignPtr (withForeignPtr)
 import Foreign.Marshal.Alloc (mallocBytes, free)
 import Foreign.Ptr (Ptr, minusPtr, plusPtr)
 import GHC.IO.Device (close)
@@ -111,7 +112,11 @@ newLogger size = do
     return $ Logger mbuf size lref
 
 pushLog :: FD -> Logger -> LogMsg -> IO ()
-pushLog fd logger@(Logger  _ size ref) nlogmsg@(LogMsg nlen _) = do
+pushLog fd logger@(Logger  _ size ref) nlogmsg@(LogMsg nlen nbuilder)
+  | nlen > size = do
+      flushLog fd logger
+      BD.toByteStringIO (writeByteString fd) nbuilder
+  | otherwise = do
     needFlush <- atomicModifyIORef' ref checkBuf
     when needFlush $ do
         flushLog fd logger
@@ -120,6 +125,10 @@ pushLog fd logger@(Logger  _ size ref) nlogmsg@(LogMsg nlen _) = do
     checkBuf ologmsg@(LogMsg olen _)
       | size < olen + nlen = (ologmsg, True)
       | otherwise          = (ologmsg <> nlogmsg, False)
+
+writeByteString :: FD -> ByteString -> IO ()
+writeByteString fd (PS ps s l) = withForeignPtr ps $ \p ->
+    write fd (p `plusPtr` s) l
 
 flushLog :: FD -> Logger -> IO ()
 flushLog fd (Logger mbuf size lref) = do
