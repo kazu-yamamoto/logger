@@ -28,7 +28,10 @@ import Data.Array (Array, listArray, (!))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.IORef
-import Data.Monoid (Monoid, mempty, mappend, (<>))
+import Data.Monoid (Monoid, mempty, mappend)
+#if MIN_VERSION_base(4,5,0)
+import Data.Monoid ((<>))
+#endif
 import Data.Word (Word8)
 import Foreign.Marshal.Alloc (mallocBytes, free)
 import Foreign.Ptr (Ptr, minusPtr, plusPtr)
@@ -36,6 +39,13 @@ import GHC.IO.Device (close)
 import GHC.IO.FD (FD, openFile, writeRawBufferPtr)
 import GHC.IO.IOMode (IOMode(..))
 import System.Log.FastLogger.File
+
+----------------------------------------------------------------
+
+#if !MIN_VERSION_base(4,5,0)
+(<>) :: Monoid m => m -> m -> m
+(<>) = mappend
+#endif
 
 ----------------------------------------------------------------
 
