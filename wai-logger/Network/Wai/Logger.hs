@@ -51,7 +51,7 @@ withStdoutLogger app = bracket setup teardown $ \(aplogger, _, _) ->
             flusher
         return (aplogger, remover, t)
     teardown (_, remover, t) = do
-        void $ remover
+        void remover
         killThread t
 
 ----------------------------------------------------------------
@@ -159,10 +159,7 @@ logRotater lgrset spec = do
     file = log_file spec
     isOver = handle (\(SomeException _) -> return False) $ do
         siz <- withFile file ReadMode hFileSize
-        if siz > log_file_size spec then
-            return True
-          else
-            return False
+        return (siz > log_file_size spec)
 
 ----------------------------------------------------------------
 

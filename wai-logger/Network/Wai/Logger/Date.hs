@@ -85,7 +85,7 @@ newDate setting tm = DateCache tm <$> formatDate setting tm
 clockDateCacher :: IO (DateCacheGetter, DateCacheUpdater)
 clockDateCacher = do
     ref <- getTime zonedDateCacheConf >>= newDate zonedDateCacheConf >>= newIORef
-    return $! (getter ref, clock ref)
+    return (getter ref, clock ref)
   where
     getter ref = formattedDate <$> readIORef ref
     clock ref = do
