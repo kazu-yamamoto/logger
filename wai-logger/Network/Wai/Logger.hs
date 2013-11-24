@@ -22,7 +22,7 @@ module Network.Wai.Logger (
 import Control.Applicative ((<$>))
 import Control.Concurrent (forkIO, threadDelay, killThread)
 import Control.Exception (handle, SomeException(..), bracket)
-import Control.Monad (when)
+import Control.Monad (when, void)
 import Network.HTTP.Types
 import Network.Wai
 import System.Log.FastLogger
@@ -50,7 +50,7 @@ withStdoutLogger app = bracket setup teardown $ \(aplogger, _, _) ->
             flusher
         return (aplogger, flusher, t)
     teardown (_, flusher, t) = do
-        flusher
+        void $ flusher -- why type is not inferred?
         killThread t
 
 ----------------------------------------------------------------
