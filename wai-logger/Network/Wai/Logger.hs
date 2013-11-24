@@ -38,7 +38,7 @@ import Network.Wai.Logger.Date
 --   This 'ApacheLogger' writes log message to stdout.
 --   Each buffer is flushed every second.
 withStdoutLogger :: (ApacheLogger -> IO a) -> IO a
-withStdoutLogger app = bracket setup teardown $ \(aplogger, _) ->
+withStdoutLogger app = bracket setup teardown $ \(aplogger, _, _) ->
     app aplogger
   where
     setup = do
@@ -48,8 +48,10 @@ withStdoutLogger app = bracket setup teardown $ \(aplogger, _) ->
             threadDelay 1000000
             updater
             flusher
-        return (aplogger, t)
-    teardown (_, t) = killThread t
+        return (aplogger, flusher, t)
+    teardown (_, flusher, t) = do
+        flusher
+        killThread t
 
 ----------------------------------------------------------------
 
