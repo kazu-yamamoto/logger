@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE BangPatterns, CPP #-}
 
 module System.Log.FastLogger (
   -- * Creating a logger set
@@ -102,7 +102,7 @@ newLogger size = do
 
 pushLog :: FD -> Logger -> LogMsg -> IO ()
 pushLog fd logger@(Logger  _ size ref) nlogmsg@(LogMsg nlen _) = do
-    needFlush <- atomicModifyIORef ref checkBuf
+    needFlush <- atomicModifyIORef' ref checkBuf
     when needFlush $ do
         flushLog fd logger
         pushLog fd logger nlogmsg
@@ -113,7 +113,7 @@ pushLog fd logger@(Logger  _ size ref) nlogmsg@(LogMsg nlen _) = do
 
 flushLog :: FD -> Logger -> IO ()
 flushLog fd (Logger mbuf size lref) = do
-    logmsg <- atomicModifyIORef lref (\old -> (mempty, old))
+    logmsg <- atomicModifyIORef' lref (\old -> (mempty, old))
     -- If a special buffer is prepared for flusher, this MVar could
     -- be removed. But such a code does not contribute logging speed
     -- according to experiment. And even with the special buffer,
@@ -170,7 +170,7 @@ flushLogMsg (LoggerSet fref arr) = do
 -- | Renewing 'FD' in 'LoggerSet'. Old 'FD' is closed.
 renewLoggerSet :: LoggerSet -> FD -> IO ()
 renewLoggerSet (LoggerSet fref _) newfd = do
-    oldfd <- atomicModifyIORef fref (\fd -> (newfd, fd))
+    oldfd <- atomicModifyIORef' fref (\fd -> (newfd, fd))
     close oldfd
 
 rmLoggerSet :: LoggerSet -> IO ()
@@ -188,3 +188,15 @@ rmLoggerSet (LoggerSet fref arr) = do
     freeIt i = do
         let (Logger mbuf _ _) = arr ! i
         takeMVar mbuf >>= free
+
+#if !MIN_VERSION_base(4,6,0)
+-- | Strict version of 'atomicModifyIORef'.  This forces both the value stored
+-- in the 'IORef' as well as the value returned.
+atomicModifyIORef' :: IORef a -> (a -> (a,b)) -> IO b
+atomicModifyIORef' ref f = do
+    c <- atomicModifyIORef ref
+            (\x -> let (a, b) = f x    -- Lazy application of "f"
+                    in (a, a `seq` b)) -- Lazy application of "seq"
+    -- The following forces "a `seq` b", so it also forces "f x".
+    c `seq` return c
+#endif
