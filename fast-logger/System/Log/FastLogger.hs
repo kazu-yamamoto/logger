@@ -37,7 +37,7 @@ import Foreign.ForeignPtr (withForeignPtr)
 import Foreign.Marshal.Alloc (mallocBytes, free)
 import Foreign.Ptr (Ptr, minusPtr, plusPtr)
 import GHC.IO.Device (close)
-import GHC.IO.FD (FD, openFile, writeRawBufferPtr)
+import GHC.IO.FD (FD(..), openFile, writeRawBufferPtr)
 import GHC.IO.IOMode (IOMode(..))
 import System.Log.FastLogger.File
 
@@ -200,7 +200,7 @@ rmLoggerSet (LoggerSet fref arr) = do
     let nums = [0..n-1]
     mapM_ (flushIt fd) nums
     mapM_ freeIt nums
-    close fd
+    when (fdFD fd /= 1) $ close fd
   where
     flushIt fd i = flushLog fd (arr ! i)
     freeIt i = do
