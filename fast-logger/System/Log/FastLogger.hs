@@ -195,14 +195,12 @@ renewLoggerSet (LoggerSet fref _) newfd = do
 -- | Flushing the buffers, closing 'FD' and freeing the buffers.
 rmLoggerSet :: LoggerSet -> IO ()
 rmLoggerSet (LoggerSet fref arr) = do
-    putStrLn "hey"
     n <- getNumCapabilities
     fd <- readIORef fref
     let nums = [0..n-1]
     mapM_ (flushIt fd) nums
     mapM_ freeIt nums
     close fd
-    putStrLn "closed"
   where
     flushIt fd i = flushLog fd (arr ! i)
     freeIt i = do
