@@ -3,7 +3,7 @@ module Network.Wai.Logger (
     ApacheLogger
   , withStdoutLogger
   -- * Creating a logger
-  , ApacheLoggerFunctions(..)
+  , ApacheLoggerActions(..)
   , initLogger
   -- * Types
   , IPAddrSource(..)
@@ -59,7 +59,7 @@ withStdoutLogger app = bracket setup teardown $ \(aplogger, _, _) ->
 -- | Apache style logger.
 type ApacheLogger = Request -> Status -> Maybe Integer -> IO ()
 
-data ApacheLoggerFunctions = ApacheLoggerFunctions {
+data ApacheLoggerActions = ApacheLoggerActions {
     apacheLogger :: ApacheLogger
     -- | Flushing log messages in the buffers.
     --   This is explicitly called from your program.
@@ -89,15 +89,15 @@ data LogType = LogNone                     -- ^ No logging.
 -- |
 -- Creating 'ApacheLogger' according to 'LogType'.
 initLogger :: IPAddrSource -> LogType -> DateCacheGetter
-           -> IO ApacheLoggerFunctions
+           -> IO ApacheLoggerActions
 initLogger _     LogNone             _       = noLoggerInit
 initLogger ipsrc (LogStdout size)    dateget = stdoutLoggerInit ipsrc size dateget
 initLogger ipsrc (LogFile spec size) dateget = fileLoggerInit ipsrc spec size dateget
 
 ----------------------------------------------------------------
 
-noLoggerInit :: IO ApacheLoggerFunctions
-noLoggerInit = return ApacheLoggerFunctions {
+noLoggerInit :: IO ApacheLoggerActions
+noLoggerInit = return ApacheLoggerActions {
     apacheLogger = noLogger
   , logFlusher = noFlusher
   , logRotator = noRotator
@@ -110,14 +110,14 @@ noLoggerInit = return ApacheLoggerFunctions {
     noRemover = return ()
 
 stdoutLoggerInit :: IPAddrSource -> BufSize -> DateCacheGetter
-                 -> IO ApacheLoggerFunctions
+                 -> IO ApacheLoggerActions
 stdoutLoggerInit ipsrc size dateget = do
     lgrset <- newLoggerSet size stdout
     let logger = apache lgrset ipsrc dateget
         flusher = flushLogMsg lgrset
         noRotator = return ()
         remover = rmLoggerSet lgrset
-    return ApacheLoggerFunctions {
+    return ApacheLoggerActions {
         apacheLogger = logger
       , logFlusher = flusher
       , logRotator = noRotator
@@ -125,7 +125,7 @@ stdoutLoggerInit ipsrc size dateget = do
       }
 
 fileLoggerInit :: IPAddrSource -> FileLogSpec -> BufSize -> DateCacheGetter
-               -> IO ApacheLoggerFunctions
+               -> IO ApacheLoggerActions
 fileLoggerInit ipsrc spec size dateget = do
     fd <- logOpen (log_file spec)
     lgrset <- newLoggerSet size fd
@@ -133,7 +133,7 @@ fileLoggerInit ipsrc spec size dateget = do
         flusher = flushLogMsg lgrset
         rotator = logRotater lgrset spec
         remover = rmLoggerSet lgrset
-    return ApacheLoggerFunctions {
+    return ApacheLoggerActions {
         apacheLogger = logger
       , logFlusher = flusher
       , logRotator = rotator
