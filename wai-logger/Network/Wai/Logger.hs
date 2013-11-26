@@ -45,10 +45,12 @@ withStdoutLogger app = bracket setup teardown $ \(aplogger, _, _) ->
         let aplogger = apacheLogger apf
             flusher = logFlusher apf
             remover = logRemover apf
-        t <- forkIO $ do
-            threadDelay 1000000
-            updater
-            flusher
+            loop = do
+                threadDelay 1000000
+                updater
+                flusher
+                loop
+        t <- forkIO loop
         return (aplogger, remover, t)
     teardown (_, remover, t) = do
         void remover
