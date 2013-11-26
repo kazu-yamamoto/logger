@@ -1,3 +1,34 @@
+-- | Apache style logger for WAI applications.
+--
+-- An example:
+--
+-- > {-# LANGUAGE OverloadedStrings #-}
+-- > module Main where
+-- >
+-- > import Blaze.ByteString.Builder (fromByteString)
+-- > import Control.Monad.IO.Class (liftIO)
+-- > import qualified Data.ByteString.Char8 as BS
+-- > import Network.HTTP.Types (status200)
+-- > import Network.Wai (Application, responseBuilder)
+-- > import Network.Wai.Handler.Warp (run)
+-- > import Network.Wai.Logger (withStdoutLogger, ApacheLogger)
+-- >
+-- > main :: IO ()
+-- > main = withStdoutLogger $ \aplogger ->
+-- >     run 3000 $ logApp aplogger
+-- >
+-- > logApp :: ApacheLogger -> Application
+-- > logApp aplogger req = do
+-- >     liftIO $ aplogger req status (Just len)
+-- >     return $ responseBuilder status hdr msg
+-- >   where
+-- >     status = status200
+-- >     hdr = [("Content-Type", "text/plain")
+-- >           ,("Content-Length", BS.pack (show len))]
+-- >     pong = "PONG"
+-- >     len = fromIntegral $ BS.length pong
+-- >     msg = fromByteString pong
+
 module Network.Wai.Logger (
   -- * High level functions
     ApacheLogger
