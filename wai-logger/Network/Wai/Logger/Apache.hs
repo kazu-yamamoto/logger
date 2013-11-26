@@ -5,6 +5,10 @@ module Network.Wai.Logger.Apache (
   , apacheLogMsg
   ) where
 
+#ifndef MIN_VERSION_base
+#define MIN_VERSION_base(x,y,z) 1
+#endif
+
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
 import Data.CaseInsensitive (CI)
