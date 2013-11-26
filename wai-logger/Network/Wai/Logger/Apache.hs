@@ -25,8 +25,7 @@ import System.Log.FastLogger
 -- >>> :set -XOverloadedStrings
 -- >>> import Network.Wai.Test
 
-{-| Source from which the IP source address of the client is obtained.
--}
+-- | Source from which the IP source address of the client is obtained.
 data IPAddrSource =
   -- | From the peer address of the HTTP connection.
     FromSocket
