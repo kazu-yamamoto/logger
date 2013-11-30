@@ -24,6 +24,7 @@ module Control.Monad.Logger
       MonadLogger(..)
     , LogLevel(..)
     , LogSource
+    , ToLogStr (..)
     -- * Helper transformer
     , LoggingT (..)
     , runStderrLoggingT
@@ -59,7 +60,21 @@ module Control.Monad.Logger
     ) where
 
 import Language.Haskell.TH.Syntax (Lift (lift), Q, Exp, Loc (..), qLocation)
+#if MIN_VERSION_fast_logger(0, 2, 0)
+import System.Log.FastLogger (LogMsg, fromByteString, pushLogMsg, LoggerSet, newLoggerSet)
+import qualified Data.ByteString.Lazy as L
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
+import qualified Data.Text.Lazy as TL
+import qualified Data.Text.Lazy.Encoding as TL
+import System.IO.Unsafe (unsafePerformIO)
+#define Handle LoggerSet
+import Data.Monoid (mempty, (<>))
+import qualified GHC.IO.FD as FD
+#else
 import System.Log.FastLogger (ToLogStr (toLogStr), LogStr (..))
+import System.IO (stdout, stderr, Handle)
+#endif
 
 import Data.Monoid (Monoid)
 
@@ -75,8 +90,6 @@ import Data.Functor.Identity (Identity)
 import Control.Monad.ST (ST)
 import qualified Control.Monad.ST.Lazy as Lazy (ST)
 import qualified Control.Monad.Trans.Class as Trans
-
-import System.IO (stdout, stderr, Handle)
 
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Control.Monad.Trans.Resource (MonadResource (liftResourceT), MonadThrow (monadThrow))
@@ -123,6 +136,24 @@ type LogSource = Text
 
 class Monad m => MonadLogger m where
     monadLoggerLog :: ToLogStr msg => Loc -> LogSource -> LogLevel -> msg -> m ()
+
+#if MIN_VERSION_fast_logger(0, 2, 0)
+class ToLogStr msg where
+    toLogStr :: msg -> LogMsg
+instance ToLogStr LogMsg where
+    toLogStr = id
+instance ToLogStr S8.ByteString where
+    toLogStr = fromByteString
+instance ToLogStr L.ByteString where
+    toLogStr = fromByteString . S8.concat . L.toChunks
+instance ToLogStr String where
+    toLogStr = toLogStr . TL.pack
+instance ToLogStr T.Text where
+    toLogStr = toLogStr . T.encodeUtf8
+instance ToLogStr TL.Text where
+    toLogStr = toLogStr . TL.encodeUtf8
+#define LogStr LogMsg
+#endif
 
 {-
 instance MonadLogger IO          where monadLoggerLog _ _ _ = return ()
@@ -315,6 +346,22 @@ defaultOutput :: Handle
               -> LogStr
               -> IO ()
 defaultOutput h loc src level msg =
+#if MIN_VERSION_fast_logger(0, 2, 0)
+    pushLogMsg h $
+    fromByteString "[" <>
+    (case level of
+        LevelOther t -> toLogStr t
+        _ -> toLogStr $ S8.pack $ drop 5 $ show level) <>
+    (if T.null src
+        then mempty
+        else fromByteString "#" <> toLogStr src) <>
+    fromByteString "] " <>
+    msg <>
+    fromByteString " @(" <>
+    toLogStr (S8.pack fileLocStr) <>
+    fromByteString ")\n"
+  where
+#else
     S8.hPutStrLn h $ S8.concat bs
   where
     bs =
@@ -333,6 +380,7 @@ defaultOutput h loc src level msg =
         , encodeUtf8 $ pack fileLocStr
         , S8.pack ")\n"
         ]
+#endif
 
     -- taken from file-location package
     -- turn the TH Loc loaction information into a human readable string
@@ -342,6 +390,16 @@ defaultOutput h loc src level msg =
       where
         line = show . fst . loc_start
         char = show . snd . loc_start
+
+#if MIN_VERSION_fast_logger(0, 2, 0)
+stdout, stderr :: LoggerSet
+stdout = unsafePerformIO $ newLoggerSet defaultBufferSize FD.stdout
+stderr = unsafePerformIO $ newLoggerSet defaultBufferSize FD.stderr
+
+-- FIXME need a good value. Kazu: should this be provided by fast-logger?
+defaultBufferSize :: Int
+defaultBufferSize = 4096
+#endif
 
 -- | Run a block using a @MonadLogger@ instance which prints to stderr.
 --
