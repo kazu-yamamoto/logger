@@ -27,7 +27,7 @@
 -- >           ,("Content-Length", BS.pack (show len))]
 -- >     pong = "PONG"
 -- >     len = fromIntegral $ BS.length pong
--- >     msg = fromByteString pong
+-- >     msg = toLogStr pong
 
 module Network.Wai.Logger (
   -- * High level functions
@@ -147,7 +147,7 @@ stdoutLoggerInit :: IPAddrSource -> BufSize -> DateCacheGetter
 stdoutLoggerInit ipsrc size dateget = do
     lgrset <- newLoggerSet size stdout
     let logger = apache lgrset ipsrc dateget
-        flusher = flushLogMsg lgrset
+        flusher = flushLogStr lgrset
         noRotator = return ()
         remover = rmLoggerSet lgrset
     return ApacheLoggerActions {
@@ -163,7 +163,7 @@ fileLoggerInit ipsrc spec size dateget = do
     fd <- logOpen (log_file spec)
     lgrset <- newLoggerSet size fd
     let logger = apache lgrset ipsrc dateget
-        flusher = flushLogMsg lgrset
+        flusher = flushLogStr lgrset
         rotator = logRotater lgrset spec
         remover = rmLoggerSet lgrset
     return ApacheLoggerActions {
@@ -178,7 +178,7 @@ fileLoggerInit ipsrc spec size dateget = do
 apache :: LoggerSet -> IPAddrSource -> DateCacheGetter -> ApacheLogger
 apache lgrset ipsrc dateget req st mlen = do
     zdata <- dateget
-    pushLogMsg lgrset (apacheLogMsg ipsrc zdata req st mlen)
+    pushLogStr lgrset (apacheLogStr ipsrc zdata req st mlen)
 
 ----------------------------------------------------------------
 

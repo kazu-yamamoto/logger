@@ -20,6 +20,7 @@ Library
                       , bytestring
                       , directory
                       , filepath
+                      , text
 
 Test-Suite spec
     Main-Is:         Spec.hs

@@ -24,7 +24,6 @@ module Control.Monad.Logger
       MonadLogger(..)
     , LogLevel(..)
     , LogSource
-    , ToLogStr (..)
     -- * Helper transformer
     , LoggingT (..)
     , runStderrLoggingT
@@ -61,12 +60,7 @@ module Control.Monad.Logger
 
 import Language.Haskell.TH.Syntax (Lift (lift), Q, Exp, Loc (..), qLocation)
 #if MIN_VERSION_fast_logger(0, 2, 0)
-import System.Log.FastLogger (LogMsg, fromByteString, pushLogMsg, LoggerSet, newLoggerSet)
-import qualified Data.ByteString.Lazy as L
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
-import qualified Data.Text.Lazy as TL
-import qualified Data.Text.Lazy.Encoding as TL
+import System.Log.FastLogger (LogStr, pushLogStr, ToLogStr (toLogStr), LoggerSet, newLoggerSet)
 import System.IO.Unsafe (unsafePerformIO)
 #define Handle LoggerSet
 import Data.Monoid (mempty, (<>))
@@ -86,9 +80,6 @@ import Control.Monad (liftM, ap, when, void)
 import Control.Monad.Base (MonadBase (liftBase))
 import Control.Monad.Loops (untilM)
 import Control.Monad.Trans.Control (MonadBaseControl (..), MonadTransControl (..))
-import Data.Functor.Identity (Identity)
-import Control.Monad.ST (ST)
-import qualified Control.Monad.ST.Lazy as Lazy (ST)
 import qualified Control.Monad.Trans.Class as Trans
 
 import Control.Monad.IO.Class (MonadIO (liftIO))
@@ -110,10 +101,9 @@ import qualified Control.Monad.Trans.RWS.Strict    as Strict ( RWST   )
 import qualified Control.Monad.Trans.State.Strict  as Strict ( StateT )
 import qualified Control.Monad.Trans.Writer.Strict as Strict ( WriterT )
 
-import Data.Text (Text, pack, unpack, empty)
+import Data.Text (Text, pack, unpack)
 import qualified Data.Text as T
 import qualified Data.ByteString.Char8 as S8
-import Data.Text.Encoding (encodeUtf8)
 
 import Control.Monad.Cont.Class   ( MonadCont (..) )
 import Control.Monad.Error.Class  ( MonadError (..) )
@@ -136,24 +126,6 @@ type LogSource = Text
 
 class Monad m => MonadLogger m where
     monadLoggerLog :: ToLogStr msg => Loc -> LogSource -> LogLevel -> msg -> m ()
-
-#if MIN_VERSION_fast_logger(0, 2, 0)
-class ToLogStr msg where
-    toLogStr :: msg -> LogMsg
-instance ToLogStr LogMsg where
-    toLogStr = id
-instance ToLogStr S8.ByteString where
-    toLogStr = fromByteString
-instance ToLogStr L.ByteString where
-    toLogStr = fromByteString . S8.concat . L.toChunks
-instance ToLogStr String where
-    toLogStr = toLogStr . TL.pack
-instance ToLogStr T.Text where
-    toLogStr = toLogStr . T.encodeUtf8
-instance ToLogStr TL.Text where
-    toLogStr = toLogStr . TL.encodeUtf8
-#define LogStr LogMsg
-#endif
 
 {-
 instance MonadLogger IO          where monadLoggerLog _ _ _ = return ()
@@ -347,19 +319,19 @@ defaultOutput :: Handle
               -> IO ()
 defaultOutput h loc src level msg =
 #if MIN_VERSION_fast_logger(0, 2, 0)
-    pushLogMsg h $
-    fromByteString "[" <>
+    pushLogStr h $
+    "[" <>
     (case level of
         LevelOther t -> toLogStr t
         _ -> toLogStr $ S8.pack $ drop 5 $ show level) <>
     (if T.null src
         then mempty
-        else fromByteString "#" <> toLogStr src) <>
-    fromByteString "] " <>
+        else "#" <> toLogStr src) <>
+    "] " <>
     msg <>
-    fromByteString " @(" <>
+    " @(" <>
     toLogStr (S8.pack fileLocStr) <>
-    fromByteString ")\n"
+    ")\n"
   where
 #else
     S8.hPutStrLn h $ S8.concat bs

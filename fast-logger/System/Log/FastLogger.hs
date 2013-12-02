@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns, CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module System.Log.FastLogger (
   -- * Creating a logger set
@@ -9,29 +10,37 @@ module System.Log.FastLogger (
   , renewLoggerSet
   -- * Removing a logger set
   , rmLoggerSet
+  -- * Log messages
+  , LogStr
+  , ToLogStr(..)
   -- * Writing a log message
-  , pushLogMsg
-  , LogMsg
-  , fromByteString
+  , pushLogStr
   -- * Flushing buffered log messages
-  , flushLogMsg
+  , flushLogStr
   -- * File rotation
   , module System.Log.FastLogger.File
   ) where
 
-import qualified Blaze.ByteString.Builder as BB
 import Blaze.ByteString.Builder.Internal.Types (Builder(..), BuildSignal(..), BufRange(..), runBuildStep, buildStep)
 import Control.Applicative ((<$>))
 import Control.Concurrent (getNumCapabilities, myThreadId, threadCapability, MVar, newMVar, takeMVar, putMVar)
 import Control.Monad (when, replicateM)
 import Data.Array (Array, listArray, (!))
-import qualified Data.ByteString as BS
 import Data.ByteString.Internal (ByteString(..))
 import Data.IORef
 import Data.Monoid (Monoid, mempty, mappend)
+import qualified Blaze.ByteString.Builder as BB
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as S8
+import qualified Data.ByteString.Lazy as L
 #if MIN_VERSION_base(4,5,0)
 import Data.Monoid ((<>))
 #endif
+import Data.String (IsString(..))
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
+import qualified Data.Text.Lazy as TL
+import qualified Data.Text.Lazy.Encoding as TL
 import Data.Word (Word8)
 import Foreign.ForeignPtr (withForeignPtr)
 import Foreign.Marshal.Alloc (mallocBytes, free)
@@ -56,29 +65,49 @@ type BufSize = Int
 
 ----------------------------------------------------------------
 
--- | Log message builder. Use ('<>') to append two LogMsg in O(1).
-data LogMsg = LogMsg !Int Builder
+-- | Log message builder. Use ('<>') to append two LogStr in O(1).
+data LogStr = LogStr !Int Builder
 
-instance Monoid LogMsg where
-    mempty = LogMsg 0 (BB.fromByteString BS.empty)
-    LogMsg s1 b1 `mappend` LogMsg s2 b2 = LogMsg (s1 + s2) (b1 <> b2)
+instance Monoid LogStr where
+    mempty = LogStr 0 (BB.fromByteString BS.empty)
+    LogStr s1 b1 `mappend` LogStr s2 b2 = LogStr (s1 + s2) (b1 <> b2)
 
--- | Creating 'LogMsg'
-fromByteString :: ByteString -> LogMsg
-fromByteString bs = LogMsg (BS.length bs) (BB.fromByteString bs)
+instance IsString LogStr where
+    fromString = toLogStr . TL.pack
+
+class ToLogStr msg where
+    toLogStr :: msg -> LogStr
+
+instance ToLogStr LogStr where
+    toLogStr = id
+instance ToLogStr S8.ByteString where
+    toLogStr = fromByteString
+instance ToLogStr L.ByteString where
+    toLogStr = fromByteString . S8.concat . L.toChunks
+instance ToLogStr String where
+    toLogStr = toLogStr . TL.pack
+instance ToLogStr T.Text where
+    toLogStr = toLogStr . T.encodeUtf8
+instance ToLogStr TL.Text where
+    toLogStr = toLogStr . TL.encodeUtf8
+#define LogStr LogStr
+
+-- | Creating 'LogStr'
+fromByteString :: ByteString -> LogStr
+fromByteString bs = LogStr (BS.length bs) (BB.fromByteString bs)
 
 ----------------------------------------------------------------
 
--- | Writting 'LogMsg' using a buffer in blocking mode.
---   The size of 'LogMsg' must be smaller or equal to
+-- | Writting 'LogStr' using a buffer in blocking mode.
+--   The size of 'LogStr' must be smaller or equal to
 --   the size of buffer.
-writeLogMsg :: FD
+writeLogStr :: FD
             -> Buffer
             -> BufSize
-            -> LogMsg
+            -> LogStr
             -> IO ()
-writeLogMsg fd buf size (LogMsg len builder)
-  | size < len = error "writeLogMsg"
+writeLogStr fd buf size (LogStr len builder)
+  | size < len = error "writeLogStr"
   | otherwise  = toBufIOWith buf size (write fd) builder
 
 toBufIOWith :: Buffer -> BufSize -> (Buffer -> Int -> IO a) -> Builder -> IO a
@@ -102,7 +131,7 @@ write fd buf len' = loop buf (fromIntegral len')
 
 ----------------------------------------------------------------
 
-data Logger = Logger (MVar Buffer) !BufSize (IORef LogMsg)
+data Logger = Logger (MVar Buffer) !BufSize (IORef LogStr)
 
 newLogger :: BufSize -> IO Logger
 newLogger size = do
@@ -111,8 +140,8 @@ newLogger size = do
     lref <- newIORef mempty
     return $ Logger mbuf size lref
 
-pushLog :: FD -> Logger -> LogMsg -> IO ()
-pushLog fd logger@(Logger  _ size ref) nlogmsg@(LogMsg nlen nbuilder)
+pushLog :: FD -> Logger -> LogStr -> IO ()
+pushLog fd logger@(Logger  _ size ref) nlogmsg@(LogStr nlen nbuilder)
   | nlen > size = do
       flushLog fd logger
       BB.toByteStringIO (writeByteString fd) nbuilder
@@ -122,7 +151,7 @@ pushLog fd logger@(Logger  _ size ref) nlogmsg@(LogMsg nlen nbuilder)
         flushLog fd logger
         pushLog fd logger nlogmsg
   where
-    checkBuf ologmsg@(LogMsg olen _)
+    checkBuf ologmsg@(LogStr olen _)
       | size < olen + nlen = (ologmsg, True)
       | otherwise          = (ologmsg <> nlogmsg, False)
 
@@ -140,7 +169,7 @@ flushLog fd (Logger mbuf size lref) = do
     -- for a buffer. So, we use MVar here.
     -- This is safe and speed penalty can be ignored.
     buf <- takeMVar mbuf
-    writeLogMsg fd buf size logmsg
+    writeLogStr fd buf size logmsg
     putMVar mbuf buf
 
 ----------------------------------------------------------------
@@ -170,16 +199,16 @@ newLoggerSet size fd = do
     return $ LoggerSet fref arr
 
 -- | Writing a log message to the corresponding buffer.
-pushLogMsg :: LoggerSet -> LogMsg -> IO ()
-pushLogMsg (LoggerSet fref arr) logmsg = do
+pushLogStr :: LoggerSet -> LogStr -> IO ()
+pushLogStr (LoggerSet fref arr) logmsg = do
     (i, _) <- myThreadId >>= threadCapability
     let logger = arr ! i
     fd <- readIORef fref
     pushLog fd logger logmsg
 
 -- | Flushing log messages in buffers.
-flushLogMsg :: LoggerSet -> IO ()
-flushLogMsg (LoggerSet fref arr) = do
+flushLogStr :: LoggerSet -> IO ()
+flushLogStr (LoggerSet fref arr) = do
     n <- getNumCapabilities
     fd <- readIORef fref
     mapM_ (flushIt fd) [0..n-1]

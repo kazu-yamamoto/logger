@@ -26,7 +26,7 @@ safeForLarge ns = mapM_ safeForLarge' ns
 
 safeForLarge' :: Int -> IO ()
 safeForLarge' n = bracket nullLogger rmLoggerSet $ \lgrset -> do
-    let xs = fromByteString $ BS.pack $ replicate (abs n) 'x'
-        lf = fromByteString "x"
-    pushLogMsg lgrset $ xs <> lf
-    flushLogMsg lgrset
+    let xs = toLogStr $ BS.pack $ replicate (abs n) 'x'
+        lf = "x"
+    pushLogStr lgrset $ xs <> lf
+    flushLogStr lgrset

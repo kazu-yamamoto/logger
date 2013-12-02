@@ -2,7 +2,7 @@
 
 module Network.Wai.Logger.Apache (
     IPAddrSource(..)
-  , apacheLogMsg
+  , apacheLogStr
   ) where
 
 #ifndef MIN_VERSION_base
@@ -39,29 +39,27 @@ data IPAddrSource =
   | FromFallback
 
 -- | Apache style log format.
-apacheLogMsg :: IPAddrSource -> ZonedDate -> Request -> Status -> Maybe Integer -> LogMsg
-apacheLogMsg ipsrc tmstr req status msize =
-      bs (getSourceIP ipsrc req)
-  <> bs " - - ["
-  <> bs tmstr
-  <> bs "] \""
-  <> bs (requestMethod req)
-  <> bs " "
-  <> bs (rawPathInfo req)
-  <> bs " "
-  <> st (show (httpVersion req))
-  <> bs "\" "
-  <> st (show (statusCode status))
-  <> bs " "
-  <> st (maybe "-" show msize)
-  <> bs " \""
-  <> bs (lookupRequestField' "referer" req)
-  <> bs "\" \""
-  <> bs (lookupRequestField' "user-agent" req)
-  <> bs "\"\n"
+apacheLogStr :: IPAddrSource -> ZonedDate -> Request -> Status -> Maybe Integer -> LogStr
+apacheLogStr ipsrc tmstr req status msize =
+      toLogStr (getSourceIP ipsrc req)
+  <> " - - ["
+  <> toLogStr tmstr
+  <> "] \""
+  <> toLogStr (requestMethod req)
+  <> " "
+  <> toLogStr (rawPathInfo req)
+  <> " "
+  <> toLogStr (show (httpVersion req))
+  <> "\" "
+  <> toLogStr (show (statusCode status))
+  <> " "
+  <> toLogStr (maybe "-" show msize)
+  <> " \""
+  <> toLogStr (lookupRequestField' "referer" req)
+  <> "\" \""
+  <> toLogStr (lookupRequestField' "user-agent" req)
+  <> "\"\n"
   where
-    st = bs . BS.pack
-    bs = fromByteString
 #if !MIN_VERSION_base(4,5,0)
     (<>) = mappend
 #endif
