@@ -47,6 +47,7 @@ module Network.Wai.Logger (
   , DateCacheUpdater
   -- * Utilities
   , logCheck
+  , showSockAddr
   ) where
 
 import Control.Concurrent (forkIO, threadDelay, killThread)
@@ -60,6 +61,7 @@ import System.Log.FastLogger
 
 import Network.Wai.Logger.Apache
 import Network.Wai.Logger.Date
+import Network.Wai.Logger.IP (showSockAddr)
 
 ----------------------------------------------------------------
 
