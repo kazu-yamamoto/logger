@@ -60,10 +60,10 @@ module Control.Monad.Logger
 
 import Language.Haskell.TH.Syntax (Lift (lift), Q, Exp, Loc (..), qLocation)
 #if MIN_VERSION_fast_logger(0, 2, 0)
-import System.Log.FastLogger (LogStr, pushLogStr, ToLogStr (toLogStr), LoggerSet, newLoggerSet)
+import System.Log.FastLogger (LogStr, pushLogStr, ToLogStr (toLogStr), LoggerSet, newLoggerSet, defaultBufSize)
 import System.IO.Unsafe (unsafePerformIO)
 #define Handle LoggerSet
-import Data.Monoid (mempty, (<>))
+import Data.Monoid (mempty, mappend)
 import qualified GHC.IO.FD as FD
 #else
 import System.Log.FastLogger (ToLogStr (toLogStr), LogStr (..))
@@ -320,17 +320,17 @@ defaultOutput :: Handle
 defaultOutput h loc src level msg =
 #if MIN_VERSION_fast_logger(0, 2, 0)
     pushLogStr h $
-    "[" <>
+    "[" `mappend`
     (case level of
         LevelOther t -> toLogStr t
-        _ -> toLogStr $ S8.pack $ drop 5 $ show level) <>
+        _ -> toLogStr $ S8.pack $ drop 5 $ show level) `mappend`
     (if T.null src
         then mempty
-        else "#" <> toLogStr src) <>
-    "] " <>
-    msg <>
-    " @(" <>
-    toLogStr (S8.pack fileLocStr) <>
+        else "#" `mappend` toLogStr src) `mappend`
+    "] " `mappend`
+    msg `mappend`
+    " @(" `mappend`
+    toLogStr (S8.pack fileLocStr) `mappend`
     ")\n"
   where
 #else
@@ -365,12 +365,10 @@ defaultOutput h loc src level msg =
 
 #if MIN_VERSION_fast_logger(0, 2, 0)
 stdout, stderr :: LoggerSet
-stdout = unsafePerformIO $ newLoggerSet defaultBufferSize FD.stdout
-stderr = unsafePerformIO $ newLoggerSet defaultBufferSize FD.stderr
-
--- FIXME need a good value. Kazu: should this be provided by fast-logger?
-defaultBufferSize :: Int
-defaultBufferSize = 4096
+stdout = unsafePerformIO $ newLoggerSet defaultBufSize FD.stdout
+{-# NOINLINE stdout #-}
+stderr = unsafePerformIO $ newLoggerSet defaultBufSize FD.stderr
+{-# NOINLINE stderr #-}
 #endif
 
 -- | Run a block using a @MonadLogger@ instance which prints to stderr.
