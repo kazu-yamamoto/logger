@@ -96,7 +96,6 @@ instance ToLogStr T.Text where
     toLogStr = toLogStr . T.encodeUtf8
 instance ToLogStr TL.Text where
     toLogStr = toLogStr . TL.encodeUtf8
-#define LogStr LogStr
 
 -- | Creating 'LogStr'
 fromByteString :: ByteString -> LogStr
