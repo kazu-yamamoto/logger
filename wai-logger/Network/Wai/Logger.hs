@@ -47,6 +47,7 @@ module Network.Wai.Logger (
   , DateCacheUpdater
   -- * Utilities
   , logCheck
+  , showSockAddr
   ) where
 
 import Control.Concurrent (forkIO, threadDelay, killThread)
@@ -60,6 +61,7 @@ import System.Log.FastLogger
 
 import Network.Wai.Logger.Apache
 import Network.Wai.Logger.Date
+import Network.Wai.Logger.IP (showSockAddr)
 
 ----------------------------------------------------------------
 
@@ -116,6 +118,7 @@ data LogType = LogNone                     -- ^ No logging.
              | LogFile FileLogSpec BufSize -- ^ Logging to a file.
                                            --   'BufSize' is a buffer size
                                            --   for each capability.
+             | LogCallback (LogStr -> IO ()) (IO ())
 
 ----------------------------------------------------------------
 
@@ -126,6 +129,7 @@ initLogger :: IPAddrSource -> LogType -> DateCacheGetter
 initLogger _     LogNone             _       = noLoggerInit
 initLogger ipsrc (LogStdout size)    dateget = stdoutLoggerInit ipsrc size dateget
 initLogger ipsrc (LogFile spec size) dateget = fileLoggerInit ipsrc spec size dateget
+initLogger ipsrc (LogCallback cb flush) dateget = callbackLoggerInit ipsrc cb flush dateget
 
 ----------------------------------------------------------------
 
@@ -146,7 +150,7 @@ stdoutLoggerInit :: IPAddrSource -> BufSize -> DateCacheGetter
                  -> IO ApacheLoggerActions
 stdoutLoggerInit ipsrc size dateget = do
     lgrset <- newLoggerSet size stdout
-    let logger = apache lgrset ipsrc dateget
+    let logger = apache (pushLogStr lgrset) ipsrc dateget
         flusher = flushLogStr lgrset
         noRotator = return ()
         remover = rmLoggerSet lgrset
@@ -162,7 +166,7 @@ fileLoggerInit :: IPAddrSource -> FileLogSpec -> BufSize -> DateCacheGetter
 fileLoggerInit ipsrc spec size dateget = do
     fd <- logOpen (log_file spec)
     lgrset <- newLoggerSet size fd
-    let logger = apache lgrset ipsrc dateget
+    let logger = apache (pushLogStr lgrset) ipsrc dateget
         flusher = flushLogStr lgrset
         rotator = logRotater lgrset spec
         remover = rmLoggerSet lgrset
@@ -173,12 +177,26 @@ fileLoggerInit ipsrc spec size dateget = do
       , logRemover = remover
       }
 
+callbackLoggerInit :: IPAddrSource -> (LogStr -> IO ()) -> IO () -> DateCacheGetter
+                   -> IO ApacheLoggerActions
+callbackLoggerInit ipsrc cb flush dateget = do
+    let logger = apache cb ipsrc dateget
+        flusher = flush
+        noRotator = return ()
+        remover = return ()
+    return ApacheLoggerActions {
+        apacheLogger = logger
+      , logFlusher = flusher
+      , logRotator = noRotator
+      , logRemover = remover
+      }
+
 ----------------------------------------------------------------
 
-apache :: LoggerSet -> IPAddrSource -> DateCacheGetter -> ApacheLogger
-apache lgrset ipsrc dateget req st mlen = do
+apache :: (LogStr -> IO ()) -> IPAddrSource -> DateCacheGetter -> ApacheLogger
+apache cb ipsrc dateget req st mlen = do
     zdata <- dateget
-    pushLogStr lgrset (apacheLogStr ipsrc zdata req st mlen)
+    cb (apacheLogStr ipsrc zdata req st mlen)
 
 ----------------------------------------------------------------
 
@@ -202,3 +220,4 @@ logCheck :: LogType -> IO ()
 logCheck LogNone          = return ()
 logCheck (LogStdout _)    = return ()
 logCheck (LogFile spec _) = check spec
+logCheck (LogCallback _ _) = return ()
