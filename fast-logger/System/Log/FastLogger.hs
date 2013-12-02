@@ -5,6 +5,7 @@ module System.Log.FastLogger (
   -- * Creating a logger set
     LoggerSet
   , BufSize
+  , defaultBufSize
   , logOpen
   , newLoggerSet
   , renewLoggerSet
@@ -60,8 +61,13 @@ import System.Log.FastLogger.File
 ----------------------------------------------------------------
 
 type Buffer = Ptr Word8
+
 -- | The type for buffer size of each core.
 type BufSize = Int
+
+-- | The default buffer size (4,096 bytes).
+defaultBufSize :: BufSize
+defaultBufSize = 4096
 
 ----------------------------------------------------------------
 
