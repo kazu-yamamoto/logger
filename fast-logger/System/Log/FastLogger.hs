@@ -14,6 +14,8 @@ module System.Log.FastLogger (
   -- * Log messages
   , LogStr
   , ToLogStr(..)
+  , logStrLength
+  , logStrBuilder
   -- * Writing a log message
   , pushLogStr
   -- * Flushing buffered log messages
@@ -72,7 +74,10 @@ defaultBufSize = 4096
 ----------------------------------------------------------------
 
 -- | Log message builder. Use ('<>') to append two LogStr in O(1).
-data LogStr = LogStr !Int Builder
+data LogStr = LogStr
+    { logStrLength :: !Int
+    , logStrBuilder :: Builder
+    }
 
 instance Monoid LogStr where
     mempty = LogStr 0 (BB.fromByteString BS.empty)
