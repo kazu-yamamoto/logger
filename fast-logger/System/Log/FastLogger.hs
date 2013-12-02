@@ -74,10 +74,12 @@ defaultBufSize = 4096
 ----------------------------------------------------------------
 
 -- | Log message builder. Use ('<>') to append two LogStr in O(1).
-data LogStr = LogStr
-    { logStrLength :: !Int
-    , logStrBuilder :: Builder
-    }
+data LogStr = LogStr {
+  -- | Obtaining the length of 'LogStr'.
+    logStrLength :: !Int
+  -- | Obtaining the 'Builder' of 'LogStr'.
+  , logStrBuilder :: Builder
+  }
 
 instance Monoid LogStr where
     mempty = LogStr 0 (BB.fromByteString BS.empty)
