@@ -59,7 +59,16 @@ module Control.Monad.Logger
     ) where
 
 import Language.Haskell.TH.Syntax (Lift (lift), Q, Exp, Loc (..), qLocation)
+#if MIN_VERSION_fast_logger(0, 2, 0)
+import System.Log.FastLogger (LogStr, pushLogStr, ToLogStr (toLogStr), LoggerSet, newLoggerSet, defaultBufSize)
+import System.IO.Unsafe (unsafePerformIO)
+#define Handle LoggerSet
+import Data.Monoid (mempty, mappend)
+import qualified GHC.IO.FD as FD
+#else
 import System.Log.FastLogger (ToLogStr (toLogStr), LogStr (..))
+import System.IO (stdout, stderr, Handle)
+#endif
 
 import Data.Monoid (Monoid)
 
@@ -71,12 +80,7 @@ import Control.Monad (liftM, ap, when, void)
 import Control.Monad.Base (MonadBase (liftBase))
 import Control.Monad.Loops (untilM)
 import Control.Monad.Trans.Control (MonadBaseControl (..), MonadTransControl (..))
-import Data.Functor.Identity (Identity)
-import Control.Monad.ST (ST)
-import qualified Control.Monad.ST.Lazy as Lazy (ST)
 import qualified Control.Monad.Trans.Class as Trans
-
-import System.IO (stdout, stderr, Handle)
 
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Control.Monad.Trans.Resource (MonadResource (liftResourceT), MonadThrow (monadThrow))
@@ -97,10 +101,9 @@ import qualified Control.Monad.Trans.RWS.Strict    as Strict ( RWST   )
 import qualified Control.Monad.Trans.State.Strict  as Strict ( StateT )
 import qualified Control.Monad.Trans.Writer.Strict as Strict ( WriterT )
 
-import Data.Text (Text, pack, unpack, empty)
+import Data.Text (Text, pack, unpack)
 import qualified Data.Text as T
 import qualified Data.ByteString.Char8 as S8
-import Data.Text.Encoding (encodeUtf8)
 
 import Control.Monad.Cont.Class   ( MonadCont (..) )
 import Control.Monad.Error.Class  ( MonadError (..) )
@@ -315,6 +318,22 @@ defaultOutput :: Handle
               -> LogStr
               -> IO ()
 defaultOutput h loc src level msg =
+#if MIN_VERSION_fast_logger(0, 2, 0)
+    pushLogStr h $
+    "[" `mappend`
+    (case level of
+        LevelOther t -> toLogStr t
+        _ -> toLogStr $ S8.pack $ drop 5 $ show level) `mappend`
+    (if T.null src
+        then mempty
+        else "#" `mappend` toLogStr src) `mappend`
+    "] " `mappend`
+    msg `mappend`
+    " @(" `mappend`
+    toLogStr (S8.pack fileLocStr) `mappend`
+    ")\n"
+  where
+#else
     S8.hPutStrLn h $ S8.concat bs
   where
     bs =
@@ -333,6 +352,7 @@ defaultOutput h loc src level msg =
         , encodeUtf8 $ pack fileLocStr
         , S8.pack ")\n"
         ]
+#endif
 
     -- taken from file-location package
     -- turn the TH Loc loaction information into a human readable string
@@ -342,6 +362,14 @@ defaultOutput h loc src level msg =
       where
         line = show . fst . loc_start
         char = show . snd . loc_start
+
+#if MIN_VERSION_fast_logger(0, 2, 0)
+stdout, stderr :: LoggerSet
+stdout = unsafePerformIO $ newLoggerSet defaultBufSize FD.stdout
+{-# NOINLINE stdout #-}
+stderr = unsafePerformIO $ newLoggerSet defaultBufSize FD.stderr
+{-# NOINLINE stderr #-}
+#endif
 
 -- | Run a block using a @MonadLogger@ instance which prints to stderr.
 --

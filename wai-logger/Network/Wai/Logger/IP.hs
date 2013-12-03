@@ -1,16 +1,14 @@
-module Network.Wai.Logger.Utils (
+module Network.Wai.Logger.IP (
     NumericAddress, showSockAddr
   ) where
 
-import Data.Bits
-import Data.Word
+import Data.Bits (shift, (.&.))
+import Data.Word (Word32)
 import Network.Socket (SockAddr(..))
-import System.ByteOrder
-import Text.Printf
+import System.ByteOrder (ByteOrder(..), byteOrder)
+import Text.Printf (printf)
 
-{-|
-  A type for IP address in numeric string representation.
--}
+-- |  A type for IP address in numeric string representation.
 type NumericAddress = String
 
 showIPv4 :: Word32 -> Bool -> NumericAddress
@@ -39,14 +37,12 @@ showIPv6 (w1,w2,w3,w4) =
       where
         h1 = shift w (-16) .&. 0x0000ffff
         h2 = w .&. 0x0000ffff
-{-|
-  Convert 'SockAddr' to 'NumericAddress'. If the address is
-  an IPv4-embedded IPv6 address, the IPv4 is extracted.
--}
--- HostAddr is network byte order.
--- HostAddr6 is host byte order.
+-- | Convert 'SockAddr' to 'NumericAddress'. If the address is
+--   IPv4-embedded IPv6 address, the IPv4 is extracted.
 showSockAddr :: SockAddr -> NumericAddress
+-- HostAddr is network byte order.
 showSockAddr (SockAddrInet _ addr4)                       = showIPv4 addr4 (byteOrder == LittleEndian)
+-- HostAddr6 is host byte order.
 showSockAddr (SockAddrInet6 _ _ (0,0,0x0000ffff,addr4) _) = showIPv4 addr4 False
 showSockAddr (SockAddrInet6 _ _ (0,0,0,1) _)              = "::1"
 showSockAddr (SockAddrInet6 _ _ addr6 _)                  = showIPv6 addr6

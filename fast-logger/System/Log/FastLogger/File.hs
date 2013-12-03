@@ -1,12 +1,12 @@
 module System.Log.FastLogger.File where
 
-import Control.Monad
-import System.Directory
-import System.FilePath
+import Control.Monad (unless, when)
+import System.Directory (doesFileExist, doesDirectoryExist, getPermissions, writable, renameFile)
+import System.FilePath (takeDirectory)
 
 -- | The spec for logging files
 data FileLogSpec = FileLogSpec {
-    log_file :: String
+    log_file :: FilePath
   , log_file_size :: Integer
   , log_backup_number :: Int
   }

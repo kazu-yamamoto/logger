@@ -1,207 +1,261 @@
-{-# LANGUAGE NoImplicitPrelude, RecordWildCards #-}
-{-# LANGUAGE FlexibleInstances, BangPatterns #-}
-{-# LANGUAGE OverloadedStrings #-}
-
--- | Fast logging system to copy log data directly to Handle buffer.
+{-# LANGUAGE BangPatterns, CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module System.Log.FastLogger (
-  -- * Logger
-    Logger
-  , mkLogger
-  , mkLogger2
-  , renewLogger
-  , rmLogger
-  -- * Logging
-  , loggerPutStr
-  , loggerPutBuilder
-  , loggerFlush
-  -- * Strings
-  , LogStr(..)
+  -- * Creating a logger set
+    LoggerSet
+  , BufSize
+  , defaultBufSize
+  , logOpen
+  , newLoggerSet
+  , renewLoggerSet
+  -- * Removing a logger set
+  , rmLoggerSet
+  -- * Log messages
+  , LogStr
   , ToLogStr(..)
-  -- * Date
-  , loggerDate
-  , module System.Log.FastLogger.Date
+  , logStrLength
+  , logStrBuilder
+  -- * Writing a log message
+  , pushLogStr
+  -- * Flushing buffered log messages
+  , flushLogStr
   -- * File rotation
   , module System.Log.FastLogger.File
   ) where
 
-import Blaze.ByteString.Builder
-import Blaze.ByteString.Builder.Char8 (fromString)
-import Control.Monad
+import Blaze.ByteString.Builder.Internal.Types (Builder(..), BuildSignal(..), BufRange(..), runBuildStep, buildStep)
+import Control.Applicative ((<$>))
+import Control.Concurrent (getNumCapabilities, myThreadId, threadCapability, MVar, newMVar, takeMVar, putMVar)
+import Control.Monad (when, replicateM)
+import Data.Array (Array, listArray, (!))
+import Data.ByteString.Internal (ByteString(..))
+import Data.IORef
+import Data.Monoid (Monoid, mempty, mappend)
+import qualified Blaze.ByteString.Builder as BB
 import qualified Data.ByteString as BS
-import Data.ByteString.Internal (ByteString(..), c2w)
-import Data.List
-import Data.Maybe
-import Data.Monoid
-import Data.Typeable
-import Foreign hiding (void)
-import GHC.Base
-import GHC.IO.Buffer
-import qualified GHC.IO.BufferedIO as Buffered
-import qualified GHC.IO.Device as RawIO
-import GHC.IO.FD
-import GHC.IO.Handle.Internals
-import GHC.IO.Handle.Text
-import GHC.IO.Handle.Types
-import GHC.IORef
-import GHC.Num
-import GHC.Real
-import System.Date.Cache
-import System.IO
-import System.Log.FastLogger.Date
+import qualified Data.ByteString.Char8 as S8
+import qualified Data.ByteString.Lazy as L
+#if MIN_VERSION_base(4,5,0)
+import Data.Monoid ((<>))
+#endif
+import Data.String (IsString(..))
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
+import qualified Data.Text.Lazy as TL
+import qualified Data.Text.Lazy.Encoding as TL
+import Data.Word (Word8)
+import Foreign.ForeignPtr (withForeignPtr)
+import Foreign.Marshal.Alloc (mallocBytes, free)
+import Foreign.Ptr (Ptr, minusPtr, plusPtr)
+import GHC.IO.Device (close)
+import GHC.IO.FD (FD(..), openFile, writeRawBufferPtr)
+import GHC.IO.IOMode (IOMode(..))
 import System.Log.FastLogger.File
 
-import qualified Data.Text as TS
-import qualified Data.Text.Encoding as TE
-import qualified Data.Text.Lazy as TL
-import qualified Data.ByteString as S
-import qualified Data.ByteString.Lazy as L
+----------------------------------------------------------------
 
--- | Abstract data type for logger.
-data Logger = Logger {
-    loggerAutoFlush  :: Bool
-  , loggerHandle     :: Handle
-  , loggerDateGetter :: DateCacheGetter
-  , loggerDateCloser :: DateCacheCloser
+#if !MIN_VERSION_base(4,5,0)
+(<>) :: Monoid m => m -> m -> m
+(<>) = mappend
+#endif
+
+----------------------------------------------------------------
+
+type Buffer = Ptr Word8
+
+-- | The type for buffer size of each core.
+type BufSize = Int
+
+-- | The default buffer size (4,096 bytes).
+defaultBufSize :: BufSize
+defaultBufSize = 4096
+
+----------------------------------------------------------------
+
+-- | Log message builder. Use ('<>') to append two LogStr in O(1).
+data LogStr = LogStr {
+  -- | Obtaining the length of 'LogStr'.
+    logStrLength :: !Int
+  -- | Obtaining the 'Builder' of 'LogStr'.
+  , logStrBuilder :: Builder
   }
 
-logBufSize :: Int
-logBufSize = 4096
+instance Monoid LogStr where
+    mempty = LogStr 0 (BB.fromByteString BS.empty)
+    LogStr s1 b1 `mappend` LogStr s2 b2 = LogStr (s1 + s2) (b1 <> b2)
 
-initHandle :: Handle -> IO ()
-initHandle hdl = hSetBuffering hdl (BlockBuffering (Just logBufSize))
+instance IsString LogStr where
+    fromString = toLogStr . TL.pack
 
--- | Creates a 'Logger' from the given handle.
--- ('ondemandDateCacher' 'zonedDateCacheConf') is used as a Date getter.
-mkLogger :: Bool -- ^ Automatically flush on each loggerPut?
-         -> Handle -- ^ If 'Handle' is associated with a file, 'AppendMode' must be used.
-         -> IO Logger
-mkLogger autoFlush hdl =
-    ondemandDateCacher zonedDateCacheConf >>= mkLogger2 autoFlush hdl
+class ToLogStr msg where
+    toLogStr :: msg -> LogStr
 
--- | Creates a 'Logger' from the given handle.
-mkLogger2 :: Bool -- ^ Automatically flush on each loggerPut?
-          -> Handle -- ^ If 'Handle' is associated with a file, 'AppendMode' must be used.
-          -> (DateCacheGetter, DateCacheCloser) -- ^ Date getter/closer. E.g. ('clockDateCacher' 'zonedDateCacheConf')           
-          -> IO Logger
-mkLogger2 autoFlush hdl (getter,closer) = do
-    initHandle hdl
-    return $ Logger autoFlush hdl getter closer
+instance ToLogStr LogStr where
+    toLogStr = id
+instance ToLogStr S8.ByteString where
+    toLogStr = fromByteString
+instance ToLogStr L.ByteString where
+    toLogStr = fromByteString . S8.concat . L.toChunks
+instance ToLogStr String where
+    toLogStr = toLogStr . TL.pack
+instance ToLogStr T.Text where
+    toLogStr = toLogStr . T.encodeUtf8
+instance ToLogStr TL.Text where
+    toLogStr = toLogStr . TL.encodeUtf8
 
--- | Creates a new 'Logger' from old one by replacing 'Handle'.
--- The new 'Handle' automatically inherits the file mode of
--- the old one.
--- The old 'Handle' is automatically closed.
-renewLogger :: Logger -> Handle -> IO Logger
-renewLogger logger newhdl = do
-    let oldhdl = loggerHandle logger
-    hFlush oldhdl
-    hClose oldhdl
-    initHandle newhdl
-    return $ logger { loggerHandle = newhdl }
+-- | Creating 'LogStr'
+fromByteString :: ByteString -> LogStr
+fromByteString bs = LogStr (BS.length bs) (BB.fromByteString bs)
 
--- | Destroy a 'Logger' by closing internal 'Handle'.
-rmLogger :: Logger -> IO ()
-rmLogger lgr = hClose (loggerHandle lgr) >> loggerDateCloser lgr
+----------------------------------------------------------------
 
--- | A date type to contain 'String' and 'ByteString'.
--- This data is exported so that format can be defined.
--- This would be replaced with 'Builder' someday when
--- it can be written directly to 'Handle' buffer.
-data LogStr = LS !String | LB !ByteString
+-- | Writting 'LogStr' using a buffer in blocking mode.
+--   The size of 'LogStr' must be smaller or equal to
+--   the size of buffer.
+writeLogStr :: FD
+            -> Buffer
+            -> BufSize
+            -> LogStr
+            -> IO ()
+writeLogStr fd buf size (LogStr len builder)
+  | size < len = error "writeLogStr"
+  | otherwise  = toBufIOWith buf size (write fd) builder
 
-class ToLogStr a where toLogStr :: a -> LogStr
-instance ToLogStr [Char] where toLogStr = LS
-instance ToLogStr ByteString where toLogStr = LB
-instance ToLogStr L.ByteString where toLogStr = LB . S.concat . L.toChunks
-instance ToLogStr TS.Text where toLogStr = LB . TE.encodeUtf8
-instance ToLogStr TL.Text where toLogStr = LB . TE.encodeUtf8 . TL.toStrict
-
-hPutLogStr :: Handle -> [LogStr] -> IO ()
-hPutLogStr handle bss =
-  wantWritableHandle "hPutLogStr" handle $ \h_ -> bufsWrite h_ bss
-
--- based on GHC.IO.Handle.Text
-
-bufsWrite :: Handle__ -> [LogStr] -> IO ()
-bufsWrite h_@Handle__{..} bss = do
-    old_buf@Buffer{
-        bufRaw = old_raw
-      , bufR = w
-      , bufSize = size
-      } <- readIORef haByteBuffer
-    if size - w > len then do
-        withRawBuffer old_raw $ \ptr ->
-            go (ptr `plusPtr` w)  bss
-        writeIORef haByteBuffer old_buf{ bufR = w + len }
-     else do
-        old_buf' <- Buffered.flushWriteBuffer haDevice old_buf
-        writeIORef haByteBuffer old_buf'
-        if size > len then
-            bufsWrite h_ bss
-          else do
-            let Just fd = cast haDevice :: Maybe FD
-            writeWithBuilder fd bss
+toBufIOWith :: Buffer -> BufSize -> (Buffer -> Int -> IO a) -> Builder -> IO a
+toBufIOWith buf !size io (Builder build) = do
+    signal <- runBuildStep step bufRange
+    case signal of
+        Done ptr _ -> io buf (ptr `minusPtr` buf)
+        _          -> error "toBufIOWith"
   where
-    len = foldl' (\ !x !y -> x + getLength y) 0 bss
-    getLength (LB s) = BS.length s
-    getLength (LS s) = length s
-    go :: Ptr Word8 -> [LogStr] -> IO ()
-    go _ [] = return ()
-    go dst (LB b:bs) = do
-      dst' <- copy dst b
-      go dst' bs
-    go dst (LS s:ss) = do
-      dst' <- copy' dst s
-      go dst' ss
+    !step = build (buildStep finalStep)
+    !bufRange = BufRange buf (buf `plusPtr` size)
+    finalStep !(BufRange p _) = return $ Done p ()
 
-writeWithBuilder :: FD -> [LogStr] -> IO ()
-writeWithBuilder fd bss = toByteStringIOWith 4096 write builder
+write :: FD -> Buffer -> Int -> IO ()
+write fd buf len' = loop buf (fromIntegral len')
   where
-    write !(PS fp o l) = withForeignPtr fp $ \p -> do
-        void $ RawIO.writeNonBlocking fd (p `plusPtr` o) l
-    builder = foldr mappend mempty $ map toBuilder bss
-    toBuilder (LB s) = fromByteString s
-    toBuilder (LS s) = fromString s
+    loop bf !len = do
+        written <- writeRawBufferPtr "write" fd bf 0 (fromIntegral len)
+        when (written < len) $
+            loop (bf `plusPtr` fromIntegral written) (len - written)
 
-copy :: Ptr Word8 -> ByteString -> IO (Ptr Word8)
-copy dst (PS ptr off len) = withForeignPtr ptr $ \s -> do
-    let !src = s `plusPtr` off
-    _ <- memcpy dst src (fromIntegral len)
-    let !res = dst `plusPtr` len
-    return res
+----------------------------------------------------------------
 
-copy' :: Ptr Word8 -> String -> IO (Ptr Word8)
-copy' dst [] = return dst
-copy' dst (x:xs) = do
-    poke dst (c2w x)
-    copy' (dst `plusPtr` 1) xs
+data Logger = Logger (MVar Buffer) !BufSize (IORef LogStr)
 
--- | The 'hPut' function to copy a list of 'LogStr' to the buffer
--- of 'Handle' of 'Logger' directly.
-loggerPutStr :: Logger -> [LogStr] -> IO ()
-loggerPutStr logger strs = do
-    hPutLogStr hdl strs
-    when autoFlush $ hFlush hdl
+newLogger :: BufSize -> IO Logger
+newLogger size = do
+    buf <- getBuffer size
+    mbuf <- newMVar buf
+    lref <- newIORef mempty
+    return $ Logger mbuf size lref
+
+pushLog :: FD -> Logger -> LogStr -> IO ()
+pushLog fd logger@(Logger  _ size ref) nlogmsg@(LogStr nlen nbuilder)
+  | nlen > size = do
+      flushLog fd logger
+      BB.toByteStringIO (writeByteString fd) nbuilder
+  | otherwise = do
+    needFlush <- atomicModifyIORef' ref checkBuf
+    when needFlush $ do
+        flushLog fd logger
+        pushLog fd logger nlogmsg
   where
-    hdl = loggerHandle logger
-    autoFlush = loggerAutoFlush logger
+    checkBuf ologmsg@(LogStr olen _)
+      | size < olen + nlen = (ologmsg, True)
+      | otherwise          = (ologmsg <> nlogmsg, False)
 
--- | The 'hPut' function directory to copy 'Builder' to the buffer.
--- The current implementation is inefficient at this moment.
--- This would replace 'loggerPutStr' someday.
-loggerPutBuilder :: Logger -> Builder -> IO ()
-loggerPutBuilder logger builder = do
-    loggerPutStr logger . return . LB . toByteString $ builder
-    when autoFlush $ hFlush hdl
+writeByteString :: FD -> ByteString -> IO ()
+writeByteString fd (PS ps s l) = withForeignPtr ps $ \p ->
+    write fd (p `plusPtr` s) l
+
+flushLog :: FD -> Logger -> IO ()
+flushLog fd (Logger mbuf size lref) = do
+    logmsg <- atomicModifyIORef' lref (\old -> (mempty, old))
+    -- If a special buffer is prepared for flusher, this MVar could
+    -- be removed. But such a code does not contribute logging speed
+    -- according to experiment. And even with the special buffer,
+    -- there is no grantee that this function is exclusively called
+    -- for a buffer. So, we use MVar here.
+    -- This is safe and speed penalty can be ignored.
+    buf <- takeMVar mbuf
+    writeLogStr fd buf size logmsg
+    putMVar mbuf buf
+
+----------------------------------------------------------------
+
+-- | Opening a log file. FIXME: Windows support.
+logOpen :: FilePath -> IO FD
+logOpen file = fst <$> openFile file AppendMode False -- FIXME blocking
+
+getBuffer :: BufSize -> IO Buffer
+getBuffer = mallocBytes
+
+----------------------------------------------------------------
+
+-- | A set of loggers.
+--   The number of loggers is the capabilities of GHC RTS.
+--   You can specify it with \"+RTS -N\<x\>\".
+--   A buffer is prepared for each capability.
+data LoggerSet = LoggerSet (IORef FD) (Array Int Logger)
+
+-- | Creating a new 'LoggerSet'.
+newLoggerSet :: BufSize -> FD -> IO LoggerSet
+newLoggerSet size fd = do
+    n <- getNumCapabilities
+    loggers <- replicateM n $ newLogger size
+    let arr = listArray (0,n-1) loggers
+    fref <- newIORef fd
+    return $ LoggerSet fref arr
+
+-- | Writing a log message to the corresponding buffer.
+pushLogStr :: LoggerSet -> LogStr -> IO ()
+pushLogStr (LoggerSet fref arr) logmsg = do
+    (i, _) <- myThreadId >>= threadCapability
+    let logger = arr ! i
+    fd <- readIORef fref
+    pushLog fd logger logmsg
+
+-- | Flushing log messages in buffers.
+flushLogStr :: LoggerSet -> IO ()
+flushLogStr (LoggerSet fref arr) = do
+    n <- getNumCapabilities
+    fd <- readIORef fref
+    mapM_ (flushIt fd) [0..n-1]
   where
-    hdl = loggerHandle logger
-    autoFlush = loggerAutoFlush logger
+    flushIt fd i = flushLog fd (arr ! i)
 
--- | Flushing the buffer of 'Handle' of 'Logger'.
-loggerFlush :: Logger -> IO ()
-loggerFlush logger = hFlush $ loggerHandle logger
+-- | Renewing 'FD' in 'LoggerSet'. Old 'FD' is closed.
+renewLoggerSet :: LoggerSet -> FD -> IO ()
+renewLoggerSet (LoggerSet fref _) newfd = do
+    oldfd <- atomicModifyIORef' fref (\fd -> (newfd, fd))
+    close oldfd
 
--- | Obtaining date string from 'Logger'.
-loggerDate :: Logger -> IO ZonedDate
-loggerDate logger = loggerDateGetter logger
+-- | Flushing the buffers, closing 'FD' and freeing the buffers.
+rmLoggerSet :: LoggerSet -> IO ()
+rmLoggerSet (LoggerSet fref arr) = do
+    n <- getNumCapabilities
+    fd <- readIORef fref
+    let nums = [0..n-1]
+    mapM_ (flushIt fd) nums
+    mapM_ freeIt nums
+    when (fdFD fd /= 1) $ close fd
+  where
+    flushIt fd i = flushLog fd (arr ! i)
+    freeIt i = do
+        let (Logger mbuf _ _) = arr ! i
+        takeMVar mbuf >>= free
+
+#if !MIN_VERSION_base(4,6,0)
+-- | Strict version of 'atomicModifyIORef'.  This forces both the value stored
+-- in the 'IORef' as well as the value returned.
+atomicModifyIORef' :: IORef a -> (a -> (a,b)) -> IO b
+atomicModifyIORef' ref f = do
+    c <- atomicModifyIORef ref
+            (\x -> let (a, b) = f x    -- Lazy application of "f"
+                    in (a, a `seq` b)) -- Lazy application of "seq"
+    -- The following forces "a `seq` b", so it also forces "f x".
+    c `seq` return c
+#endif

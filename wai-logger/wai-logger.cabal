@@ -1,5 +1,5 @@
 Name:                   wai-logger
-Version:                0.3.2
+Version:                2.0.0
 Author:                 Kazu Yamamoto <kazu@iij.ad.jp>
 Maintainer:             Kazu Yamamoto <kazu@iij.ad.jp>
 License:                BSD3
@@ -14,18 +14,23 @@ Library
   Default-Language:     Haskell2010
   GHC-Options:          -Wall
   Exposed-Modules:      Network.Wai.Logger
-                        Network.Wai.Logger.Format
-                        Network.Wai.Logger.Utils
+  Other-Modules:        Network.Wai.Logger.Apache
+                        Network.Wai.Logger.Date
+                        Network.Wai.Logger.IP
   Build-Depends:        base >= 4 && < 5
                       , blaze-builder
                       , byteorder
                       , bytestring
                       , case-insensitive
-                      , date-cache >= 0.3
-                      , fast-logger >= 0.3
+                      , fast-logger >= 2.0.0
                       , http-types
                       , network
-                      , wai
+                      , wai >= 2.0.0
+  if os(windows)
+      Cpp-Options:      -DWINDOWS
+  else
+      Build-Depends:    unix
+                      , unix-time
 
 Test-Suite doctest
   Type:                 exitcode-stdio-1.0
