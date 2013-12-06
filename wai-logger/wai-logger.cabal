@@ -28,6 +28,8 @@ Library
                       , wai >= 2.0.0
   if os(windows)
       Cpp-Options:      -DWINDOWS
+      Build-Depends:    time
+                      , old-locale
   else
       Build-Depends:    unix
                       , unix-time
