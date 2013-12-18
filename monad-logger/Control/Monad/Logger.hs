@@ -59,8 +59,8 @@ module Control.Monad.Logger
     ) where
 
 import Language.Haskell.TH.Syntax (Lift (lift), Q, Exp, Loc (..), qLocation)
-#if MIN_VERSION_fast_logger(0, 2, 0)
-import System.Log.FastLogger (LogStr, pushLogStr, ToLogStr (toLogStr), LoggerSet, newLoggerSet, defaultBufSize)
+#if MIN_VERSION_fast_logger(2, 0, 0)
+import System.Log.FastLogger (LogStr, pushLogStr, ToLogStr (toLogStr), LoggerSet, newLoggerSet, defaultBufSize, flushLogStr)
 import System.IO.Unsafe (unsafePerformIO)
 #define Handle LoggerSet
 import Data.Monoid (mempty, mappend)
@@ -319,7 +319,8 @@ defaultOutput :: Handle
               -> IO ()
 defaultOutput h loc src level msg =
 #if MIN_VERSION_fast_logger(0, 2, 0)
-    pushLogStr h $
+ do
+   pushLogStr h $
     "[" `mappend`
     (case level of
         LevelOther t -> toLogStr t
@@ -332,6 +333,7 @@ defaultOutput h loc src level msg =
     " @(" `mappend`
     toLogStr (S8.pack fileLocStr) `mappend`
     ")\n"
+   flushLogStr h
   where
 #else
     S8.hPutStrLn h $ S8.concat bs
