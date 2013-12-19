@@ -59,6 +59,7 @@ module Control.Monad.Logger
 
     -- * utilities for defining your own loggers
     , defaultLogStr
+    , Loc
     ) where
 
 import Language.Haskell.TH.Syntax (Lift (lift), Q, Exp, Loc (..), qLocation)
