@@ -56,6 +56,9 @@ module Control.Monad.Logger
     , logWarnNS
     , logErrorNS
     , logOtherNS
+
+    -- * utilities for defining your own loggers
+    , defaultLogStr
     ) where
 
 import Language.Haskell.TH.Syntax (Lift (lift), Q, Exp, Loc (..), qLocation)
@@ -319,8 +322,24 @@ defaultOutput :: Handle
               -> IO ()
 defaultOutput h loc src level msg =
 #if MIN_VERSION_fast_logger(0, 2, 0)
- do
-   pushLogStr h $
+    pushLogStr h ls >> flushLogStr h
+#else
+    S8.hPutStrLn h ls
+#endif
+  where
+    ls = defaultLogStr loc src level msg
+
+defaultLogStr :: Loc
+              -> LogSource
+              -> LogLevel
+              -> LogStr
+#if MIN_VERSION_fast_logger(0, 2, 0)
+              -> LogStr
+#else
+              -> S8.ByteString
+#endif
+defaultLogStr loc src level msg =
+#if MIN_VERSION_fast_logger(0, 2, 0)
     "[" `mappend`
     (case level of
         LevelOther t -> toLogStr t
@@ -333,12 +352,8 @@ defaultOutput h loc src level msg =
     " @(" `mappend`
     toLogStr (S8.pack fileLocStr) `mappend`
     ")\n"
-   flushLogStr h
-  where
 #else
-    S8.hPutStrLn h $ S8.concat bs
-  where
-    bs =
+    S8.concat
         [ S8.pack "["
         , case level of
             LevelOther t -> encodeUtf8 t
@@ -355,7 +370,7 @@ defaultOutput h loc src level msg =
         , S8.pack ")\n"
         ]
 #endif
-
+  where
     -- taken from file-location package
     -- turn the TH Loc loaction information into a human readable string
     -- leaving out the loc_end parameter
