@@ -32,7 +32,7 @@ Library
                       , old-locale
   else
       Build-Depends:    unix
-                      , unix-time
+                      , unix-time >= 0.2.2
 
 Test-Suite doctest
   Type:                 exitcode-stdio-1.0
