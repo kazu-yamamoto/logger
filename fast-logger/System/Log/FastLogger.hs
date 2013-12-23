@@ -23,39 +23,19 @@ module System.Log.FastLogger (
   , module System.Log.FastLogger.File
   ) where
 
-#if MIN_VERSION_bytestring(0,10,2)
-import Data.ByteString.Builder.Extra (Next(..))
-import qualified Data.ByteString.Builder.Extra as BBE
-#else
-import Blaze.ByteString.Builder.Internal.Types (Builder(..), BuildSignal(..), BufRange(..), runBuildStep, buildStep)
-import Foreign.Ptr (minusPtr)
-#endif
 import Control.Applicative ((<$>))
 import Control.Concurrent (getNumCapabilities, myThreadId, threadCapability, MVar, newMVar, takeMVar, withMVar)
 import Control.Monad (when, replicateM)
 import Data.Array (Array, listArray, (!))
-import Data.ByteString.Internal (ByteString(..))
 import Data.IORef
-import Data.Word (Word8)
-import Foreign.ForeignPtr (withForeignPtr)
 import Foreign.Marshal.Alloc (mallocBytes, free)
-import Foreign.Ptr (Ptr, plusPtr)
+import Foreign.Ptr (plusPtr)
 import GHC.IO.Device (close)
 import GHC.IO.FD (FD(..), openFile, writeRawBufferPtr)
 import GHC.IO.IOMode (IOMode(..))
 import System.Log.FastLogger.File
 import System.Log.FastLogger.LogStr
-
-----------------------------------------------------------------
-
-type Buffer = Ptr Word8
-
--- | The type for buffer size of each core.
-type BufSize = Int
-
--- | The default buffer size (4,096 bytes).
-defaultBufSize :: BufSize
-defaultBufSize = 4096
+import System.Log.FastLogger.IO
 
 ----------------------------------------------------------------
 
@@ -70,45 +50,6 @@ writeLogStr :: FD
 writeLogStr fd buf size (LogStr len builder)
   | size < len = error "writeLogStr"
   | otherwise  = toBufIOWith buf size (write fd) builder
-
--- FIXME:
--- | After this function call, Buffer should be empty
-#if MIN_VERSION_bytestring(0,10,2)
-toBufIOWith :: Buffer -> BufSize -> (Buffer -> Int -> IO ()) -> Builder -> IO ()
-toBufIOWith buf !size io builder = loop $ BBE.runBuilder builder
-  where
-    loop writer = do
-        (len, next) <- writer buf size
-        io buf len
-        case next of
-             Done -> return ()
-             More minSize writer'
-               | size < minSize -> error "toBufIOWith: More: minSize"
-               | otherwise      -> loop writer'
-             Chunk (PS fptr off siz) writer'
-               | len == 0  -> loop writer' -- flushing
-               | otherwise -> withForeignPtr fptr $ \ptr -> io (ptr `plusPtr` off) siz
-#else
-toBufIOWith :: Buffer -> BufSize -> (Buffer -> Int -> IO ()) -> Builder -> IO ()
-toBufIOWith buf !size io (Builder build) = loop firstStep
-  where
-    firstStep = build (buildStep finalStep)
-    finalStep (BufRange p _) = return $ Done p ()
-    bufRange = BufRange buf (buf `plusPtr` size)
-    loop step = do
-        signal <- runBuildStep step bufRange
-        case signal of
-             Done ptr _ -> io buf (ptr `minusPtr` buf)
-             BufferFull minSize ptr next
-               | size < minSize -> error "toBufIOWith: BufferFull: minSize"
-               | otherwise      -> do
-                   io buf (ptr `minusPtr` buf)
-                   loop next
-             InsertByteString ptr (PS fptr off siz) next -> do
-                 io buf (ptr `minusPtr` buf)
-                 withForeignPtr fptr $ \p -> io (p `plusPtr` off) siz
-                 loop next
-#endif
 
 write :: FD -> Buffer -> Int -> IO ()
 write fd buf len' = loop buf (fromIntegral len')
@@ -133,7 +74,6 @@ pushLog :: FD -> Logger -> LogStr -> IO ()
 pushLog fd logger@(Logger mbuf size ref) nlogmsg@(LogStr nlen nbuilder)
   | nlen > size = do
       flushLog fd logger
-      -- FIXME: lock me!
       withMVar mbuf $ \buf -> toBufIOWith buf nlen (write fd) nbuilder
   | otherwise = do
     needFlush <- atomicModifyIORef' ref checkBuf
@@ -158,9 +98,9 @@ flushLog fd (Logger mbuf size lref) = do
 
 ----------------------------------------------------------------
 
--- | Opening a log file. FIXME: Windows support.
+-- | Opening a log file.
 logOpen :: FilePath -> IO FD
-logOpen file = fst <$> openFile file AppendMode False -- FIXME blocking
+logOpen file = fst <$> openFile file AppendMode False
 
 getBuffer :: BufSize -> IO Buffer
 getBuffer = mallocBytes
