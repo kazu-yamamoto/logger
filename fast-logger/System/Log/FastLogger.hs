@@ -1,5 +1,4 @@
 {-# LANGUAGE BangPatterns, CPP #-}
-{-# LANGUAGE FlexibleInstances #-}
 
 module System.Log.FastLogger (
   -- * Creating a logger set
@@ -25,12 +24,10 @@ module System.Log.FastLogger (
   ) where
 
 #if MIN_VERSION_bytestring(0,10,2)
-import Data.ByteString.Builder (Builder, byteString)
 import Data.ByteString.Builder.Extra (Next(..))
 import qualified Data.ByteString.Builder.Extra as BBE
 #else
 import Blaze.ByteString.Builder.Internal.Types (Builder(..), BuildSignal(..), BufRange(..), runBuildStep, buildStep)
-import qualified Blaze.ByteString.Builder as BB
 import Foreign.Ptr (minusPtr)
 #endif
 import Control.Applicative ((<$>))
@@ -39,18 +36,6 @@ import Control.Monad (when, replicateM)
 import Data.Array (Array, listArray, (!))
 import Data.ByteString.Internal (ByteString(..))
 import Data.IORef
-import Data.Monoid (Monoid, mempty, mappend)
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Char8 as S8
-import qualified Data.ByteString.Lazy as L
-#if MIN_VERSION_base(4,5,0)
-import Data.Monoid ((<>))
-#endif
-import Data.String (IsString(..))
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
-import qualified Data.Text.Lazy as TL
-import qualified Data.Text.Lazy.Encoding as TL
 import Data.Word (Word8)
 import Foreign.ForeignPtr (withForeignPtr)
 import Foreign.Marshal.Alloc (mallocBytes, free)
@@ -59,18 +44,7 @@ import GHC.IO.Device (close)
 import GHC.IO.FD (FD(..), openFile, writeRawBufferPtr)
 import GHC.IO.IOMode (IOMode(..))
 import System.Log.FastLogger.File
-
-----------------------------------------------------------------
-
-#if !MIN_VERSION_base(4,5,0)
-(<>) :: Monoid m => m -> m -> m
-(<>) = mappend
-#endif
-
-#if !MIN_VERSION_bytestring(0,10,2)
-byteString :: ByteString -> Builder
-byteString = BB.fromByteString
-#endif
+import System.Log.FastLogger.LogStr
 
 ----------------------------------------------------------------
 
@@ -82,43 +56,6 @@ type BufSize = Int
 -- | The default buffer size (4,096 bytes).
 defaultBufSize :: BufSize
 defaultBufSize = 4096
-
-----------------------------------------------------------------
-
--- | Log message builder. Use ('<>') to append two LogStr in O(1).
-data LogStr = LogStr {
-  -- | Obtaining the length of 'LogStr'.
-    logStrLength :: !Int
-  -- | Obtaining the 'Builder' of 'LogStr'.
-  , logStrBuilder :: Builder
-  }
-
-instance Monoid LogStr where
-    mempty = LogStr 0 (byteString BS.empty)
-    LogStr s1 b1 `mappend` LogStr s2 b2 = LogStr (s1 + s2) (b1 <> b2)
-
-instance IsString LogStr where
-    fromString = toLogStr . TL.pack
-
-class ToLogStr msg where
-    toLogStr :: msg -> LogStr
-
-instance ToLogStr LogStr where
-    toLogStr = id
-instance ToLogStr S8.ByteString where
-    toLogStr = fromByteString
-instance ToLogStr L.ByteString where
-    toLogStr = fromByteString . S8.concat . L.toChunks
-instance ToLogStr String where
-    toLogStr = toLogStr . TL.pack
-instance ToLogStr T.Text where
-    toLogStr = toLogStr . T.encodeUtf8
-instance ToLogStr TL.Text where
-    toLogStr = toLogStr . TL.encodeUtf8
-
--- | Creating 'LogStr'
-fromByteString :: ByteString -> LogStr
-fromByteString bs = LogStr (BS.length bs) (byteString bs)
 
 ----------------------------------------------------------------
 
@@ -156,7 +93,7 @@ toBufIOWith :: Buffer -> BufSize -> (Buffer -> Int -> IO ()) -> Builder -> IO ()
 toBufIOWith buf !size io (Builder build) = loop firstStep
   where
     firstStep = build (buildStep finalStep)
-    finalStep !(BufRange p _) = return $ Done p ()
+    finalStep (BufRange p _) = return $ Done p ()
     bufRange = BufRange buf (buf `plusPtr` size)
     loop step = do
         signal <- runBuildStep step bufRange
