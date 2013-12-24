@@ -1,6 +1,11 @@
 {-# LANGUAGE BangPatterns, CPP #-}
 
-module System.Log.FastLogger.Logger where
+module System.Log.FastLogger.Logger (
+    Logger(..)
+  , newLogger
+  , pushLog
+  , flushLog
+  ) where
 
 import Control.Concurrent (MVar, newMVar, withMVar)
 import Control.Monad (when)
