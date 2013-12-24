@@ -9,24 +9,15 @@ module System.Log.FastLogger.Logger (
 
 import Control.Concurrent (MVar, newMVar, withMVar)
 import Control.Monad (when)
-import Data.IORef
 import Foreign.Ptr (plusPtr)
 import GHC.IO.FD (FD, writeRawBufferPtr)
 import System.Log.FastLogger.IO
 import System.Log.FastLogger.LogStr
+import System.Log.FastLogger.IORef
 
 ----------------------------------------------------------------
 
 data Logger = Logger (MVar Buffer) !BufSize (IORef LogStr)
-
-#if !MIN_VERSION_base(4, 6, 0)
-atomicModifyIORef' :: IORef a -> (a -> (a,b)) -> IO b
-atomicModifyIORef' ref f = do
-    b <- atomicModifyIORef ref
-            (\x -> let (a, b) = f x
-                    in (a, a `seq` b))
-    b `seq` return b
-#endif
 
 newLogger :: BufSize -> IO Logger
 newLogger size = do

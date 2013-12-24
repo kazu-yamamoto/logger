@@ -25,12 +25,12 @@ import Control.Applicative ((<$>))
 import Control.Concurrent (getNumCapabilities, myThreadId, threadCapability, takeMVar)
 import Control.Monad (when, replicateM)
 import Data.Array (Array, listArray, (!))
-import Data.IORef
 import GHC.IO.Device (close)
 import GHC.IO.FD (FD(..), openFile)
 import GHC.IO.IOMode (IOMode(..))
 import System.Log.FastLogger.File
 import System.Log.FastLogger.IO
+import System.Log.FastLogger.IORef
 import System.Log.FastLogger.LogStr
 import System.Log.FastLogger.Logger
 
@@ -94,15 +94,3 @@ rmLoggerSet (LoggerSet fref arr) = do
     freeIt i = do
         let (Logger mbuf _ _) = arr ! i
         takeMVar mbuf >>= freeBuffer
-
-#if !MIN_VERSION_base(4,6,0)
--- | Strict version of 'atomicModifyIORef'.  This forces both the value stored
--- in the 'IORef' as well as the value returned.
-atomicModifyIORef' :: IORef a -> (a -> (a,b)) -> IO b
-atomicModifyIORef' ref f = do
-    c <- atomicModifyIORef ref
-            (\x -> let (a, b) = f x    -- Lazy application of "f"
-                    in (a, a `seq` b)) -- Lazy application of "seq"
-    -- The following forces "a `seq` b", so it also forces "f x".
-    c `seq` return c
-#endif
