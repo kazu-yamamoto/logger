@@ -12,6 +12,7 @@ import Foreign.Ptr (minusPtr)
 import Data.ByteString.Internal (ByteString(..))
 import Data.Word (Word8)
 import Foreign.ForeignPtr (withForeignPtr)
+import Foreign.Marshal.Alloc (mallocBytes, free)
 import Foreign.Ptr (Ptr, plusPtr)
 import System.Log.FastLogger.LogStr
 
@@ -23,6 +24,12 @@ type BufSize = Int
 -- | The default buffer size (4,096 bytes).
 defaultBufSize :: BufSize
 defaultBufSize = 4096
+
+getBuffer :: BufSize -> IO Buffer
+getBuffer = mallocBytes
+
+freeBuffer :: Buffer -> IO ()
+freeBuffer = free
 
 #if MIN_VERSION_bytestring(0,10,2)
 toBufIOWith :: Buffer -> BufSize -> (Buffer -> Int -> IO ()) -> Builder -> IO ()

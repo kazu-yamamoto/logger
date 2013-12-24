@@ -2,10 +2,10 @@
 
 module System.Log.FastLogger (
   -- * Creating a logger set
-    LoggerSet
-  , BufSize
+    BufSize
   , defaultBufSize
   , logOpen
+  , LoggerSet
   , newLoggerSet
   , renewLoggerSet
   -- * Removing a logger set
@@ -24,86 +24,23 @@ module System.Log.FastLogger (
   ) where
 
 import Control.Applicative ((<$>))
-import Control.Concurrent (getNumCapabilities, myThreadId, threadCapability, MVar, newMVar, takeMVar, withMVar)
+import Control.Concurrent (getNumCapabilities, myThreadId, threadCapability, takeMVar)
 import Control.Monad (when, replicateM)
 import Data.Array (Array, listArray, (!))
 import Data.IORef
-import Foreign.Marshal.Alloc (mallocBytes, free)
-import Foreign.Ptr (plusPtr)
 import GHC.IO.Device (close)
-import GHC.IO.FD (FD(..), openFile, writeRawBufferPtr)
+import GHC.IO.FD (FD(..), openFile)
 import GHC.IO.IOMode (IOMode(..))
 import System.Log.FastLogger.File
-import System.Log.FastLogger.LogStr
 import System.Log.FastLogger.IO
-
-----------------------------------------------------------------
-
--- | Writting 'LogStr' using a buffer in blocking mode.
---   The size of 'LogStr' must be smaller or equal to
---   the size of buffer.
-writeLogStr :: FD
-            -> Buffer
-            -> BufSize
-            -> LogStr
-            -> IO ()
-writeLogStr fd buf size (LogStr len builder)
-  | size < len = error "writeLogStr"
-  | otherwise  = toBufIOWith buf size (write fd) builder
-
-write :: FD -> Buffer -> Int -> IO ()
-write fd buf len' = loop buf (fromIntegral len')
-  where
-    loop bf !len = do
-        written <- writeRawBufferPtr "write" fd bf 0 (fromIntegral len)
-        when (written < len) $
-            loop (bf `plusPtr` fromIntegral written) (len - written)
-
-----------------------------------------------------------------
-
-data Logger = Logger (MVar Buffer) !BufSize (IORef LogStr)
-
-newLogger :: BufSize -> IO Logger
-newLogger size = do
-    buf <- getBuffer size
-    mbuf <- newMVar buf
-    lref <- newIORef mempty
-    return $ Logger mbuf size lref
-
-pushLog :: FD -> Logger -> LogStr -> IO ()
-pushLog fd logger@(Logger mbuf size ref) nlogmsg@(LogStr nlen nbuilder)
-  | nlen > size = do
-      flushLog fd logger
-      withMVar mbuf $ \buf -> toBufIOWith buf nlen (write fd) nbuilder
-  | otherwise = do
-    needFlush <- atomicModifyIORef' ref checkBuf
-    when needFlush $ do
-        flushLog fd logger
-        pushLog fd logger nlogmsg
-  where
-    checkBuf ologmsg@(LogStr olen _)
-      | size < olen + nlen = (ologmsg, True)
-      | otherwise          = (ologmsg <> nlogmsg, False)
-
-flushLog :: FD -> Logger -> IO ()
-flushLog fd (Logger mbuf size lref) = do
-    logmsg <- atomicModifyIORef' lref (\old -> (mempty, old))
-    -- If a special buffer is prepared for flusher, this MVar could
-    -- be removed. But such a code does not contribute logging speed
-    -- according to experiment. And even with the special buffer,
-    -- there is no grantee that this function is exclusively called
-    -- for a buffer. So, we use MVar here.
-    -- This is safe and speed penalty can be ignored.
-    withMVar mbuf $ \buf -> writeLogStr fd buf size logmsg
+import System.Log.FastLogger.LogStr
+import System.Log.FastLogger.Logger
 
 ----------------------------------------------------------------
 
 -- | Opening a log file.
 logOpen :: FilePath -> IO FD
 logOpen file = fst <$> openFile file AppendMode False
-
-getBuffer :: BufSize -> IO Buffer
-getBuffer = mallocBytes
 
 ----------------------------------------------------------------
 
@@ -158,7 +95,7 @@ rmLoggerSet (LoggerSet fref arr) = do
     flushIt fd i = flushLog fd (arr ! i)
     freeIt i = do
         let (Logger mbuf _ _) = arr ! i
-        takeMVar mbuf >>= free
+        takeMVar mbuf >>= freeBuffer
 
 #if !MIN_VERSION_base(4,6,0)
 -- | Strict version of 'atomicModifyIORef'.  This forces both the value stored
