@@ -9,8 +9,8 @@ import System.Log.FastLogger (LogStr, logStrBuilder)
 import qualified Data.ByteString.Char8 as BS8
 import Blaze.ByteString.Builder as BB
 
-runSyslogLoggingT :: MonadIO m => String -> LoggingT m a -> m a
-runSyslogLoggingT source = (`runLoggingT` syslogOutput)
+runSyslogLoggingT :: MonadIO m => LoggingT m a -> m a
+runSyslogLoggingT = (`runLoggingT` syslogOutput)
 
 
 syslogOutput :: Loc
@@ -19,7 +19,11 @@ syslogOutput :: Loc
               -> LogStr
               -> IO ()
 syslogOutput l s level msg =
-    syslog (levelToPriority level) $ BS8.unpack $ toByteString $ logStrBuilder $ defaultLogStr l s level msg
+    syslog (levelToPriority level) $
+        BS8.unpack $
+        toByteString $
+        logStrBuilder $
+        defaultLogStr l s level msg
 
 
 levelToPriority :: LogLevel -> Priority
