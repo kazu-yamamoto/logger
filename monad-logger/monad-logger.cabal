@@ -28,12 +28,13 @@ library
                      , lifted-base
                      , resourcet          >= 0.4       && < 0.5
                      , conduit            >= 1.0       && < 1.1
-                     , fast-logger        >= 2.0       && < 2.1
+                     , fast-logger        >= 2.0       && < 2.2
                      , transformers-base
                      , monad-control
                      , monad-loops
                      , mtl
                      , bytestring
+                     , blaze-builder
   if flag(template_haskell)
      build-depends:     template-haskell
 

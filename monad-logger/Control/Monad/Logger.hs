@@ -69,16 +69,6 @@ module Control.Monad.Logger
 #if WITH_TEMPLATE_HASKELL
 import Language.Haskell.TH.Syntax (Lift (lift), Q, Exp, Loc (..), qLocation)
 #endif
-#if MIN_VERSION_fast_logger(2, 0, 0)
-import System.Log.FastLogger (LogStr, pushLogStr, ToLogStr (toLogStr), LoggerSet, newLoggerSet, defaultBufSize, flushLogStr)
-import System.IO.Unsafe (unsafePerformIO)
-#define Handle LoggerSet
-import Data.Monoid (mempty, mappend)
-import qualified GHC.IO.FD as FD
-#else
-import System.Log.FastLogger (ToLogStr (toLogStr), LogStr (..))
-import System.IO (stdout, stderr, Handle)
-#endif
 
 import Data.Monoid (Monoid)
 
@@ -115,12 +105,23 @@ import Data.Text (Text, pack, unpack)
 import qualified Data.Text as T
 import qualified Data.ByteString.Char8 as S8
 
+import Data.Monoid (mappend, mempty)
+import System.Log.FastLogger
+import System.IO (Handle, stdout, stderr)
+
 import Control.Monad.Cont.Class   ( MonadCont (..) )
 import Control.Monad.Error.Class  ( MonadError (..) )
 import Control.Monad.RWS.Class    ( MonadRWS )
 import Control.Monad.Reader.Class ( MonadReader (..) )
 import Control.Monad.State.Class  ( MonadState (..) )
 import Control.Monad.Writer.Class ( MonadWriter (..) )
+
+import Blaze.ByteString.Builder (toByteString)
+
+#if !MIN_VERSION_fast_logger(2, 1, 0) && MIN_VERSION_bytestring(0, 10, 2)
+import qualified Data.ByteString.Lazy as L
+import Data.ByteString.Builder (toLazyByteString)
+#endif
 
 data LogLevel = LevelDebug | LevelInfo | LevelWarn | LevelError | LevelOther Text
     deriving (Eq, Prelude.Show, Prelude.Read, Ord)
@@ -345,13 +346,24 @@ defaultOutput :: Handle
               -> LogStr
               -> IO ()
 defaultOutput h loc src level msg =
-#if MIN_VERSION_fast_logger(0, 2, 0)
-    pushLogStr h ls >> flushLogStr h
-#else
     S8.hPutStrLn h ls
-#endif
   where
-    ls = defaultLogStr loc src level msg
+    ls = defaultLogStrBS loc src level msg
+defaultLogStrBS :: Loc
+                -> LogSource
+                -> LogLevel
+                -> LogStr
+                -> S8.ByteString
+defaultLogStrBS a b c d =
+    toBS $ defaultLogStr a b c d
+  where
+#if MIN_VERSION_fast_logger(2, 1, 0)
+    toBS = fromLogStr
+#elif MIN_VERSION_bytestring(0, 10, 2)
+    toBS = L.toStrict . toLazyByteString . logStrBuilder
+#else
+    toBS = toByteString . logStrBuilder
+#endif
 
 defaultLogStr :: Loc
               -> LogSource
@@ -403,14 +415,6 @@ defaultLogStr loc src level msg =
       where
         line = show . fst . loc_start
         char = show . snd . loc_start
-
-#if MIN_VERSION_fast_logger(0, 2, 0)
-stdout, stderr :: LoggerSet
-stdout = unsafePerformIO $ newLoggerSet defaultBufSize FD.stdout
-{-# NOINLINE stdout #-}
-stderr = unsafePerformIO $ newLoggerSet defaultBufSize FD.stderr
-{-# NOINLINE stderr #-}
-#endif
 
 -- | Run a block using a @MonadLogger@ instance which prints to stderr.
 --
