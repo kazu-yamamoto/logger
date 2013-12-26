@@ -19,7 +19,7 @@ spec = describe "pushLogMsg" $ do
       ]
 
 nullLogger :: IO LoggerSet
-nullLogger = logOpen "/dev/null" >>= newLoggerSet 4096
+nullLogger = newLoggerSet 4096 "/dev/null"
 
 safeForLarge :: [Int] -> IO ()
 safeForLarge ns = mapM_ safeForLarge' ns

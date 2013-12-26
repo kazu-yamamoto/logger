@@ -4,7 +4,6 @@ module System.Log.FastLogger (
   -- * Creating a logger set
     BufSize
   , defaultBufSize
-  , logOpen
   , LoggerSet
   , newLoggerSet
   , renewLoggerSet
@@ -48,20 +47,21 @@ logOpen file = fst <$> openFile file AppendMode False
 --   The number of loggers is the capabilities of GHC RTS.
 --   You can specify it with \"+RTS -N\<x\>\".
 --   A buffer is prepared for each capability.
-data LoggerSet = LoggerSet (IORef FD) (Array Int Logger)
+data LoggerSet = LoggerSet FilePath (IORef FD) (Array Int Logger)
 
 -- | Creating a new 'LoggerSet'.
-newLoggerSet :: BufSize -> FD -> IO LoggerSet
-newLoggerSet size fd = do
+newLoggerSet :: BufSize -> FilePath -> IO LoggerSet
+newLoggerSet size file = do
+    fd <- logOpen file
     n <- getNumCapabilities
     loggers <- replicateM n $ newLogger size
     let arr = listArray (0,n-1) loggers
     fref <- newIORef fd
-    return $ LoggerSet fref arr
+    return $ LoggerSet file fref arr
 
 -- | Writing a log message to the corresponding buffer.
 pushLogStr :: LoggerSet -> LogStr -> IO ()
-pushLogStr (LoggerSet fref arr) logmsg = do
+pushLogStr (LoggerSet _ fref arr) logmsg = do
     (i, _) <- myThreadId >>= threadCapability
     let logger = arr ! i
     fd <- readIORef fref
@@ -69,7 +69,7 @@ pushLogStr (LoggerSet fref arr) logmsg = do
 
 -- | Flushing log messages in buffers.
 flushLogStr :: LoggerSet -> IO ()
-flushLogStr (LoggerSet fref arr) = do
+flushLogStr (LoggerSet _ fref arr) = do
     n <- getNumCapabilities
     fd <- readIORef fref
     mapM_ (flushIt fd) [0..n-1]
@@ -77,14 +77,15 @@ flushLogStr (LoggerSet fref arr) = do
     flushIt fd i = flushLog fd (arr ! i)
 
 -- | Renewing 'FD' in 'LoggerSet'. Old 'FD' is closed.
-renewLoggerSet :: LoggerSet -> FD -> IO ()
-renewLoggerSet (LoggerSet fref _) newfd = do
+renewLoggerSet :: LoggerSet -> IO ()
+renewLoggerSet (LoggerSet file fref _) = do
+    newfd <- logOpen file
     oldfd <- atomicModifyIORef' fref (\fd -> (newfd, fd))
     close oldfd
 
 -- | Flushing the buffers, closing 'FD' and freeing the buffers.
 rmLoggerSet :: LoggerSet -> IO ()
-rmLoggerSet (LoggerSet fref arr) = do
+rmLoggerSet (LoggerSet _ fref arr) = do
     n <- getNumCapabilities
     fd <- readIORef fref
     let nums = [0..n-1]
