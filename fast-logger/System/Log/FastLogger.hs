@@ -13,8 +13,8 @@ module System.Log.FastLogger (
   -- * Log messages
   , LogStr
   , ToLogStr(..)
+  , fromLogStr
   , logStrLength
-  , logStrBuilder
   -- * Writing a log message
   , pushLogStr
   -- * Flushing buffered log messages

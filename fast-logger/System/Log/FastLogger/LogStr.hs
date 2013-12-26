@@ -4,22 +4,25 @@
 module System.Log.FastLogger.LogStr (
     Builder
   , LogStr(..)
+  , logStrLength
+  , fromLogStr
   , ToLogStr(..)
   , mempty
   , (<>)
   ) where
 
 #if MIN_VERSION_bytestring(0,10,2)
-import Data.ByteString.Builder (Builder, byteString)
+import Data.ByteString.Builder (Builder)
+import qualified Data.ByteString.Builder as B
 #else
-import qualified Blaze.ByteString.Builder as BB (fromByteString)
+import qualified Blaze.ByteString.Builder as BB
 import Blaze.ByteString.Builder.Internal.Types as BB (Builder(..))
 #endif
-import Data.ByteString.Internal (ByteString(..))
-import Data.Monoid (Monoid, mempty, mappend)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as S8
-import qualified Data.ByteString.Lazy as L
+import Data.ByteString.Internal (ByteString(..))
+import qualified Data.ByteString.Lazy as BL
+import Data.Monoid (Monoid, mempty, mappend)
 #if MIN_VERSION_base(4,5,0)
 import Data.Monoid ((<>))
 #endif
@@ -36,23 +39,27 @@ import qualified Data.Text.Lazy.Encoding as TL
 (<>) = mappend
 #endif
 
-#if !MIN_VERSION_bytestring(0,10,2)
-byteString :: ByteString -> Builder
-byteString = BB.fromByteString
+toBuilder :: ByteString -> Builder
+#if MIN_VERSION_bytestring(0,10,2)
+toBuilder = B.byteString
+#else
+toBuilder = BB.fromByteString
+#endif
+
+fromBuilder :: Builder -> ByteString
+#if MIN_VERSION_bytestring(0,10,2)
+fromBuilder = BL.toStrict . B.toLazyByteString
+#else
+fromBuilder = BB.toByteString
 #endif
 
 ----------------------------------------------------------------
 
 -- | Log message builder. Use ('<>') to append two LogStr in O(1).
-data LogStr = LogStr {
-  -- | Obtaining the length of 'LogStr'.
-    logStrLength :: !Int
-  -- | Obtaining the 'Builder' of 'LogStr'.
-  , logStrBuilder :: Builder
-  }
+data LogStr = LogStr !Int Builder
 
 instance Monoid LogStr where
-    mempty = LogStr 0 (byteString BS.empty)
+    mempty = LogStr 0 (toBuilder BS.empty)
     LogStr s1 b1 `mappend` LogStr s2 b2 = LogStr (s1 + s2) (b1 <> b2)
 
 instance IsString LogStr where
@@ -64,9 +71,9 @@ class ToLogStr msg where
 instance ToLogStr LogStr where
     toLogStr = id
 instance ToLogStr S8.ByteString where
-    toLogStr = fromByteString
-instance ToLogStr L.ByteString where
-    toLogStr = fromByteString . S8.concat . L.toChunks
+    toLogStr bs = LogStr (BS.length bs) (toBuilder bs)
+instance ToLogStr BL.ByteString where
+    toLogStr = toLogStr . S8.concat . BL.toChunks
 instance ToLogStr String where
     toLogStr = toLogStr . TL.pack
 instance ToLogStr T.Text where
@@ -74,6 +81,10 @@ instance ToLogStr T.Text where
 instance ToLogStr TL.Text where
     toLogStr = toLogStr . TL.encodeUtf8
 
--- | Creating 'LogStr'
-fromByteString :: ByteString -> LogStr
-fromByteString bs = LogStr (BS.length bs) (byteString bs)
+-- | Obtaining the length of 'LogStr'.
+logStrLength :: LogStr -> Int
+logStrLength (LogStr n _) = n
+
+-- | Converting 'LogStr' to 'ByteString'.
+fromLogStr :: LogStr -> ByteString
+fromLogStr (LogStr _ builder) = fromBuilder builder
