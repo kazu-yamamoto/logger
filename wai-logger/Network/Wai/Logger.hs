@@ -53,7 +53,6 @@ module Network.Wai.Logger (
 import Control.Concurrent (forkIO, threadDelay, killThread)
 import Control.Exception (handle, SomeException(..), bracket)
 import Control.Monad (when, void)
-import GHC.IO.FD (stdout)
 import Network.HTTP.Types (Status)
 import Network.Wai (Request)
 import System.IO (withFile, hFileSize, IOMode(..))
@@ -149,7 +148,7 @@ noLoggerInit = return ApacheLoggerActions {
 stdoutLoggerInit :: IPAddrSource -> BufSize -> DateCacheGetter
                  -> IO ApacheLoggerActions
 stdoutLoggerInit ipsrc size dateget = do
-    lgrset <- newLoggerSet size stdout
+    lgrset <- newLoggerSet size Nothing
     let logger = apache (pushLogStr lgrset) ipsrc dateget
         flusher = flushLogStr lgrset
         noRotator = return ()
@@ -164,8 +163,7 @@ stdoutLoggerInit ipsrc size dateget = do
 fileLoggerInit :: IPAddrSource -> FileLogSpec -> BufSize -> DateCacheGetter
                -> IO ApacheLoggerActions
 fileLoggerInit ipsrc spec size dateget = do
-    fd <- logOpen (log_file spec)
-    lgrset <- newLoggerSet size fd
+    lgrset <- newLoggerSet size $ Just (log_file spec)
     let logger = apache (pushLogStr lgrset) ipsrc dateget
         flusher = flushLogStr lgrset
         rotator = logRotater lgrset spec
@@ -205,7 +203,7 @@ logRotater lgrset spec = do
     over <- isOver
     when over $ do
         rotate spec
-        logOpen (log_file spec) >>= renewLoggerSet lgrset
+        renewLoggerSet lgrset
   where
     file = log_file spec
     isOver = handle (\(SomeException _) -> return False) $ do
