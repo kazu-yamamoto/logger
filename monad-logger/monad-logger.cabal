@@ -12,10 +12,15 @@ build-type:          Simple
 cabal-version:       >=1.8
 
 
+flag template_haskell {
+      Description: Enable Template Haskell support
+      Default:     True
+      Manual:      True
+}
+
 library
   exposed-modules:     Control.Monad.Logger
   build-depends:       base               >= 4         && < 5
-                     , template-haskell
                      , transformers
                      , text
                      , stm
@@ -29,3 +34,8 @@ library
                      , monad-loops
                      , mtl
                      , bytestring
+  if flag(template_haskell)
+     build-depends:     template-haskell
+
+  if flag(template_haskell)
+     cpp-options: -DWITH_TEMPLATE_HASKELL

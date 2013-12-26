@@ -1,5 +1,7 @@
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE CPP #-}
+#if WITH_TEMPLATE_HASKELL
+{-# LANGUAGE TemplateHaskell #-}
+#endif
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -30,6 +32,7 @@ module Control.Monad.Logger
     , runStdoutLoggingT
     , withChannelLogger
     , NoLoggingT (..)
+#if WITH_TEMPLATE_HASKELL
     -- * TH logging
     , logDebug
     , logInfo
@@ -44,6 +47,7 @@ module Control.Monad.Logger
     , logOtherS
     -- * TH util
     , liftLoc
+#endif
     -- * Non-TH logging
     , logDebugN
     , logInfoN
@@ -62,7 +66,9 @@ module Control.Monad.Logger
     , Loc
     ) where
 
+#if WITH_TEMPLATE_HASKELL
 import Language.Haskell.TH.Syntax (Lift (lift), Q, Exp, Loc (..), qLocation)
+#endif
 #if MIN_VERSION_fast_logger(2, 0, 0)
 import System.Log.FastLogger (LogStr, pushLogStr, ToLogStr (toLogStr), LoggerSet, newLoggerSet, defaultBufSize, flushLogStr)
 import System.IO.Unsafe (unsafePerformIO)
@@ -119,6 +125,10 @@ import Control.Monad.Writer.Class ( MonadWriter (..) )
 data LogLevel = LevelDebug | LevelInfo | LevelWarn | LevelError | LevelOther Text
     deriving (Eq, Prelude.Show, Prelude.Read, Ord)
 
+type LogSource = Text
+
+#if WITH_TEMPLATE_HASKELL
+
 instance Lift LogLevel where
     lift LevelDebug = [|LevelDebug|]
     lift LevelInfo = [|LevelInfo|]
@@ -126,10 +136,21 @@ instance Lift LogLevel where
     lift LevelError = [|LevelError|]
     lift (LevelOther x) = [|LevelOther $ pack $(lift $ unpack x)|]
 
-type LogSource = Text
+#else
+
+data Loc
+  = Loc { loc_filename :: String
+    , loc_package  :: String
+    , loc_module   :: String
+    , loc_start    :: CharPos
+    , loc_end      :: CharPos }
+type CharPos = (Int, Int)
+
+#endif
 
 class Monad m => MonadLogger m where
     monadLoggerLog :: ToLogStr msg => Loc -> LogSource -> LogLevel -> msg -> m ()
+
 
 {-
 instance MonadLogger IO          where monadLoggerLog _ _ _ = return ()
@@ -156,6 +177,7 @@ instance (MonadLogger m, Monoid w) => MonadLogger (Strict.WriterT w m) where DEF
 instance (MonadLogger m, Monoid w) => MonadLogger (Strict.RWST r w s m) where DEF
 #undef DEF
 
+#if WITH_TEMPLATE_HASKELL
 logTH :: LogLevel -> Q Exp
 logTH level =
     [|monadLoggerLog $(qLocation >>= liftLoc) (pack "") $(lift level) . (id :: Text -> Text)|]
@@ -215,6 +237,7 @@ logErrorS = [|\a b -> monadLoggerLog $(qLocation >>= liftLoc) a LevelError (b ::
 -- > $logOtherS "SomeSource" "My new level" "This is a log message"
 logOtherS :: Q Exp
 logOtherS = [|\src level msg -> monadLoggerLog $(qLocation >>= liftLoc) src (LevelOther level) (msg :: Text)|]
+#endif
 
 -- | Monad transformer that disables logging.
 --
