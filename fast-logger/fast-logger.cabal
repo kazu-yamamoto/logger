@@ -14,7 +14,7 @@ Library
   GHC-Options:          -Wall
   Exposed-Modules:      System.Log.FastLogger
                         System.Log.FastLogger.File
-                        System.Log.FastLogger.IO
+  Other-Modules:        System.Log.FastLogger.IO
                         System.Log.FastLogger.IORef
                         System.Log.FastLogger.LogStr
                         System.Log.FastLogger.Logger
