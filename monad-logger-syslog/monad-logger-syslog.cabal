@@ -18,13 +18,11 @@ library
   ghc-options: -Wall -Werror
   build-depends:       base >=4.6 && <4.7
                      , monad-logger >= 0.3.4.0
-                     , fast-logger
+                     , fast-logger >= 2.1.0
                      , hsyslog
                      , transformers
                      , text
                      , bytestring
-                     , blaze-builder
-                     -- , file-location
 
 test-suite smoke
   default-language:    Haskell2010
