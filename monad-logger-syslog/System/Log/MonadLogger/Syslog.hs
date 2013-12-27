@@ -9,8 +9,17 @@ import System.Log.FastLogger (LogStr, logStrBuilder)
 import qualified Data.ByteString.Char8 as BS8
 import Blaze.ByteString.Builder as BB
 
+runSyslogLoggingT :: MonadIO m => LoggingT m a -> m a
+runSyslogLoggingT = (`runLoggingT` syslogOutput)
+
+-- TODO: useSyslog allows giving a source name and should be more efficient
+-- But it assumes IO
+-- Perhaps should use mmorph to generalize IO to MonadIO
+{-
 runSyslogLoggingT :: MonadIO m => String -> LoggingT m a -> m a
-runSyslogLoggingT source = (`runLoggingT` syslogOutput)
+runSyslogLoggingT source action =
+  useSyslog source (runLoggingT action syslogOutput)
+-}
 
 
 syslogOutput :: Loc
@@ -19,7 +28,11 @@ syslogOutput :: Loc
               -> LogStr
               -> IO ()
 syslogOutput l s level msg =
-    syslog (levelToPriority level) $ BS8.unpack $ toByteString $ logStrBuilder $ defaultLogStr l s level msg
+    syslog (levelToPriority level) $
+        BS8.unpack $
+        toByteString $
+        logStrBuilder $
+        defaultLogStr l s level msg
 
 
 levelToPriority :: LogLevel -> Priority
