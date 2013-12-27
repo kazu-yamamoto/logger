@@ -24,3 +24,13 @@ library
                      , text
                      , bytestring
                      , blaze-builder
+                     -- , file-location
+
+test-suite smoke
+  default-language:    Haskell2010
+
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: smoke.hs
+
+  build-depends: base, monad-logger, monad-logger-syslog, shelly

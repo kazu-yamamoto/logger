@@ -12,6 +12,15 @@ import Blaze.ByteString.Builder as BB
 runSyslogLoggingT :: MonadIO m => LoggingT m a -> m a
 runSyslogLoggingT = (`runLoggingT` syslogOutput)
 
+-- TODO: useSyslog allows giving a source name and should be more efficient
+-- But it assumes IO
+-- Perhaps should use mmorph to generalize IO to MonadIO
+{-
+runSyslogLoggingT :: MonadIO m => String -> LoggingT m a -> m a
+runSyslogLoggingT source action =
+  useSyslog source (runLoggingT action syslogOutput)
+-}
+
 
 syslogOutput :: Loc
               -> LogSource
