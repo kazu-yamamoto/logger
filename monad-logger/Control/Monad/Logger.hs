@@ -132,8 +132,8 @@ type LogSource = Text
 
 instance Lift LogLevel where
     lift LevelDebug = [|LevelDebug|]
-    lift LevelInfo = [|LevelInfo|]
-    lift LevelWarn = [|LevelWarn|]
+    lift LevelInfo  = [|LevelInfo|]
+    lift LevelWarn  = [|LevelWarn|]
     lift LevelError = [|LevelError|]
     lift (LevelOther x) = [|LevelOther $ pack $(lift $ unpack x)|]
 
@@ -365,6 +365,11 @@ defaultLogStrBS a b c d =
     toBS = toByteString . logStrBuilder
 #endif
 
+defaultLogLevelStr :: LogLevel -> LogStr
+defaultLogLevelStr level = case level of
+    LevelOther t -> toLogStr t
+    _            -> toLogStr $ S8.pack $ drop 5 $ show level
+
 defaultLogStr :: Loc
               -> LogSource
               -> LogLevel
@@ -376,10 +381,7 @@ defaultLogStr :: Loc
 #endif
 defaultLogStr loc src level msg =
 #if MIN_VERSION_fast_logger(0, 2, 0)
-    "[" `mappend`
-    (case level of
-        LevelOther t -> toLogStr t
-        _ -> toLogStr $ S8.pack $ drop 5 $ show level) `mappend`
+    "[" `mappend` defaultLogLevelStr level `mappend`
     (if T.null src
         then mempty
         else "#" `mappend` toLogStr src) `mappend`
@@ -415,6 +417,18 @@ defaultLogStr loc src level msg =
       where
         line = show . fst . loc_start
         char = show . snd . loc_start
+{-
+defaultLogStrWithoutLoc ::
+    LogSource -> LogLevel -> LogStr -> LogStr
+defaultLogStrWithoutLoc loc src level msg =
+    "[" `mappend` defaultLogLevelStr level `mappend`
+    (if T.null src
+        then mempty
+        else "#" `mappend` toLogStr src) `mappend`
+    "] " `mappend`
+    msg `mappend` "\n"
+-}
+
 
 -- | Run a block using a @MonadLogger@ instance which prints to stderr.
 --
@@ -477,42 +491,35 @@ instance MonadWriter w m => MonadWriter w (LoggingT m) where
 defaultLoc :: Loc
 defaultLoc = Loc "<unknown>" "<unknown>" "<unknown>" (0,0) (0,0)
 
+logWithoutLoc :: (MonadLogger m, ToLogStr msg) => LogSource -> LogLevel -> msg -> m ()
+logWithoutLoc = monadLoggerLog defaultLoc
+
 logDebugN :: MonadLogger m => Text -> m ()
-logDebugN msg =
-    monadLoggerLog defaultLoc "" LevelDebug msg
+logDebugN = logWithoutLoc "" LevelDebug
 
 logInfoN :: MonadLogger m => Text -> m ()
-logInfoN msg =
-    monadLoggerLog defaultLoc "" LevelInfo msg
+logInfoN = logWithoutLoc "" LevelInfo
 
 logWarnN :: MonadLogger m => Text -> m ()
-logWarnN msg =
-    monadLoggerLog defaultLoc "" LevelWarn msg
+logWarnN = logWithoutLoc "" LevelWarn
 
 logErrorN :: MonadLogger m => Text -> m ()
-logErrorN msg =
-    monadLoggerLog defaultLoc "" LevelError msg
+logErrorN = logWithoutLoc "" LevelError
 
 logOtherN :: MonadLogger m => LogLevel -> Text -> m ()
-logOtherN level msg =
-    monadLoggerLog defaultLoc "" level msg
+logOtherN = logWithoutLoc ""
 
 logDebugNS :: MonadLogger m => Text -> Text -> m ()
-logDebugNS src msg =
-    monadLoggerLog defaultLoc src LevelDebug msg
+logDebugNS src = logWithoutLoc src LevelDebug
 
 logInfoNS :: MonadLogger m => Text -> Text -> m ()
-logInfoNS src msg =
-    monadLoggerLog defaultLoc src LevelInfo msg
+logInfoNS src = logWithoutLoc src LevelInfo
 
 logWarnNS :: MonadLogger m => Text -> Text -> m ()
-logWarnNS src msg =
-    monadLoggerLog defaultLoc src LevelWarn msg
+logWarnNS src = logWithoutLoc src LevelWarn
 
 logErrorNS :: MonadLogger m => Text -> Text -> m ()
-logErrorNS src msg =
-    monadLoggerLog defaultLoc src LevelError msg
+logErrorNS src = logWithoutLoc src LevelError
 
 logOtherNS :: MonadLogger m => Text -> LogLevel -> Text -> m ()
-logOtherNS src level msg =
-    monadLoggerLog defaultLoc src level msg
+logOtherNS = logWithoutLoc
