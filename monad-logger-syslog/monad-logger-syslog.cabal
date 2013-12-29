@@ -15,7 +15,7 @@ cabal-version:       >=1.10
 library
   default-language:    Haskell2010
   exposed-modules:     System.Log.MonadLogger.Syslog
-  ghc-options: -Wall -Werror
+  ghc-options:        -Wall
   build-depends:       base >=4.6 && <4.7
                      , monad-logger >= 0.3.4.0
                      , fast-logger >= 2.1.0
