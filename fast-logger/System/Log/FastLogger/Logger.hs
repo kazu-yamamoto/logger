@@ -19,6 +19,8 @@ import System.Log.FastLogger.IORef
 
 data Logger = Logger (MVar Buffer) !BufSize (IORef LogStr)
 
+----------------------------------------------------------------
+
 newLogger :: BufSize -> IO Logger
 newLogger size = do
     buf <- getBuffer size
@@ -26,20 +28,24 @@ newLogger size = do
     lref <- newIORef mempty
     return $ Logger mbuf size lref
 
+----------------------------------------------------------------
+
 pushLog :: FD -> Logger -> LogStr -> IO ()
 pushLog fd logger@(Logger mbuf size ref) nlogmsg@(LogStr nlen nbuilder)
   | nlen > size = do
       flushLog fd logger
       withMVar mbuf $ \buf -> toBufIOWith buf nlen (write fd) nbuilder
   | otherwise = do
-    needFlush <- atomicModifyIORef' ref checkBuf
-    when needFlush $ do
-        flushLog fd logger
-        pushLog fd logger nlogmsg
+    mmsg <- atomicModifyIORef' ref checkBuf
+    case mmsg of
+        Nothing  -> return ()
+        Just msg -> withMVar mbuf $ \buf -> writeLogStr fd buf size msg
   where
     checkBuf ologmsg@(LogStr olen _)
-      | size < olen + nlen = (ologmsg, True)
-      | otherwise          = (ologmsg <> nlogmsg, False)
+      | size < olen + nlen = (nlogmsg, Just ologmsg)
+      | otherwise          = (ologmsg <> nlogmsg, Nothing)
+
+----------------------------------------------------------------
 
 flushLog :: FD -> Logger -> IO ()
 flushLog fd (Logger mbuf size lref) = do
@@ -73,4 +79,3 @@ write fd buf len' = loop buf (fromIntegral len')
         written <- writeRawBufferPtr "write" fd bf 0 (fromIntegral len)
         when (written < len) $
             loop (bf `plusPtr` fromIntegral written) (len - written)
-
