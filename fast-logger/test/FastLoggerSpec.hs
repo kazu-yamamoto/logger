@@ -1,10 +1,13 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, BangPatterns #-}
 
 module FastLoggerSpec where
 
-import Control.Exception (bracket)
+import Control.Applicative ((<$>))
+import Control.Exception (bracket, finally)
+import Control.Monad (when)
 import qualified Data.ByteString.Char8 as BS
 import Data.Monoid ((<>))
+import System.Directory (doesFileExist, removeFile)
 import System.Log.FastLogger
 import Test.Hspec
 
@@ -17,6 +20,7 @@ spec = describe "pushLogMsg" $ do
       , 100000
       , 1000000
       ]
+    it "logs all messages" logAllMsgs
 
 nullLogger :: IO LoggerSet
 nullLogger = newLoggerSet 4096 (Just "/dev/null")
@@ -30,3 +34,21 @@ safeForLarge' n = bracket nullLogger rmLoggerSet $ \lgrset -> do
         lf = "x"
     pushLogStr lgrset $ xs <> lf
     flushLogStr lgrset
+
+logAllMsgs :: IO ()
+logAllMsgs = logAll "LICENSE" `finally` cleanup tmpfile
+  where
+    tmpfile = "test/temp"
+    cleanup file = do
+        exist <- doesFileExist file
+        when exist $ removeFile file
+    logAll file = do
+        cleanup tmpfile
+        lgrset <- newLoggerSet 512 (Just tmpfile)
+        src <- BS.readFile file
+        let bs = (<> "\n") . toLogStr <$> BS.lines src
+        mapM_ (pushLogStr lgrset) bs
+        flushLogStr lgrset
+        rmLoggerSet lgrset
+        dst <- BS.readFile tmpfile
+        dst `shouldBe` src
