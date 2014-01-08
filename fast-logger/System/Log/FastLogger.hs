@@ -5,6 +5,9 @@ module System.Log.FastLogger (
     BufSize
   , defaultBufSize
   , LoggerSet
+  , newFileLoggerSet
+  , newStderrLoggerSet
+  , newStdoutLoggerSet
   , newLoggerSet
   , renewLoggerSet
   -- * Removing a logger set
@@ -28,7 +31,7 @@ import Control.Monad (when, replicateM)
 import Data.Array (Array, listArray, (!))
 import Data.Maybe (isJust)
 import GHC.IO.Device (close)
-import GHC.IO.FD (FD(..), openFile, stdout)
+import GHC.IO.FD (FD(..), openFile, stderr, stdout)
 import GHC.IO.IOMode (IOMode(..))
 import System.Log.FastLogger.File
 import System.Log.FastLogger.IO
@@ -50,14 +53,27 @@ logOpen file = fst <$> openFile file AppendMode False
 --   A buffer is prepared for each capability.
 data LoggerSet = LoggerSet (Maybe FilePath) (IORef FD) (Array Int Logger)
 
+-- | Creating a new 'LoggerSet' using a file.
+newFileLoggerSet :: BufSize -> FilePath -> IO LoggerSet
+newFileLoggerSet size file = logOpen file >>= newFDLoggerSet size (Just file)
+
+-- | Creating a new 'LoggerSet' using stderr.
+newStderrLoggerSet :: BufSize -> IO LoggerSet
+newStderrLoggerSet size = newFDLoggerSet size Nothing stderr
+
+-- | Creating a new 'LoggerSet' using stdout.
+newStdoutLoggerSet :: BufSize -> IO LoggerSet
+newStdoutLoggerSet size = newFDLoggerSet size Nothing stdout
+
 -- | Creating a new 'LoggerSet'.
 --   If 'Nothing' is specified to the second argument,
 --   stdout is used.
 newLoggerSet :: BufSize -> Maybe FilePath -> IO LoggerSet
-newLoggerSet size mfile = do
-    fd <- case mfile of
-        Nothing   -> return stdout
-        Just file -> logOpen file
+newLoggerSet size = maybe (newStdoutLoggerSet size) (newFileLoggerSet size)
+
+-- | Creating a new 'LoggerSet' using a 'FD'.
+newFDLoggerSet :: BufSize -> Maybe FilePath -> FD -> IO LoggerSet
+newFDLoggerSet size mfile fd = do
     n <- getNumCapabilities
     loggers <- replicateM n $ newLogger size
     let arr = listArray (0,n-1) loggers
