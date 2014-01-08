@@ -53,13 +53,14 @@ data LoggerSet = LoggerSet (Maybe FilePath) (IORef FD) (Array Int Logger)
 -- | Creating a new 'LoggerSet'.
 --   If 'Nothing' is specified to the second argument,
 --   stdout is used.
+--   Please note that the minimum 'BufSize' is 1.
 newLoggerSet :: BufSize -> Maybe FilePath -> IO LoggerSet
 newLoggerSet size mfile = do
     fd <- case mfile of
         Nothing   -> return stdout
         Just file -> logOpen file
     n <- getNumCapabilities
-    loggers <- replicateM n $ newLogger size
+    loggers <- replicateM n $ newLogger (max 1 size)
     let arr = listArray (0,n-1) loggers
     fref <- newIORef fd
     return $ LoggerSet mfile fref arr
