@@ -34,7 +34,7 @@ pushLog :: FD -> Logger -> LogStr -> IO ()
 pushLog fd logger@(Logger mbuf size ref) nlogmsg@(LogStr nlen nbuilder)
   | nlen > size = do
       flushLog fd logger
-      withMVar mbuf $ \buf -> toBufIOWith buf nlen (write fd) nbuilder
+      withMVar mbuf $ \buf -> toBufIOWith buf size (write fd) nbuilder
   | otherwise = do
     mmsg <- atomicModifyIORef' ref checkBuf
     case mmsg of
