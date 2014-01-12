@@ -148,7 +148,7 @@ noLoggerInit = return ApacheLoggerActions {
 stdoutLoggerInit :: IPAddrSource -> BufSize -> DateCacheGetter
                  -> IO ApacheLoggerActions
 stdoutLoggerInit ipsrc size dateget = do
-    lgrset <- newLoggerSet size Nothing
+    lgrset <- newStdoutLoggerSet size
     let logger = apache (pushLogStr lgrset) ipsrc dateget
         flusher = flushLogStr lgrset
         noRotator = return ()
@@ -163,7 +163,7 @@ stdoutLoggerInit ipsrc size dateget = do
 fileLoggerInit :: IPAddrSource -> FileLogSpec -> BufSize -> DateCacheGetter
                -> IO ApacheLoggerActions
 fileLoggerInit ipsrc spec size dateget = do
-    lgrset <- newLoggerSet size $ Just (log_file spec)
+    lgrset <- newFileLoggerSet size $ log_file spec
     let logger = apache (pushLogStr lgrset) ipsrc dateget
         flusher = flushLogStr lgrset
         rotator = logRotater lgrset spec
