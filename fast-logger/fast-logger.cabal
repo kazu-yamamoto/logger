@@ -10,10 +10,6 @@ Category:               System
 Cabal-Version:          >= 1.8
 Build-Type:             Simple
 
-Flag UseByteString102
-  Description: Use bytestring 0.10.2 or newer
-  Default: True
-
 Library
   GHC-Options:          -Wall
   Exposed-Modules:      System.Log.FastLogger
@@ -24,15 +20,12 @@ Library
                         System.Log.FastLogger.Logger
   Build-Depends:        base >= 4 && < 5
                       , array
+                      -- FIXME: blaze-builder should be removed someday
+                      , blaze-builder
+                      , bytestring
                       , directory
                       , filepath
                       , text
-
-  if flag(UseByteString102)
-    Build-Depends:      bytestring >= 0.10.2
-  else
-    Build-Depends:      blaze-builder
-                      , bytestring < 0.10.2
 
 Test-Suite spec
     Main-Is:         Spec.hs
