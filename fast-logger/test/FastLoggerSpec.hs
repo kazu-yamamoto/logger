@@ -23,7 +23,7 @@ spec = describe "pushLogMsg" $ do
     it "logs all messages" logAllMsgs
 
 nullLogger :: IO LoggerSet
-nullLogger = newLoggerSet 4096 (Just "/dev/null")
+nullLogger = newFileLoggerSet 4096 "/dev/null"
 
 safeForLarge :: [Int] -> IO ()
 safeForLarge ns = mapM_ safeForLarge' ns
@@ -44,7 +44,7 @@ logAllMsgs = logAll "LICENSE" `finally` cleanup tmpfile
         when exist $ removeFile file
     logAll file = do
         cleanup tmpfile
-        lgrset <- newLoggerSet 512 (Just tmpfile)
+        lgrset <- newFileLoggerSet 512 tmpfile
         src <- BS.readFile file
         let bs = (<> "\n") . toLogStr <$> BS.lines src
         mapM_ (pushLogStr lgrset) bs
