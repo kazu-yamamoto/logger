@@ -1,16 +1,19 @@
+-- | This module provides a fast logging system which
+--   scales on multicore environments (i.e. +RTS -N\<x\>).
 {-# LANGUAGE BangPatterns, CPP #-}
 
 module System.Log.FastLogger (
   -- * Creating a logger set
-    BufSize
-  , defaultBufSize
-  , LoggerSet
+    LoggerSet
   , newFileLoggerSet
-  , newStderrLoggerSet
   , newStdoutLoggerSet
+  , newStderrLoggerSet
   , newLoggerSet
+  -- * Buffer size
+  , BufSize
+  , defaultBufSize
+  -- * Renewing and removing a logger set
   , renewLoggerSet
-  -- * Removing a logger set
   , rmLoggerSet
   -- * Log messages
   , LogStr
@@ -57,14 +60,15 @@ data LoggerSet = LoggerSet (Maybe FilePath) (IORef FD) (Array Int Logger)
 newFileLoggerSet :: BufSize -> FilePath -> IO LoggerSet
 newFileLoggerSet size file = logOpen file >>= newFDLoggerSet size (Just file)
 
--- | Creating a new 'LoggerSet' using stderr.
-newStderrLoggerSet :: BufSize -> IO LoggerSet
-newStderrLoggerSet size = newFDLoggerSet size Nothing stderr
-
 -- | Creating a new 'LoggerSet' using stdout.
 newStdoutLoggerSet :: BufSize -> IO LoggerSet
 newStdoutLoggerSet size = newFDLoggerSet size Nothing stdout
 
+-- | Creating a new 'LoggerSet' using stderr.
+newStderrLoggerSet :: BufSize -> IO LoggerSet
+newStderrLoggerSet size = newFDLoggerSet size Nothing stderr
+
+{-# DEPRECATED newLoggerSet "Use newFileLoggerSet etc instead" #-}
 -- | Creating a new 'LoggerSet'.
 --   If 'Nothing' is specified to the second argument,
 --   stdout is used.
@@ -72,7 +76,7 @@ newStdoutLoggerSet size = newFDLoggerSet size Nothing stdout
 newLoggerSet :: BufSize -> Maybe FilePath -> IO LoggerSet
 newLoggerSet size = maybe (newStdoutLoggerSet size) (newFileLoggerSet size)
 
--- | Creating a new 'LoggerSet' using a 'FD'.
+-- | Creating a new 'LoggerSet' using a FD.
 newFDLoggerSet :: BufSize -> Maybe FilePath -> FD -> IO LoggerSet
 newFDLoggerSet size mfile fd = do
     n <- getNumCapabilities
@@ -82,6 +86,8 @@ newFDLoggerSet size mfile fd = do
     return $ LoggerSet mfile fref arr
 
 -- | Writing a log message to the corresponding buffer.
+--   If the buffer becomes full, the log messages in the buffer
+--   are written to its corresponding file, stdout, or stderr.
 pushLogStr :: LoggerSet -> LogStr -> IO ()
 pushLogStr (LoggerSet _ fref arr) logmsg = do
     (i, _) <- myThreadId >>= threadCapability
@@ -90,6 +96,8 @@ pushLogStr (LoggerSet _ fref arr) logmsg = do
     pushLog fd logger logmsg
 
 -- | Flushing log messages in buffers.
+--   This function must be called explicitly when the program is
+--   being terminated.
 flushLogStr :: LoggerSet -> IO ()
 flushLogStr (LoggerSet _ fref arr) = do
     n <- getNumCapabilities
@@ -99,6 +107,7 @@ flushLogStr (LoggerSet _ fref arr) = do
     flushIt fd i = flushLog fd (arr ! i)
 
 -- | Renewing the internal file information in 'LoggerSet'.
+--   This does nothing for stdout and stderr.
 renewLoggerSet :: LoggerSet -> IO ()
 renewLoggerSet (LoggerSet Nothing     _    _) = return ()
 renewLoggerSet (LoggerSet (Just file) fref _) = do
