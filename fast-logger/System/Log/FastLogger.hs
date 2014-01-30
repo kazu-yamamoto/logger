@@ -106,9 +106,9 @@ pushLogStr (LoggerSet _ fref arr) logmsg = do
 --   being terminated.
 flushLogStr :: LoggerSet -> IO ()
 flushLogStr (LoggerSet _ fref arr) = do
-    n <- getNumCapabilities
+    let (l,u) = bounds arr
     fd <- readIORef fref
-    mapM_ (flushIt fd) [0..n-1]
+    mapM_ (flushIt fd) [l .. u]
   where
     flushIt fd i = flushLog fd (arr ! i)
 
@@ -125,9 +125,9 @@ renewLoggerSet (LoggerSet (Just file) fref _) = do
 --   and freeing the buffers.
 rmLoggerSet :: LoggerSet -> IO ()
 rmLoggerSet (LoggerSet mfile fref arr) = do
-    n <- getNumCapabilities
+    let (l,u) = bounds arr
     fd <- readIORef fref
-    let nums = [0..n-1]
+    let nums = [l .. u]
     mapM_ (flushIt fd) nums
     mapM_ freeIt nums
     when (isJust mfile) $ close fd
