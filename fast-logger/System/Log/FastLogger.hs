@@ -31,7 +31,7 @@ module System.Log.FastLogger (
 import Control.Applicative ((<$>))
 import Control.Concurrent (getNumCapabilities, myThreadId, threadCapability, takeMVar)
 import Control.Monad (when, replicateM)
-import Data.Array (Array, listArray, (!))
+import Data.Array (Array, listArray, (!), bounds)
 import Data.Maybe (isJust)
 import GHC.IO.Device (close)
 import GHC.IO.FD (FD(..), openFile, stderr, stdout)
@@ -91,7 +91,13 @@ newFDLoggerSet size mfile fd = do
 pushLogStr :: LoggerSet -> LogStr -> IO ()
 pushLogStr (LoggerSet _ fref arr) logmsg = do
     (i, _) <- myThreadId >>= threadCapability
-    let logger = arr ! i
+    -- The number of capability could be dynamically changed.
+    -- So, let's check the upper boundary of the array.
+    let u = snd $ bounds arr
+        lim = u + 1
+        j | i < lim   = i
+          | otherwise = i `mod` lim
+    let logger = arr ! j
     fd <- readIORef fref
     pushLog fd logger logmsg
 
