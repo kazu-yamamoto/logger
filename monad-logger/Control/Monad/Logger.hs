@@ -83,7 +83,10 @@ import Control.Monad.Trans.Control (MonadBaseControl (..), MonadTransControl (..
 import qualified Control.Monad.Trans.Class as Trans
 
 import Control.Monad.IO.Class (MonadIO (liftIO))
-import Control.Monad.Trans.Resource (MonadResource (liftResourceT), MonadThrow (monadThrow))
+import Control.Monad.Trans.Resource (MonadResource (liftResourceT), MonadThrow, monadThrow)
+#if MIN_VERSION_resourcet(1,1,0)
+import Control.Monad.Trans.Resource (throwM)
+#endif
 
 import Control.Monad.Trans.Identity ( IdentityT)
 import Control.Monad.Trans.List     ( ListT    )
@@ -259,8 +262,13 @@ instance Monad m => Monad (NoLoggingT m) where
 instance MonadIO m => MonadIO (NoLoggingT m) where
     liftIO = Trans.lift . liftIO
 
+#if MIN_VERSION_resourcet(1,1,0)
+instance MonadThrow m => MonadThrow (NoLoggingT m) where
+    throwM = Trans.lift . throwM
+#else
 instance MonadThrow m => MonadThrow (NoLoggingT m) where
     monadThrow = Trans.lift . monadThrow
+#endif
 
 instance MonadResource m => MonadResource (NoLoggingT m) where
     liftResourceT = Trans.lift . liftResourceT
@@ -310,8 +318,13 @@ instance Monad m => Monad (LoggingT m) where
 instance MonadIO m => MonadIO (LoggingT m) where
     liftIO = Trans.lift . liftIO
 
+#if MIN_VERSION_resourcet(1,1,0)
+instance MonadThrow m => MonadThrow (LoggingT m) where
+    throwM = Trans.lift . throwM
+#else
 instance MonadThrow m => MonadThrow (LoggingT m) where
     monadThrow = Trans.lift . monadThrow
+#endif
 
 instance MonadResource m => MonadResource (LoggingT m) where
     liftResourceT = Trans.lift . liftResourceT
