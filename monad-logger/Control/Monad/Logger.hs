@@ -75,7 +75,7 @@ import Data.Monoid (Monoid)
 import Control.Applicative (Applicative (..))
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TBChan
-import Control.Exception.Lifted
+import Control.Exception.Lifted (onException)
 import Control.Monad (liftM, ap, when, void)
 import Control.Monad.Base (MonadBase (liftBase))
 import Control.Monad.Loops (untilM)
@@ -86,6 +86,7 @@ import Control.Monad.IO.Class (MonadIO (liftIO))
 import Control.Monad.Trans.Resource (MonadResource (liftResourceT), MonadThrow, monadThrow)
 #if MIN_VERSION_resourcet(1,1,0)
 import Control.Monad.Trans.Resource (throwM)
+import Control.Monad.Catch (MonadCatch (..))
 #endif
 
 import Control.Monad.Trans.Identity ( IdentityT)
@@ -265,6 +266,15 @@ instance MonadIO m => MonadIO (NoLoggingT m) where
 #if MIN_VERSION_resourcet(1,1,0)
 instance MonadThrow m => MonadThrow (NoLoggingT m) where
     throwM = Trans.lift . throwM
+
+instance MonadCatch m => MonadCatch (NoLoggingT m) where
+    catch (NoLoggingT m) c =
+        NoLoggingT $ m `catch` \e -> runNoLoggingT (c e)
+    mask a = NoLoggingT $ mask $ \u -> runNoLoggingT (a $ q u)
+      where q u (NoLoggingT b) = NoLoggingT $ u b
+    uninterruptibleMask a =
+        NoLoggingT $ uninterruptibleMask $ \u -> runNoLoggingT (a $ q u)
+      where q u (NoLoggingT b) = NoLoggingT $ u b
 #else
 instance MonadThrow m => MonadThrow (NoLoggingT m) where
     monadThrow = Trans.lift . monadThrow
@@ -321,6 +331,14 @@ instance MonadIO m => MonadIO (LoggingT m) where
 #if MIN_VERSION_resourcet(1,1,0)
 instance MonadThrow m => MonadThrow (LoggingT m) where
     throwM = Trans.lift . throwM
+instance MonadCatch m => MonadCatch (LoggingT m) where
+  catch (LoggingT m) c =
+      LoggingT $ \r -> m r `catch` \e -> runLoggingT (c e) r
+  mask a = LoggingT $ \e -> mask $ \u -> runLoggingT (a $ q u) e
+    where q u (LoggingT b) = LoggingT (u . b)
+  uninterruptibleMask a =
+    LoggingT $ \e -> uninterruptibleMask $ \u -> runLoggingT (a $ q u) e
+      where q u (LoggingT b) = LoggingT (u . b)
 #else
 instance MonadThrow m => MonadThrow (LoggingT m) where
     monadThrow = Trans.lift . monadThrow
