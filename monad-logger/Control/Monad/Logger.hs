@@ -122,6 +122,8 @@ import Control.Monad.Writer.Class ( MonadWriter (..) )
 
 import Blaze.ByteString.Builder (toByteString)
 
+import Prelude hiding (catch)
+
 #if !MIN_VERSION_fast_logger(2, 1, 0) && MIN_VERSION_bytestring(0, 10, 2)
 import qualified Data.ByteString.Lazy as L
 import Data.ByteString.Builder (toLazyByteString)
