@@ -129,6 +129,10 @@ import qualified Data.ByteString.Lazy as L
 import Data.ByteString.Builder (toLazyByteString)
 #endif
 
+#if MIN_VERSION_conduit_extra(1,1,0)
+import Data.Conduit.Lazy (MonadActive, monadActive)
+#endif
+
 data LogLevel = LevelDebug | LevelInfo | LevelWarn | LevelError | LevelOther Text
     deriving (Eq, Prelude.Show, Prelude.Read, Ord)
 
@@ -280,6 +284,13 @@ instance MonadCatch m => MonadCatch (NoLoggingT m) where
 #else
 instance MonadThrow m => MonadThrow (NoLoggingT m) where
     monadThrow = Trans.lift . monadThrow
+#endif
+
+#if MIN_VERSION_conduit_extra(1,1,0)
+instance MonadActive m => MonadActive (NoLoggingT m) where
+    monadActive = Trans.lift monadActive
+instance MonadActive m => MonadActive (LoggingT m) where
+    monadActive = Trans.lift monadActive
 #endif
 
 instance MonadResource m => MonadResource (NoLoggingT m) where
