@@ -86,7 +86,11 @@ import Control.Monad.IO.Class (MonadIO (liftIO))
 import Control.Monad.Trans.Resource (MonadResource (liftResourceT), MonadThrow, monadThrow)
 #if MIN_VERSION_resourcet(1,1,0)
 import Control.Monad.Trans.Resource (throwM)
-import Control.Monad.Catch (MonadCatch (..))
+import Control.Monad.Catch (MonadCatch (..)
+#if MIN_VERSION_exceptions(0,6,0)
+    , MonadMask (..)
+#endif
+    )
 #endif
 
 import Control.Monad.Trans.Identity ( IdentityT)
@@ -276,6 +280,9 @@ instance MonadThrow m => MonadThrow (NoLoggingT m) where
 instance MonadCatch m => MonadCatch (NoLoggingT m) where
     catch (NoLoggingT m) c =
         NoLoggingT $ m `catch` \e -> runNoLoggingT (c e)
+#if MIN_VERSION_exceptions(0,6,0)
+instance MonadMask m => MonadMask (NoLoggingT m) where
+#endif
     mask a = NoLoggingT $ mask $ \u -> runNoLoggingT (a $ q u)
       where q u (NoLoggingT b) = NoLoggingT $ u b
     uninterruptibleMask a =
@@ -347,6 +354,9 @@ instance MonadThrow m => MonadThrow (LoggingT m) where
 instance MonadCatch m => MonadCatch (LoggingT m) where
   catch (LoggingT m) c =
       LoggingT $ \r -> m r `catch` \e -> runLoggingT (c e) r
+#if MIN_VERSION_exceptions(0,6,0)
+instance MonadMask m => MonadMask (LoggingT m) where
+#endif
   mask a = LoggingT $ \e -> mask $ \u -> runLoggingT (a $ q u) e
     where q u (LoggingT b) = LoggingT (u . b)
   uninterruptibleMask a =
