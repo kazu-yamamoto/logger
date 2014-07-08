@@ -97,6 +97,7 @@ import Control.Monad.Trans.Identity ( IdentityT)
 import Control.Monad.Trans.List     ( ListT    )
 import Control.Monad.Trans.Maybe    ( MaybeT   )
 import Control.Monad.Trans.Error    ( ErrorT, Error)
+import Control.Monad.Trans.Except   ( ExceptT  )
 import Control.Monad.Trans.Reader   ( ReaderT  )
 import Control.Monad.Trans.Cont     ( ContT  )
 import Control.Monad.Trans.State    ( StateT   )
@@ -179,6 +180,7 @@ instance MonadLogger m => MonadLogger (IdentityT m) where DEF
 instance MonadLogger m => MonadLogger (ListT m) where DEF
 instance MonadLogger m => MonadLogger (MaybeT m) where DEF
 instance (MonadLogger m, Error e) => MonadLogger (ErrorT e m) where DEF
+instance MonadLogger m => MonadLogger (ExceptT e m) where DEF
 instance MonadLogger m => MonadLogger (ReaderT r m) where DEF
 instance MonadLogger m => MonadLogger (ContT r m) where DEF
 instance MonadLogger m => MonadLogger (StateT s m) where DEF
