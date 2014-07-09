@@ -33,7 +33,7 @@ library
                      , transformers-base
                      , monad-control
                      , monad-loops
-                     , mtl                >= 2.2.1
+                     , mtl
                      , bytestring
                      , blaze-builder
                      , exceptions
