@@ -146,7 +146,7 @@ fileLoggerInit :: IPAddrSource -> FileLogSpec -> BufSize -> DateCacheGetter
 fileLoggerInit ipsrc spec size dateget = do
     lgrset <- newFileLoggerSet size $ log_file spec
     let logger = apache (pushLogStr lgrset) ipsrc dateget
-        rotator = logRotater lgrset spec
+        rotator = logFileRotator lgrset spec
         remover = rmLoggerSet lgrset
     return ApacheLoggerActions {
         apacheLogger = logger
@@ -178,8 +178,8 @@ apache cb ipsrc dateget req st mlen = do
 
 ----------------------------------------------------------------
 
-logRotater :: LoggerSet -> FileLogSpec -> IO ()
-logRotater lgrset spec = do
+logFileRotator :: LoggerSet -> FileLogSpec -> IO ()
+logFileRotator lgrset spec = do
     over <- isOver
     when over $ do
         rotate spec
