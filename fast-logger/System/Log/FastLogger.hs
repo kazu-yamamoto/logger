@@ -29,6 +29,7 @@ module System.Log.FastLogger (
   ) where
 
 import Control.Applicative ((<$>))
+import Control.AutoUpdate (mkAutoUpdate, defaultUpdateSettings, updateAction)
 import Control.Concurrent (getNumCapabilities, myThreadId, threadCapability, takeMVar)
 import Control.Monad (when, replicateM)
 import Data.Array (Array, listArray, (!), bounds)
@@ -54,7 +55,7 @@ logOpen file = fst <$> openFile file AppendMode False
 --   The number of loggers is the capabilities of GHC RTS.
 --   You can specify it with \"+RTS -N\<x\>\".
 --   A buffer is prepared for each capability.
-data LoggerSet = LoggerSet (Maybe FilePath) (IORef FD) (Array Int Logger)
+data LoggerSet = LoggerSet (Maybe FilePath) (IORef FD) (Array Int Logger) (IO ())
 
 -- | Creating a new 'LoggerSet' using a file.
 newFileLoggerSet :: BufSize -> FilePath -> IO LoggerSet
@@ -83,13 +84,16 @@ newFDLoggerSet size mfile fd = do
     loggers <- replicateM n $ newLogger (max 1 size)
     let arr = listArray (0,n-1) loggers
     fref <- newIORef fd
-    return $ LoggerSet mfile fref arr
+    flush <- mkAutoUpdate defaultUpdateSettings
+        { updateAction = flushLogStrRaw fref arr
+        }
+    return $ LoggerSet mfile fref arr flush
 
 -- | Writing a log message to the corresponding buffer.
 --   If the buffer becomes full, the log messages in the buffer
 --   are written to its corresponding file, stdout, or stderr.
 pushLogStr :: LoggerSet -> LogStr -> IO ()
-pushLogStr (LoggerSet _ fref arr) logmsg = do
+pushLogStr (LoggerSet _ fref arr flush) logmsg = do
     (i, _) <- myThreadId >>= threadCapability
     -- The number of capability could be dynamically changed.
     -- So, let's check the upper boundary of the array.
@@ -100,12 +104,20 @@ pushLogStr (LoggerSet _ fref arr) logmsg = do
     let logger = arr ! j
     fd <- readIORef fref
     pushLog fd logger logmsg
+    flush
 
 -- | Flushing log messages in buffers.
 --   This function must be called explicitly when the program is
 --   being terminated.
+--
+--   Note: Since version 2.1.6, this function does not need to be
+--   explicitly called, as every push includes an auto-debounced flush
+--   courtesy of the auto-update package.
 flushLogStr :: LoggerSet -> IO ()
-flushLogStr (LoggerSet _ fref arr) = do
+flushLogStr (LoggerSet _ _ _ go) = go
+
+flushLogStrRaw :: IORef FD -> Array Int Logger -> IO ()
+flushLogStrRaw fref arr = do
     let (l,u) = bounds arr
     fd <- readIORef fref
     mapM_ (flushIt fd) [l .. u]
@@ -115,8 +127,8 @@ flushLogStr (LoggerSet _ fref arr) = do
 -- | Renewing the internal file information in 'LoggerSet'.
 --   This does nothing for stdout and stderr.
 renewLoggerSet :: LoggerSet -> IO ()
-renewLoggerSet (LoggerSet Nothing     _    _) = return ()
-renewLoggerSet (LoggerSet (Just file) fref _) = do
+renewLoggerSet (LoggerSet Nothing     _    _ _) = return ()
+renewLoggerSet (LoggerSet (Just file) fref _ _) = do
     newfd <- logOpen file
     oldfd <- atomicModifyIORef' fref (\fd -> (newfd, fd))
     close oldfd
@@ -124,7 +136,7 @@ renewLoggerSet (LoggerSet (Just file) fref _) = do
 -- | Flushing the buffers, closing the internal file information
 --   and freeing the buffers.
 rmLoggerSet :: LoggerSet -> IO ()
-rmLoggerSet (LoggerSet mfile fref arr) = do
+rmLoggerSet (LoggerSet mfile fref arr _) = do
     let (l,u) = bounds arr
     fd <- readIORef fref
     let nums = [l .. u]

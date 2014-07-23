@@ -15,9 +15,8 @@ module Network.Wai.Logger.Date (
   , clockDateCacher
   ) where
 
-import Control.Applicative ((<$>))
+import Control.AutoUpdate (mkAutoUpdate, defaultUpdateSettings, updateAction)
 import Data.ByteString (ByteString)
-import Data.IORef (newIORef, readIORef, writeIORef)
 #if WINDOWS
 import qualified Data.ByteString.Char8 as BS
 import Data.Time
@@ -69,30 +68,17 @@ zonedDateCacheConf = DateCacheConf {
 
 ----------------------------------------------------------------
 
-data DateCache t = DateCache {
-    timeKey :: !t
-  , formattedDate :: !ByteString
-  } deriving (Eq, Show)
-
-----------------------------------------------------------------
-
-newDate :: DateCacheConf t -> t -> IO (DateCache t)
-newDate setting tm = DateCache tm <$> formatDate setting tm
-
 -- |
 -- Returning 'DateCacheGetter' and 'DateCacheUpdater'.
+--
+-- Note: Since version 2.1.2, this function uses the auto-update package
+-- internally, and therefore the @DateCacheUpdater@ value returned need
+-- not be called. To wit, the return value is in fact an empty action.
 
 clockDateCacher :: IO (DateCacheGetter, DateCacheUpdater)
 clockDateCacher = do
-    ref <- getTime zonedDateCacheConf >>= newDate zonedDateCacheConf >>= newIORef
-    return (getter ref, clock ref)
-  where
-    getter ref = formattedDate <$> readIORef ref
-    clock ref = do
-        tm <- getTime zonedDateCacheConf
-        date <- formatDate zonedDateCacheConf tm
-        let new = DateCache {
-                timeKey = tm
-              , formattedDate = date
-              }
-        writeIORef ref new
+    getter <- mkAutoUpdate defaultUpdateSettings
+        { updateAction = getTime zonedDateCacheConf
+                     >>= formatDate zonedDateCacheConf
+        }
+    return (getter, return ())

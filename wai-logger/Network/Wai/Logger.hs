@@ -72,21 +72,12 @@ withStdoutLogger app = bracket setup teardown $ \(aplogger, _, _) ->
     app aplogger
   where
     setup = do
-        (getter, updater) <- clockDateCacher
+        (getter, _updater) <- clockDateCacher
         apf <- initLogger FromFallback (LogStdout 4096) getter
         let aplogger = apacheLogger apf
-            flusher = logFlusher apf
             remover = logRemover apf
-            loop = do
-                threadDelay 1000000
-                updater
-                flusher
-                loop
-        t <- forkIO loop
-        return (aplogger, remover, t)
-    teardown (_, remover, t) = do
-        void remover
-        killThread t
+        return (aplogger, remover)
+    teardown (_, remover) = void remover
 
 ----------------------------------------------------------------
 
@@ -95,12 +86,6 @@ type ApacheLogger = Request -> Status -> Maybe Integer -> IO ()
 
 data ApacheLoggerActions = ApacheLoggerActions {
     apacheLogger :: ApacheLogger
-    -- | Flushing log messages in the buffers.
-    --   This is explicitly called from your program.
-    --   Probably, one second and 10 seconds is proper to stdout and
-    --   log files, respectively.
-    --   See the source code of 'withStdoutLogger'.
-  , logFlusher :: IO ()
     -- | Rotating log files.
     --   This is explicitly called from your program.
     --   Probably, 10 seconds is proper.
@@ -135,13 +120,11 @@ initLogger ipsrc (LogCallback cb flush) dateget = callbackLoggerInit ipsrc cb fl
 noLoggerInit :: IO ApacheLoggerActions
 noLoggerInit = return ApacheLoggerActions {
     apacheLogger = noLogger
-  , logFlusher = noFlusher
   , logRotator = noRotator
   , logRemover = noRemover
   }
   where
     noLogger _ _ _ = return ()
-    noFlusher = return ()
     noRotator = return ()
     noRemover = return ()
 
@@ -150,12 +133,10 @@ stdoutLoggerInit :: IPAddrSource -> BufSize -> DateCacheGetter
 stdoutLoggerInit ipsrc size dateget = do
     lgrset <- newStdoutLoggerSet size
     let logger = apache (pushLogStr lgrset) ipsrc dateget
-        flusher = flushLogStr lgrset
         noRotator = return ()
         remover = rmLoggerSet lgrset
     return ApacheLoggerActions {
         apacheLogger = logger
-      , logFlusher = flusher
       , logRotator = noRotator
       , logRemover = remover
       }
@@ -165,12 +146,10 @@ fileLoggerInit :: IPAddrSource -> FileLogSpec -> BufSize -> DateCacheGetter
 fileLoggerInit ipsrc spec size dateget = do
     lgrset <- newFileLoggerSet size $ log_file spec
     let logger = apache (pushLogStr lgrset) ipsrc dateget
-        flusher = flushLogStr lgrset
         rotator = logRotater lgrset spec
         remover = rmLoggerSet lgrset
     return ApacheLoggerActions {
         apacheLogger = logger
-      , logFlusher = flusher
       , logRotator = rotator
       , logRemover = remover
       }
@@ -178,13 +157,14 @@ fileLoggerInit ipsrc spec size dateget = do
 callbackLoggerInit :: IPAddrSource -> (LogStr -> IO ()) -> IO () -> DateCacheGetter
                    -> IO ApacheLoggerActions
 callbackLoggerInit ipsrc cb flush dateget = do
-    let logger = apache cb ipsrc dateget
-        flusher = flush
+    flush' <- mkAutoUpdate defaultUpdateSettings
+        { updateAction = flush
+        }
+    let logger = apache cb ipsrc dateget >> flush'
         noRotator = return ()
         remover = return ()
     return ApacheLoggerActions {
         apacheLogger = logger
-      , logFlusher = flusher
       , logRotator = noRotator
       , logRemover = remover
       }
