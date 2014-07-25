@@ -22,6 +22,7 @@ Library
                       , byteorder
                       , bytestring
                       , case-insensitive
+                      , easy-file >= 0.2
                       , fast-logger >= 2.1.4
                       , http-types
                       , network

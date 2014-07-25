@@ -50,13 +50,14 @@ module Network.Wai.Logger (
   , showSockAddr
   ) where
 
+import Control.Applicative ((<$>))
 import Control.Concurrent (forkIO, threadDelay, killThread)
 import Control.Exception (handle, SomeException(..), bracket)
 import Control.Monad (when, void)
 import Network.HTTP.Types (Status)
 import Network.Wai (Request)
-import System.IO (withFile, hFileSize, IOMode(..))
 import System.Log.FastLogger
+import System.EasyFile (getFileSize)
 
 import Network.Wai.Logger.Apache
 import Network.Wai.Logger.Date
@@ -207,7 +208,9 @@ logRotater lgrset spec = do
   where
     file = log_file spec
     isOver = handle (\(SomeException _) -> return False) $ do
-        siz <- withFile file ReadMode hFileSize
+        -- The log file is locked by GHC.
+        -- We need to get its file size by the way not using locks.
+        siz <- fromIntegral <$> getFileSize file
         return (siz > log_file_size spec)
 
 ----------------------------------------------------------------
