@@ -1,5 +1,5 @@
 name:                monad-logger
-version:             0.3.7
+version:             0.3.7.1
 synopsis:            A class of monads which can log messages.
 description:         This package uses template-haskell for determining source code locations of messages.
 homepage:            https://github.com/kazu-yamamoto/logger
@@ -29,7 +29,7 @@ library
                      , resourcet          >= 0.4       && < 1.2
                      , conduit            >= 1.0       && < 1.2
                      , conduit-extra      >= 1.0       && < 1.2
-                     , fast-logger        >= 2.0       && < 2.2
+                     , fast-logger        >= 2.0       && < 2.3
                      , transformers-base
                      , monad-control
                      , monad-loops
