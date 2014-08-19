@@ -52,8 +52,11 @@ module Network.Wai.Logger (
 
 import Control.Applicative ((<$>))
 import Control.AutoUpdate (mkAutoUpdate, defaultUpdateSettings, updateAction)
+import Control.Concurrent (MVar, newMVar, tryTakeMVar, putMVar)
 import Control.Exception (handle, SomeException(..), bracket)
 import Control.Monad (when, void)
+import Data.IORef (IORef, atomicModifyIORef', newIORef, writeIORef)
+import Data.Maybe (isJust)
 import Network.HTTP.Types (Status)
 import Network.Wai (Request)
 import System.EasyFile (getFileSize)
@@ -87,9 +90,8 @@ type ApacheLogger = Request -> Status -> Maybe Integer -> IO ()
 
 data ApacheLoggerActions = ApacheLoggerActions {
     apacheLogger :: ApacheLogger
-    -- | Rotating log files.
-    --   This is explicitly called from your program.
-    --   Probably, 10 seconds is proper.
+    -- | This is obsoleted. Rotation is done on-demand.
+    --   So, this is now an empty action.
   , logRotator :: IO ()
     -- | Removing resources relating Apache logger.
     --   E.g. flushing and deallocating internal buffers.
@@ -104,6 +106,7 @@ data LogType = LogNone                     -- ^ No logging.
              | LogFile FileLogSpec BufSize -- ^ Logging to a file.
                                            --   'BufSize' is a buffer size
                                            --   for each capability.
+                                           --   File rotation is done on-demand.
              | LogCallback (LogStr -> IO ()) (IO ())
 
 ----------------------------------------------------------------
@@ -147,14 +150,22 @@ fileLoggerInit :: IPAddrSource -> FileLogSpec -> BufSize -> DateCacheGetter
                -> IO ApacheLoggerActions
 fileLoggerInit ipsrc spec size dateget = do
     lgrset <- newFileLoggerSet size $ log_file spec
-    let logger = apache (pushLogStr lgrset) ipsrc dateget
-        rotator = logFileRotator lgrset spec
+    ref <- newIORef (0 :: Int)
+    mvar <- newMVar ()
+    let logger a b c = do
+            cnt <- decrease ref
+            apache (pushLogStr lgrset) ipsrc dateget a b c
+            when (cnt <= 0) $ tryRotate lgrset spec ref mvar
+        noRotator = return ()
         remover = rmLoggerSet lgrset
     return ApacheLoggerActions {
         apacheLogger = logger
-      , logRotator = rotator
+      , logRotator = noRotator
       , logRemover = remover
       }
+
+decrease :: IORef Int -> IO Int
+decrease ref = atomicModifyIORef' ref (\x -> (x - 1, x - 1))
 
 callbackLoggerInit :: IPAddrSource -> (LogStr -> IO ()) -> IO () -> DateCacheGetter
                    -> IO ApacheLoggerActions
@@ -180,19 +191,33 @@ apache cb ipsrc dateget req st mlen = do
 
 ----------------------------------------------------------------
 
-logFileRotator :: LoggerSet -> FileLogSpec -> IO ()
-logFileRotator lgrset spec = do
-    over <- isOver
-    when over $ do
-        rotate spec
-        renewLoggerSet lgrset
+tryRotate :: LoggerSet -> FileLogSpec -> IORef Int -> MVar () -> IO ()
+tryRotate lgrset spec ref mvar = do
+    mlock <- tryTakeMVar mvar
+    when (isJust mlock) $ do
+        msiz <- getSize
+        case msiz of
+            -- A file is not available.
+            -- So, let's set a big value to the counter so that
+            -- this function is not called frequently.
+            Nothing -> writeIORef ref 1000000
+            Just siz
+                | siz > limit -> do
+                    rotate spec
+                    renewLoggerSet lgrset
+                    writeIORef ref $ estimate limit
+                | otherwise -> do
+                    writeIORef ref $ estimate (limit - siz)
+        putMVar mvar ()
   where
     file = log_file spec
-    isOver = handle (\(SomeException _) -> return False) $ do
+    limit = log_file_size spec
+    getSize = handle (\(SomeException _) -> return Nothing) $ do
         -- The log file is locked by GHC.
         -- We need to get its file size by the way not using locks.
-        siz <- fromIntegral <$> getFileSize file
-        return (siz > log_file_size spec)
+        Just . fromIntegral <$> getFileSize file
+    -- 200 is an ad-hoc value for the length of log line.
+    estimate x = fromInteger (x `div` 200)
 
 ----------------------------------------------------------------
 
