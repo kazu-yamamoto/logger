@@ -92,6 +92,7 @@ data ApacheLoggerActions = ApacheLoggerActions {
     --   Probably, 10 seconds is proper.
   , logRotator :: IO ()
     -- | Removing resources relating Apache logger.
+    --   E.g. flushing and deallocating internal buffers.
   , logRemover :: IO ()
   }
 
