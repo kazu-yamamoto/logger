@@ -56,7 +56,6 @@ import Control.Concurrent (MVar, newMVar, tryTakeMVar, putMVar)
 import Control.Exception (handle, SomeException(..), bracket)
 import Control.Monad (when, void)
 import Data.IORef (IORef, atomicModifyIORef', newIORef, writeIORef)
-import Data.Maybe (isJust)
 import Network.HTTP.Types (Status)
 import Network.Wai (Request)
 import System.EasyFile (getFileSize)
@@ -192,9 +191,13 @@ apache cb ipsrc dateget req st mlen = do
 ----------------------------------------------------------------
 
 tryRotate :: LoggerSet -> FileLogSpec -> IORef Int -> MVar () -> IO ()
-tryRotate lgrset spec ref mvar = do
-    mlock <- tryTakeMVar mvar
-    when (isJust mlock) $ do
+tryRotate lgrset spec ref mvar = bracket lock unlock rotateFiles
+  where
+    lock           = tryTakeMVar mvar
+    unlock Nothing = return ()
+    unlock _       = putMVar mvar ()
+    rotateFiles Nothing = return ()
+    rotateFiles _       = do
         msiz <- getSize
         case msiz of
             -- A file is not available.
@@ -208,8 +211,6 @@ tryRotate lgrset spec ref mvar = do
                     writeIORef ref $ estimate limit
                 | otherwise -> do
                     writeIORef ref $ estimate (limit - siz)
-        putMVar mvar ()
-  where
     file = log_file spec
     limit = log_file_size spec
     getSize = handle (\(SomeException _) -> return Nothing) $ do
