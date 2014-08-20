@@ -55,7 +55,6 @@ import Control.AutoUpdate (mkAutoUpdate, defaultUpdateSettings, updateAction)
 import Control.Concurrent (MVar, newMVar, tryTakeMVar, putMVar)
 import Control.Exception (handle, SomeException(..), bracket)
 import Control.Monad (when, void)
-import Data.IORef (IORef, atomicModifyIORef', newIORef, writeIORef)
 import Network.HTTP.Types (Status)
 import Network.Wai (Request)
 import System.EasyFile (getFileSize)
@@ -63,6 +62,7 @@ import System.Log.FastLogger
 
 import Network.Wai.Logger.Apache
 import Network.Wai.Logger.Date
+import Network.Wai.Logger.IORef
 import Network.Wai.Logger.IP (showSockAddr)
 
 ----------------------------------------------------------------
