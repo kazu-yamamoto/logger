@@ -20,7 +20,7 @@ Library
                         System.Log.FastLogger.Logger
   Build-Depends:        base >= 4 && < 5
                       , array
-                      , auto-update
+                      , auto-update >= 0.1.2
                       -- FIXME: blaze-builder should be removed someday
                       , blaze-builder
                       , bytestring

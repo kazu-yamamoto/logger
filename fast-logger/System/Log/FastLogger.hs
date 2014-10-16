@@ -29,7 +29,7 @@ module System.Log.FastLogger (
   ) where
 
 import Control.Applicative ((<$>))
-import Control.AutoUpdate (mkAutoUpdate, defaultUpdateSettings, updateAction)
+import Control.Debounce (mkDebounce, defaultDebounceSettings, debounceAction)
 import Control.Concurrent (getNumCapabilities, myThreadId, threadCapability, takeMVar)
 import Control.Monad (when, replicateM)
 import Data.Array (Array, listArray, (!), bounds)
@@ -84,8 +84,8 @@ newFDLoggerSet size mfile fd = do
     loggers <- replicateM n $ newLogger (max 1 size)
     let arr = listArray (0,n-1) loggers
     fref <- newIORef fd
-    flush <- mkAutoUpdate defaultUpdateSettings
-        { updateAction = flushLogStrRaw fref arr
+    flush <- mkDebounce defaultDebounceSettings
+        { debounceAction = flushLogStrRaw fref arr
         }
     return $ LoggerSet mfile fref arr flush
 
