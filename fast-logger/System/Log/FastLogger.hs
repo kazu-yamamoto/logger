@@ -87,7 +87,7 @@ newFDLoggerSet size mfile fd = do
     flush <- mkDebounce defaultDebounceSettings
         { debounceAction = flushLogStrRaw fref arr
         }
-    return $ LoggerSet mfile fref arr flush
+    return $ LoggerSet mfile fref arr (flushLogStrRaw fref arr)
 
 -- | Writing a log message to the corresponding buffer.
 --   If the buffer becomes full, the log messages in the buffer
@@ -112,7 +112,9 @@ pushLogStr (LoggerSet _ fref arr flush) logmsg = do
 --
 --   Note: Since version 2.1.6, this function does not need to be
 --   explicitly called, as every push includes an auto-debounced flush
---   courtesy of the auto-update package.
+--   courtesy of the auto-update package. Since version 2.2.2, this
+--   function can be used to force flushing outside of the debounced
+--   flush calls.
 flushLogStr :: LoggerSet -> IO ()
 flushLogStr (LoggerSet _ _ _ go) = go
 
