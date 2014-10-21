@@ -87,7 +87,7 @@ newFDLoggerSet size mfile fd = do
     flush <- mkDebounce defaultDebounceSettings
         { debounceAction = flushLogStrRaw fref arr
         }
-    return $ LoggerSet mfile fref arr (flushLogStrRaw fref arr)
+    return $ LoggerSet mfile fref arr flush
 
 -- | Writing a log message to the corresponding buffer.
 --   If the buffer becomes full, the log messages in the buffer
@@ -116,7 +116,7 @@ pushLogStr (LoggerSet _ fref arr flush) logmsg = do
 --   function can be used to force flushing outside of the debounced
 --   flush calls.
 flushLogStr :: LoggerSet -> IO ()
-flushLogStr (LoggerSet _ _ _ go) = go
+flushLogStr (LoggerSet _ fref arr _) = flushLogStrRaw fref arr
 
 flushLogStrRaw :: IORef FD -> Array Int Logger -> IO ()
 flushLogStrRaw fref arr = do
