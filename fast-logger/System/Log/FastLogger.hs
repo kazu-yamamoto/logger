@@ -112,9 +112,11 @@ pushLogStr (LoggerSet _ fref arr flush) logmsg = do
 --
 --   Note: Since version 2.1.6, this function does not need to be
 --   explicitly called, as every push includes an auto-debounced flush
---   courtesy of the auto-update package.
+--   courtesy of the auto-update package. Since version 2.2.2, this
+--   function can be used to force flushing outside of the debounced
+--   flush calls.
 flushLogStr :: LoggerSet -> IO ()
-flushLogStr (LoggerSet _ _ _ go) = go
+flushLogStr (LoggerSet _ fref arr _) = flushLogStrRaw fref arr
 
 flushLogStrRaw :: IORef FD -> Array Int Logger -> IO ()
 flushLogStrRaw fref arr = do
