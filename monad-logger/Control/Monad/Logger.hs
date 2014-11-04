@@ -333,7 +333,7 @@ instance MonadBaseControl b m => MonadBaseControl b (NoLoggingT m) where
              f $ liftM StMT' . runInBase . (\(NoLoggingT r) -> r)
      restoreM (StMT' base) = NoLoggingT $ restoreM base
 
-instance MonadIO m => MonadLogger (NoLoggingT m) where
+instance Monad m => MonadLogger (NoLoggingT m) where
     monadLoggerLog _ _ _ _ = return ()
 
 -- | Monad transformer that adds a new logging function.
