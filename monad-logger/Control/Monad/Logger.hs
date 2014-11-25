@@ -534,6 +534,10 @@ instance MonadError e m => MonadError e (LoggingT m) where
   throwError = Trans.lift . throwError
   catchError r h = LoggingT $ \i -> runLoggingT r i `catchError` \e -> runLoggingT (h e) i
 
+instance MonadError e m => MonadError e (NoLoggingT m) where
+  throwError = Trans.lift . throwError
+  catchError r h = NoLoggingT $ runNoLoggingT r `catchError` \e -> runNoLoggingT (h e)
+
 instance MonadRWS r w s m => MonadRWS r w s (LoggingT m)
 
 instance MonadReader r m => MonadReader r (LoggingT m) where
