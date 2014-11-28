@@ -1,3 +1,7 @@
+## 0.3.10
+
+Introduce the `MonadLoggerIO` typeclass.
+
 ## 0.3.9
 
 Add missing `MonadError NoLoggingT` instance #49

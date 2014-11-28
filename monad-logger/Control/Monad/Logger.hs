@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DefaultSignatures #-}
 #if WITH_TEMPLATE_HASKELL
 {-# LANGUAGE TemplateHaskell #-}
 #endif
@@ -24,6 +25,7 @@
 module Control.Monad.Logger
     ( -- * MonadLogger
       MonadLogger(..)
+    , MonadLoggerIO (..)
     , LogLevel(..)
     , LogSource
     -- * Helper transformer
@@ -168,8 +170,24 @@ type CharPos = (Int, Int)
 
 #endif
 
+-- | A @Monad@ which has the ability to log messages in some manner.
 class Monad m => MonadLogger m where
     monadLoggerLog :: ToLogStr msg => Loc -> LogSource -> LogLevel -> msg -> m ()
+
+-- | An extension of @MonadLogger@ for the common case where the logging action
+-- is a simple @IO@ action. The advantage of using this typeclass is that the
+-- logging function itself can be extracted as a first-class value, which can
+-- make it easier to manipulate monad transfomrer stacks, as an example.
+--
+-- Since 0.3.10
+class (MonadLogger m, MonadIO m) => MonadLoggerIO m where
+    -- | Request the logging function itself.
+    --
+    -- Since 0.3.10
+    askLoggerIO :: m (Loc -> LogSource -> LogLevel -> LogStr -> IO ())
+    default askLoggerIO :: (Trans.MonadTrans t, MonadLogger (t m), MonadIO (t m))
+                        => t m (Loc -> LogSource -> LogLevel -> LogStr -> IO ())
+    askLoggerIO = Trans.lift askLoggerIO
 
 
 {-
@@ -201,6 +219,27 @@ instance MonadLogger m => MonadLogger (Strict.StateT s m) where DEF
 instance (MonadLogger m, Monoid w) => MonadLogger (Strict.WriterT w m) where DEF
 instance (MonadLogger m, Monoid w) => MonadLogger (Strict.RWST r w s m) where DEF
 #undef DEF
+
+instance MonadLoggerIO m => MonadLoggerIO (IdentityT m)
+instance MonadLoggerIO m => MonadLoggerIO (ListT m)
+instance MonadLoggerIO m => MonadLoggerIO (MaybeT m)
+instance (MonadLoggerIO m, Error e) => MonadLoggerIO (ErrorT e m)
+
+#if MIN_VERSION_transformers(0,4,0)
+instance MonadLoggerIO m => MonadLoggerIO (ExceptT e m)
+#endif
+
+instance MonadLoggerIO m => MonadLoggerIO (ReaderT r m)
+instance MonadLoggerIO m => MonadLoggerIO (ContT r m)
+instance MonadLoggerIO m => MonadLoggerIO (StateT s m)
+instance (MonadLoggerIO m, Monoid w) => MonadLoggerIO (WriterT w m)
+instance (MonadLoggerIO m, Monoid w) => MonadLoggerIO (RWST r w s m)
+instance MonadLoggerIO m => MonadLoggerIO (ResourceT m)
+instance MonadLoggerIO m => MonadLoggerIO (Pipe l i o u m)
+instance MonadLoggerIO m => MonadLoggerIO (ConduitM i o m)
+instance MonadLoggerIO m => MonadLoggerIO (Strict.StateT s m)
+instance (MonadLoggerIO m, Monoid w) => MonadLoggerIO (Strict.WriterT w m)
+instance (MonadLoggerIO m, Monoid w) => MonadLoggerIO (Strict.RWST r w s m)
 
 #if WITH_TEMPLATE_HASKELL
 logTH :: LogLevel -> Q Exp
@@ -335,6 +374,8 @@ instance MonadBaseControl b m => MonadBaseControl b (NoLoggingT m) where
 
 instance Monad m => MonadLogger (NoLoggingT m) where
     monadLoggerLog _ _ _ _ = return ()
+instance MonadIO m => MonadLoggerIO (NoLoggingT m) where
+    askLoggerIO = return $ \_ _ _ _ -> return ()
 
 -- | Monad transformer that adds a new logging function.
 --
@@ -402,6 +443,8 @@ instance MonadBaseControl b m => MonadBaseControl b (LoggingT m) where
 
 instance MonadIO m => MonadLogger (LoggingT m) where
     monadLoggerLog a b c d = LoggingT $ \f -> liftIO $ f a b c (toLogStr d)
+instance MonadIO m => MonadLoggerIO (LoggingT m) where
+    askLoggerIO = LoggingT return
 
 defaultOutput :: Handle
               -> Loc
