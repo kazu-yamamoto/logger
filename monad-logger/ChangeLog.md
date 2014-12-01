@@ -1,3 +1,7 @@
+## 0.3.10.1
+
+Remove unnecessary extra newline in log messages.
+
 ## 0.3.10
 
 Introduce the `MonadLoggerIO` typeclass.

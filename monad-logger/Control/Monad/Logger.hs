@@ -453,7 +453,7 @@ defaultOutput :: Handle
               -> LogStr
               -> IO ()
 defaultOutput h loc src level msg =
-    S8.hPutStrLn h ls
+    S8.hPutStr h ls
   where
     ls = defaultLogStrBS loc src level msg
 defaultLogStrBS :: Loc
