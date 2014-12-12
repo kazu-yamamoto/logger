@@ -1,3 +1,7 @@
+## 0.3.11
+
+Add missing `MonadState` and `MonadWriter` instances for `NoLoggingT` [#51](https://github.com/kazu-yamamoto/logger/pull/51)
+
 ## 0.3.10.1
 
 Remove unnecessary extra newline in log messages.
