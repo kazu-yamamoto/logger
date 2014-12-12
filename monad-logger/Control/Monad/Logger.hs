@@ -599,6 +599,18 @@ instance MonadWriter w m => MonadWriter w (LoggingT m) where
   listen = mapLoggingT listen
   pass   = mapLoggingT pass
 
+mapNoLoggingT :: (m a -> n b) -> NoLoggingT m a -> NoLoggingT n b
+mapNoLoggingT f = NoLoggingT . f . runNoLoggingT
+
+instance MonadState s m => MonadState s (NoLoggingT m) where
+    get = Trans.lift get
+    put = Trans.lift . put
+
+instance MonadWriter w m => MonadWriter w (NoLoggingT m) where
+    tell   = Trans.lift . tell
+    listen = mapNoLoggingT listen
+    pass   = mapNoLoggingT pass
+
 defaultLoc :: Loc
 defaultLoc = Loc "<unknown>" "<unknown>" "<unknown>" (0,0) (0,0)
 
