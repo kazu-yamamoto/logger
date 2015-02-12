@@ -13,6 +13,10 @@ cabal-version:       >=1.8
 extra-source-files:  ChangeLog.md
                      README.md
 
+source-repository head
+  type:              git
+  location:          https://github.com/kazu-yamamoto/logger.git
+
 flag template_haskell {
       Description: Enable Template Haskell support
       Default:     True
