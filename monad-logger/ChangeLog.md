@@ -1,3 +1,7 @@
+## 0.3.12
+
+* Use transformers-compat to provide universal ExceptT support [#53](https://github.com/kazu-yamamoto/logger/pull/53)
+
 ## 0.3.11.1
 
 Add support for monad-control 1.0 [#52](https://github.com/kazu-yamamoto/logger/pull/52)
