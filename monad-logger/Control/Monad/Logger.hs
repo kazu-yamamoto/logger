@@ -99,10 +99,7 @@ import Control.Monad.Trans.Identity ( IdentityT)
 import Control.Monad.Trans.List     ( ListT    )
 import Control.Monad.Trans.Maybe    ( MaybeT   )
 import Control.Monad.Trans.Error    ( ErrorT, Error)
-
-#if MIN_VERSION_transformers(0,4,0)
 import Control.Monad.Trans.Except   ( ExceptT  )
-#endif
 
 import Control.Monad.Trans.Reader   ( ReaderT  )
 import Control.Monad.Trans.Cont     ( ContT  )
@@ -202,11 +199,7 @@ instance MonadLogger m => MonadLogger (IdentityT m) where DEF
 instance MonadLogger m => MonadLogger (ListT m) where DEF
 instance MonadLogger m => MonadLogger (MaybeT m) where DEF
 instance (MonadLogger m, Error e) => MonadLogger (ErrorT e m) where DEF
-
-#if MIN_VERSION_transformers(0,4,0)
 instance MonadLogger m => MonadLogger (ExceptT e m) where DEF
-#endif
-
 instance MonadLogger m => MonadLogger (ReaderT r m) where DEF
 instance MonadLogger m => MonadLogger (ContT r m) where DEF
 instance MonadLogger m => MonadLogger (StateT s m) where DEF
@@ -224,11 +217,7 @@ instance MonadLoggerIO m => MonadLoggerIO (IdentityT m)
 instance MonadLoggerIO m => MonadLoggerIO (ListT m)
 instance MonadLoggerIO m => MonadLoggerIO (MaybeT m)
 instance (MonadLoggerIO m, Error e) => MonadLoggerIO (ErrorT e m)
-
-#if MIN_VERSION_transformers(0,4,0)
 instance MonadLoggerIO m => MonadLoggerIO (ExceptT e m)
-#endif
-
 instance MonadLoggerIO m => MonadLoggerIO (ReaderT r m)
 instance MonadLoggerIO m => MonadLoggerIO (ContT r m)
 instance MonadLoggerIO m => MonadLoggerIO (StateT s m)
