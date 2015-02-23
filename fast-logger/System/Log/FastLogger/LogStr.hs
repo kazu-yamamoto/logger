@@ -11,13 +11,8 @@ module System.Log.FastLogger.LogStr (
   , (<>)
   ) where
 
-#if MIN_VERSION_bytestring(0,10,2)
 import Data.ByteString.Builder (Builder)
 import qualified Data.ByteString.Builder as B
-#else
-import qualified Blaze.ByteString.Builder as BB
-import Blaze.ByteString.Builder.Internal.Types as BB (Builder(..))
-#endif
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as S8
 import Data.ByteString.Internal (ByteString(..))
@@ -40,18 +35,10 @@ import qualified Data.Text.Lazy.Encoding as TL
 #endif
 
 toBuilder :: ByteString -> Builder
-#if MIN_VERSION_bytestring(0,10,2)
 toBuilder = B.byteString
-#else
-toBuilder = BB.fromByteString
-#endif
 
 fromBuilder :: Builder -> ByteString
-#if MIN_VERSION_bytestring(0,10,2)
 fromBuilder = BL.toStrict . B.toLazyByteString
-#else
-fromBuilder = BB.toByteString
-#endif
 
 ----------------------------------------------------------------
 
