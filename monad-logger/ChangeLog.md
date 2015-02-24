@@ -1,3 +1,7 @@
+## 0.3.13
+
+* Re-export LogStr from fast-logger [#56](https://github.com/kazu-yamamoto/logger/pull/56)
+
 ## 0.3.12
 
 * Use transformers-compat to provide universal ExceptT support [#53](https://github.com/kazu-yamamoto/logger/pull/53)
