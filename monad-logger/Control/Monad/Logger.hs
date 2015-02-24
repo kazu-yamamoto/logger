@@ -26,6 +26,9 @@ module Control.Monad.Logger
       MonadLogger(..)
     , LogLevel(..)
     , LogSource
+    -- * Re-export from fast-logger
+    , LogStr
+    , ToLogStr(..)
     -- * Helper transformer
     , LoggingT (..)
     , runStderrLoggingT
