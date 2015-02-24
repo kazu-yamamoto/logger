@@ -36,6 +36,7 @@ module Control.Monad.Logger
     , runStderrLoggingT
     , runStdoutLoggingT
     , withChannelLogger
+    , filterLogger
     , NoLoggingT (..)
 #if WITH_TEMPLATE_HASKELL
     -- * TH logging
@@ -589,6 +590,18 @@ withChannelLogger size action = LoggingT $ \logger -> do
 
     dumpLogs chan = liftIO $
         sequence_ =<< atomically (untilM (readTBChan chan) (isEmptyTBChan chan))
+
+-- | Only log messages passing the given predicate function.
+--
+-- This can be a convenient way, for example, to ignore debug level messages.
+--
+-- Since 0.3.13
+filterLogger :: (LogSource -> LogLevel -> Bool)
+             -> LoggingT m a
+             -> LoggingT m a
+filterLogger p (LoggingT f) = LoggingT $ \logger ->
+    f $ \loc src level msg ->
+        when (p src level) $ logger loc src level msg
 
 instance MonadCont m => MonadCont (LoggingT m) where
   callCC f = LoggingT $ \i -> callCC $ \c -> runLoggingT (f (LoggingT . const . c)) i

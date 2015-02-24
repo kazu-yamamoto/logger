@@ -1,6 +1,7 @@
 ## 0.3.13
 
 * Re-export LogStr from fast-logger [#56](https://github.com/kazu-yamamoto/logger/pull/56)
+* Added `filterLogger`
 
 ## 0.3.12
 
