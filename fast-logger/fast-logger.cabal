@@ -1,5 +1,5 @@
 Name:                   fast-logger
-Version:                2.2.2
+Version:                2.3.0
 Author:                 Kazu Yamamoto <kazu@iij.ad.jp>
 Maintainer:             Kazu Yamamoto <kazu@iij.ad.jp>
 License:                BSD3
@@ -9,6 +9,7 @@ Description:            A fast logging system
 Category:               System
 Cabal-Version:          >= 1.8
 Build-Type:             Simple
+extra-source-files:     README.md ChangeLog.md
 
 Library
   GHC-Options:          -Wall
