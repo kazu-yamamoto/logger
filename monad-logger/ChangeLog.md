@@ -1,3 +1,7 @@
+## 0.3.13.1
+
+* Allow fast-logger 2.3
+
 ## 0.3.13
 
 * Re-export LogStr from fast-logger [#56](https://github.com/kazu-yamamoto/logger/pull/56)
