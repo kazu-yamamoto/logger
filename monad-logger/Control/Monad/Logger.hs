@@ -178,7 +178,7 @@ class Monad m => MonadLogger m where
 -- | An extension of @MonadLogger@ for the common case where the logging action
 -- is a simple @IO@ action. The advantage of using this typeclass is that the
 -- logging function itself can be extracted as a first-class value, which can
--- make it easier to manipulate monad transfomrer stacks, as an example.
+-- make it easier to manipulate monad transformer stacks, as an example.
 --
 -- Since 0.3.10
 class (MonadLogger m, MonadIO m) => MonadLoggerIO m where
