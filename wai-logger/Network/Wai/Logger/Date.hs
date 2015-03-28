@@ -19,8 +19,12 @@ import Control.AutoUpdate (mkAutoUpdate, defaultUpdateSettings, updateAction)
 import Data.ByteString (ByteString)
 #if WINDOWS
 import qualified Data.ByteString.Char8 as BS
-import Data.Time
-import System.Locale
+import Data.Time (UTCTime, formatTime, getCurrentTime, utcToLocalZonedTime)
+# if MIN_VERSION_time(1,5,0)
+import Data.Time (defaultTimeLocale)
+# else
+import System.Locale (defaultTimeLocale)
+# endif
 #else
 import Data.UnixTime (formatUnixTime, fromEpochTime)
 import System.Posix (EpochTime, epochTime)
