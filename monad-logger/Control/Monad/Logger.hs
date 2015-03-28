@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DefaultSignatures #-}
 #if WITH_TEMPLATE_HASKELL
 {-# LANGUAGE TemplateHaskell #-}
 #endif
@@ -24,13 +25,18 @@
 module Control.Monad.Logger
     ( -- * MonadLogger
       MonadLogger(..)
+    , MonadLoggerIO (..)
     , LogLevel(..)
     , LogSource
+    -- * Re-export from fast-logger
+    , LogStr
+    , ToLogStr(..)
     -- * Helper transformer
     , LoggingT (..)
     , runStderrLoggingT
     , runStdoutLoggingT
     , withChannelLogger
+    , filterLogger
     , NoLoggingT (..)
 #if WITH_TEMPLATE_HASKELL
     -- * TH logging
@@ -97,10 +103,7 @@ import Control.Monad.Trans.Identity ( IdentityT)
 import Control.Monad.Trans.List     ( ListT    )
 import Control.Monad.Trans.Maybe    ( MaybeT   )
 import Control.Monad.Trans.Error    ( ErrorT, Error)
-
-#if MIN_VERSION_transformers(0,4,0)
 import Control.Monad.Trans.Except   ( ExceptT  )
-#endif
 
 import Control.Monad.Trans.Reader   ( ReaderT  )
 import Control.Monad.Trans.Cont     ( ContT  )
@@ -168,8 +171,24 @@ type CharPos = (Int, Int)
 
 #endif
 
+-- | A @Monad@ which has the ability to log messages in some manner.
 class Monad m => MonadLogger m where
     monadLoggerLog :: ToLogStr msg => Loc -> LogSource -> LogLevel -> msg -> m ()
+
+-- | An extension of @MonadLogger@ for the common case where the logging action
+-- is a simple @IO@ action. The advantage of using this typeclass is that the
+-- logging function itself can be extracted as a first-class value, which can
+-- make it easier to manipulate monad transformer stacks, as an example.
+--
+-- Since 0.3.10
+class (MonadLogger m, MonadIO m) => MonadLoggerIO m where
+    -- | Request the logging function itself.
+    --
+    -- Since 0.3.10
+    askLoggerIO :: m (Loc -> LogSource -> LogLevel -> LogStr -> IO ())
+    default askLoggerIO :: (Trans.MonadTrans t, MonadLogger (t m), MonadIO (t m))
+                        => t m (Loc -> LogSource -> LogLevel -> LogStr -> IO ())
+    askLoggerIO = Trans.lift askLoggerIO
 
 
 {-
@@ -184,11 +203,7 @@ instance MonadLogger m => MonadLogger (IdentityT m) where DEF
 instance MonadLogger m => MonadLogger (ListT m) where DEF
 instance MonadLogger m => MonadLogger (MaybeT m) where DEF
 instance (MonadLogger m, Error e) => MonadLogger (ErrorT e m) where DEF
-
-#if MIN_VERSION_transformers(0,4,0)
 instance MonadLogger m => MonadLogger (ExceptT e m) where DEF
-#endif
-
 instance MonadLogger m => MonadLogger (ReaderT r m) where DEF
 instance MonadLogger m => MonadLogger (ContT r m) where DEF
 instance MonadLogger m => MonadLogger (StateT s m) where DEF
@@ -201,6 +216,23 @@ instance MonadLogger m => MonadLogger (Strict.StateT s m) where DEF
 instance (MonadLogger m, Monoid w) => MonadLogger (Strict.WriterT w m) where DEF
 instance (MonadLogger m, Monoid w) => MonadLogger (Strict.RWST r w s m) where DEF
 #undef DEF
+
+instance MonadLoggerIO m => MonadLoggerIO (IdentityT m)
+instance MonadLoggerIO m => MonadLoggerIO (ListT m)
+instance MonadLoggerIO m => MonadLoggerIO (MaybeT m)
+instance (MonadLoggerIO m, Error e) => MonadLoggerIO (ErrorT e m)
+instance MonadLoggerIO m => MonadLoggerIO (ExceptT e m)
+instance MonadLoggerIO m => MonadLoggerIO (ReaderT r m)
+instance MonadLoggerIO m => MonadLoggerIO (ContT r m)
+instance MonadLoggerIO m => MonadLoggerIO (StateT s m)
+instance (MonadLoggerIO m, Monoid w) => MonadLoggerIO (WriterT w m)
+instance (MonadLoggerIO m, Monoid w) => MonadLoggerIO (RWST r w s m)
+instance MonadLoggerIO m => MonadLoggerIO (ResourceT m)
+instance MonadLoggerIO m => MonadLoggerIO (Pipe l i o u m)
+instance MonadLoggerIO m => MonadLoggerIO (ConduitM i o m)
+instance MonadLoggerIO m => MonadLoggerIO (Strict.StateT s m)
+instance (MonadLoggerIO m, Monoid w) => MonadLoggerIO (Strict.WriterT w m)
+instance (MonadLoggerIO m, Monoid w) => MonadLoggerIO (Strict.RWST r w s m)
 
 #if WITH_TEMPLATE_HASKELL
 logTH :: LogLevel -> Q Exp
@@ -320,21 +352,37 @@ instance Trans.MonadTrans NoLoggingT where
     lift = NoLoggingT
 
 instance MonadTransControl NoLoggingT where
+#if MIN_VERSION_monad_control(1,0,0)
+    type StT NoLoggingT a = a
+    liftWith f = NoLoggingT $ f runNoLoggingT
+    restoreT = NoLoggingT
+#else
     newtype StT NoLoggingT a = StIdent {unStIdent :: a}
     liftWith f = NoLoggingT $ f $ \(NoLoggingT t) -> liftM StIdent t
     restoreT = NoLoggingT . liftM unStIdent
+#endif
     {-# INLINE liftWith #-}
     {-# INLINE restoreT #-}
 
 instance MonadBaseControl b m => MonadBaseControl b (NoLoggingT m) where
+#if MIN_VERSION_monad_control(1,0,0)
+     type StM (NoLoggingT m) a = StM m a
+     liftBaseWith f = NoLoggingT $
+         liftBaseWith $ \runInBase ->
+             f $ runInBase . runNoLoggingT
+     restoreM = NoLoggingT . restoreM
+#else
      newtype StM (NoLoggingT m) a = StMT' (StM m a)
      liftBaseWith f = NoLoggingT $
          liftBaseWith $ \runInBase ->
              f $ liftM StMT' . runInBase . (\(NoLoggingT r) -> r)
      restoreM (StMT' base) = NoLoggingT $ restoreM base
+#endif
 
-instance MonadIO m => MonadLogger (NoLoggingT m) where
+instance Monad m => MonadLogger (NoLoggingT m) where
     monadLoggerLog _ _ _ _ = return ()
+instance MonadIO m => MonadLoggerIO (NoLoggingT m) where
+    askLoggerIO = return $ \_ _ _ _ -> return ()
 
 -- | Monad transformer that adds a new logging function.
 --
@@ -387,21 +435,37 @@ instance Trans.MonadTrans LoggingT where
     lift = LoggingT . const
 
 instance MonadTransControl LoggingT where
+#if MIN_VERSION_monad_control(1,0,0)
+    type StT LoggingT a = a
+    liftWith f = LoggingT $ \r -> f $ \(LoggingT t) -> t r
+    restoreT = LoggingT . const
+#else
     newtype StT LoggingT a = StReader {unStReader :: a}
     liftWith f = LoggingT $ \r -> f $ \(LoggingT t) -> liftM StReader $ t r
     restoreT = LoggingT . const . liftM unStReader
+#endif
     {-# INLINE liftWith #-}
     {-# INLINE restoreT #-}
 
 instance MonadBaseControl b m => MonadBaseControl b (LoggingT m) where
+#if MIN_VERSION_monad_control(1,0,0)
+     type StM (LoggingT m) a = StM m a
+     liftBaseWith f = LoggingT $ \reader' ->
+         liftBaseWith $ \runInBase ->
+             f $ runInBase . (\(LoggingT r) -> r reader')
+     restoreM = LoggingT . const . restoreM
+#else
      newtype StM (LoggingT m) a = StMT (StM m a)
      liftBaseWith f = LoggingT $ \reader' ->
          liftBaseWith $ \runInBase ->
              f $ liftM StMT . runInBase . (\(LoggingT r) -> r reader')
      restoreM (StMT base) = LoggingT $ const $ restoreM base
+#endif
 
 instance MonadIO m => MonadLogger (LoggingT m) where
     monadLoggerLog a b c d = LoggingT $ \f -> liftIO $ f a b c (toLogStr d)
+instance MonadIO m => MonadLoggerIO (LoggingT m) where
+    askLoggerIO = LoggingT return
 
 defaultOutput :: Handle
               -> Loc
@@ -410,7 +474,7 @@ defaultOutput :: Handle
               -> LogStr
               -> IO ()
 defaultOutput h loc src level msg =
-    S8.hPutStrLn h ls
+    S8.hPutStr h ls
   where
     ls = defaultLogStrBS loc src level msg
 defaultLogStrBS :: Loc
@@ -527,12 +591,28 @@ withChannelLogger size action = LoggingT $ \logger -> do
     dumpLogs chan = liftIO $
         sequence_ =<< atomically (untilM (readTBChan chan) (isEmptyTBChan chan))
 
+-- | Only log messages passing the given predicate function.
+--
+-- This can be a convenient way, for example, to ignore debug level messages.
+--
+-- Since 0.3.13
+filterLogger :: (LogSource -> LogLevel -> Bool)
+             -> LoggingT m a
+             -> LoggingT m a
+filterLogger p (LoggingT f) = LoggingT $ \logger ->
+    f $ \loc src level msg ->
+        when (p src level) $ logger loc src level msg
+
 instance MonadCont m => MonadCont (LoggingT m) where
   callCC f = LoggingT $ \i -> callCC $ \c -> runLoggingT (f (LoggingT . const . c)) i
 
 instance MonadError e m => MonadError e (LoggingT m) where
   throwError = Trans.lift . throwError
   catchError r h = LoggingT $ \i -> runLoggingT r i `catchError` \e -> runLoggingT (h e) i
+
+instance MonadError e m => MonadError e (NoLoggingT m) where
+  throwError = Trans.lift . throwError
+  catchError r h = NoLoggingT $ runNoLoggingT r `catchError` \e -> runNoLoggingT (h e)
 
 instance MonadRWS r w s m => MonadRWS r w s (LoggingT m)
 
@@ -551,6 +631,18 @@ instance MonadWriter w m => MonadWriter w (LoggingT m) where
   tell   = Trans.lift . tell
   listen = mapLoggingT listen
   pass   = mapLoggingT pass
+
+mapNoLoggingT :: (m a -> n b) -> NoLoggingT m a -> NoLoggingT n b
+mapNoLoggingT f = NoLoggingT . f . runNoLoggingT
+
+instance MonadState s m => MonadState s (NoLoggingT m) where
+    get = Trans.lift get
+    put = Trans.lift . put
+
+instance MonadWriter w m => MonadWriter w (NoLoggingT m) where
+    tell   = Trans.lift . tell
+    listen = mapNoLoggingT listen
+    pass   = mapNoLoggingT pass
 
 defaultLoc :: Loc
 defaultLoc = Loc "<unknown>" "<unknown>" "<unknown>" (0,0) (0,0)
