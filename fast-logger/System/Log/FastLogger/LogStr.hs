@@ -38,7 +38,11 @@ toBuilder :: ByteString -> Builder
 toBuilder = B.byteString
 
 fromBuilder :: Builder -> ByteString
+#if MIN_VERSION_bytestring(0,10,0)
 fromBuilder = BL.toStrict . B.toLazyByteString
+#else
+fromBuilder = BS.concat . BL.toChunks . B.toLazyByteString
+#endif
 
 ----------------------------------------------------------------
 
