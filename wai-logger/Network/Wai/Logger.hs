@@ -18,16 +18,15 @@
 -- >     run 3000 $ logApp aplogger
 -- >
 -- > logApp :: ApacheLogger -> Application
--- > logApp aplogger req = do
+-- > logApp aplogger req response = do
 -- >     liftIO $ aplogger req status (Just len)
--- >     return $ responseBuilder status hdr msg
+-- >     response $ responseBuilder status hdr msg
 -- >   where
 -- >     status = status200
--- >     hdr = [("Content-Type", "text/plain")
--- >           ,("Content-Length", BS.pack (show len))]
+-- >     hdr = [("Content-Type", "text/plain")]
 -- >     pong = "PONG"
+-- >     msg = fromByteString pong
 -- >     len = fromIntegral $ BS.length pong
--- >     msg = toLogStr pong
 
 module Network.Wai.Logger (
   -- * High level functions
