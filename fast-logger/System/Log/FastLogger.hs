@@ -22,6 +22,7 @@ module System.Log.FastLogger (
   , logStrLength
   -- * Writing a log message
   , pushLogStr
+  , pushLogStrLn
   -- * Flushing buffered log messages
   , flushLogStr
   -- * File rotation
@@ -105,6 +106,10 @@ pushLogStr (LoggerSet _ fref arr flush) logmsg = do
     fd <- readIORef fref
     pushLog fd logger logmsg
     flush
+
+-- | Same as 'pushLogStr' but also appends a newline.
+pushLogStrLn :: LoggerSet -> LogStr -> IO ()
+pushLogStrLn loggerSet logStr = pushLogStr loggerSet (logStr <> toLogStr "\n")
 
 -- | Flushing log messages in buffers.
 --   This function must be called explicitly when the program is
