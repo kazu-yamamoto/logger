@@ -29,7 +29,9 @@ module System.Log.FastLogger (
   , module System.Log.FastLogger.File
   ) where
 
+#if __GLASGOW_HASKELL__ < 709
 import Control.Applicative ((<$>))
+#endif
 import Control.Debounce (mkDebounce, defaultDebounceSettings, debounceAction)
 import Control.Concurrent (getNumCapabilities, myThreadId, threadCapability, takeMVar)
 import Control.Monad (when, replicateM)

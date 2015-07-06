@@ -17,7 +17,9 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as S8
 import Data.ByteString.Internal (ByteString(..))
 import qualified Data.ByteString.Lazy as BL
+#if __GLASGOW_HASKELL__ < 709
 import Data.Monoid (Monoid, mempty, mappend)
+#endif
 #if MIN_VERSION_base(4,5,0)
 import Data.Monoid ((<>))
 #endif

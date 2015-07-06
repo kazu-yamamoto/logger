@@ -1,8 +1,10 @@
-{-# LANGUAGE OverloadedStrings, BangPatterns #-}
+{-# LANGUAGE OverloadedStrings, BangPatterns, CPP #-}
 
 module FastLoggerSpec where
 
+#if __GLASGOW_HASKELL__ < 709
 import Control.Applicative ((<$>))
+#endif
 import Control.Exception (bracket, finally)
 import Control.Monad (when)
 import qualified Data.ByteString.Char8 as BS
