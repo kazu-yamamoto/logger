@@ -1,0 +1,9 @@
+resolver: lts-2.18
+packages:
+- monad-logger/
+- wai-logger-prefork/
+- wai-logger/
+- date-cache/
+- fast-logger/
+extra-deps:
+- doctest-0.10.1
