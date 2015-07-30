@@ -576,7 +576,7 @@ runStdoutLoggingT = (`runLoggingT` defaultOutput stdout)
 --
 -- Since 0.3.2
 withChannelLogger :: (MonadBaseControl IO m, MonadIO m)
-                  => Int         -- ^ Number of mesasges to keep
+                  => Int         -- ^ Number of messages to keep
                   -> LoggingT m a
                   -> LoggingT m a
 withChannelLogger size action = LoggingT $ \logger -> do
