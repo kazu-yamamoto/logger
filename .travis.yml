@@ -1,14 +1,42 @@
-language: haskell
+sudo: false
 
-ghc:
-    - "7.6"
-    - "7.8"
-    - "7.10"
+addons:
+    apt:
+        sources:
+            - hvr-ghc
+        packages:
+            - cabal-install-1.22
+            - ghc-7.6.3
+            - ghc-7.8.4
+            - ghc-7.10.1
+            - ghc-7.10.2
+
+env:
+  global:
+    - CABALVER=1.22
+    - PACKAGE_LIST="./monad-logger ./wai-logger ./date-cache ./fast-logger"
+  matrix:
+    - GHCVER=7.6.3
+    - GHCVER=7.8.4
+    - GHCVER=7.10.1
+    - GHCVER=7.10.2
+
+matrix:
+  allow_failures:
+    # Seems like Travis doesn't reliably have this yet
+    - env: GHCVER=7.10.2
+
+before_install:
+ - export PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$HOME/.cabal/bin:$PATH
 
 install:
-    - ghc --version
-    - cabal --version
-    - cabal install hspec doctest cabal-meta cabal-src
-    - cabal-meta install --force-reinstalls
+ - cabal --version
+ - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
+ - travis_retry cabal update
 
-script: mega-sdist --test
+script:
+ # First install all packages with dependencies. Have to jump through these
+ # hoops because of problems with wai-extra, see:
+ # https://github.com/kazu-yamamoto/logger/issues/42
+ - cabal install --enable-tests --enable-benchmarks --force-reinstalls wai-extra $PACKAGE_LIST
+ - cabal install --run-tests --force-reinstalls $PACKAGE_LIST
