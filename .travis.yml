@@ -26,4 +26,4 @@ install:
  - travis_retry cabal update
 
 script:
- - cabal install --run-tests --enable-benchmarks --force-reinstalls ./monad-logger ./wai-logger-prefork ./wai-logger ./date-cache ./fast-logger
+ - cabal install --run-tests --enable-benchmarks --force-reinstalls wai-extra ./monad-logger ./wai-logger-prefork ./wai-logger ./date-cache ./fast-logger
