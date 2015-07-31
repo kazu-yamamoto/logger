@@ -14,7 +14,7 @@ addons:
 env:
   global:
     - CABALVER=1.22
-    - PACKAGE_LIST="./monad-logger ./wai-logger-prefork ./wai-logger ./date-cache ./fast-logger"
+    - PACKAGE_LIST="./monad-logger ./wai-logger ./date-cache ./fast-logger"
   matrix:
     - GHCVER=7.6.3
     - GHCVER=7.8.4
