@@ -14,6 +14,7 @@ addons:
 env:
   global:
     - CABALVER=1.22
+    - PACKAGE_LIST="./monad-logger ./wai-logger-prefork ./wai-logger ./date-cache ./fast-logger"
   matrix:
     - GHCVER=7.6.3
     - GHCVER=7.8.4
@@ -34,4 +35,8 @@ install:
  - travis_retry cabal update
 
 script:
- - cabal install --run-tests --enable-benchmarks --force-reinstalls wai-extra ./monad-logger ./wai-logger-prefork ./wai-logger ./date-cache ./fast-logger
+ # First install all packages with dependencies. Have to jump through these
+ # hoops because of problems with wai-extra, see:
+ # https://github.com/kazu-yamamoto/logger/issues/42
+ - cabal install --enable-tests --enable-benchmarks --force-reinstalls wai-extra $PACKAGE_LIST
+ - cabal install --run-tests $PACKAGE_LIST
