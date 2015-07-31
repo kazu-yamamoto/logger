@@ -24,7 +24,6 @@ install:
  - cabal --version
  - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
  - travis_retry cabal update
- - cabal install hspec doctest cabal-meta cabal-src
 
 script:
- - cabal-meta install --only-dependencies --run-tests --enable-benchmarks --force-reinstalls
+ - cabal install --run-tests --enable-benchmarks --force-reinstalls ./monad-logger ./wai-logger-prefork ./wai-logger ./date-cache ./fast-logger
