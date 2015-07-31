@@ -20,6 +20,11 @@ env:
     - GHCVER=7.10.1
     - GHCVER=7.10.2
 
+matrix:
+  allow_failures:
+    # Seems like Travis doesn't reliably have this yet
+    - env: GHCVER=7.10.2
+
 before_install:
  - export PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$HOME/.cabal/bin:$PATH
 
