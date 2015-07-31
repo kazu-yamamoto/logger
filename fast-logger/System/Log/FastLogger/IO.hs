@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE Trustworthy #-}
 
 module System.Log.FastLogger.IO where
 
