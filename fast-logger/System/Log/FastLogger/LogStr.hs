@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE Safe #-}
 
 module System.Log.FastLogger.LogStr (
     Builder
@@ -13,9 +14,9 @@ module System.Log.FastLogger.LogStr (
 
 import Data.ByteString.Builder (Builder)
 import qualified Data.ByteString.Builder as B
+import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as S8
-import Data.ByteString.Internal (ByteString(..))
 import qualified Data.ByteString.Lazy as BL
 #if __GLASGOW_HASKELL__ < 709
 import Data.Monoid (Monoid, mempty, mappend)

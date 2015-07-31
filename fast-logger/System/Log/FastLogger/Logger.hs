@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns, CPP #-}
+{-# LANGUAGE Safe #-}
 
 module System.Log.FastLogger.Logger (
     Logger(..)

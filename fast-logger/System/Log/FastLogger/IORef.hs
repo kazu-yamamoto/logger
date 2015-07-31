@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE Safe #-}
 
 module System.Log.FastLogger.IORef (
        IORef

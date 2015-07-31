@@ -9,6 +9,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE Trustworthy #-}
 -- |  This module provides the facilities needed for a decoupled logging system.
 --
 -- The 'MonadLogger' class is implemented by monads that give access to a
@@ -132,13 +133,15 @@ import Control.Monad.Reader.Class ( MonadReader (..) )
 import Control.Monad.State.Class  ( MonadState (..) )
 import Control.Monad.Writer.Class ( MonadWriter (..) )
 
-import Blaze.ByteString.Builder (toByteString)
-
 import Prelude hiding (catch)
 
-#if !MIN_VERSION_fast_logger(2, 1, 0) && MIN_VERSION_bytestring(0, 10, 2)
+#if MIN_VERSION_fast_logger(2, 1, 0)
+-- Using System.Log.FastLogger
+#elif MIN_VERSION_bytestring(0, 10, 2)
 import qualified Data.ByteString.Lazy as L
 import Data.ByteString.Builder (toLazyByteString)
+#else
+import Blaze.ByteString.Builder (toByteString)
 #endif
 
 #if MIN_VERSION_conduit_extra(1,1,0)
