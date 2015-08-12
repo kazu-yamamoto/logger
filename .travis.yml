@@ -1,32 +1,24 @@
-sudo: false
-
-addons:
-    apt:
-        sources:
-            - hvr-ghc
-        packages:
-            - cabal-install-1.22
-            - ghc-7.6.3
-            - ghc-7.8.4
-            - ghc-7.10.1
-            - ghc-7.10.2
-
 env:
   global:
     - CABALVER=1.22
-    - PACKAGE_LIST="./monad-logger ./wai-logger ./date-cache ./fast-logger"
+    - PACKAGE_LIST="./monad-logger ./wai-logger ./fast-logger"
   matrix:
+    - GHCVER=7.4.2
     - GHCVER=7.6.3
     - GHCVER=7.8.4
     - GHCVER=7.10.1
     - GHCVER=7.10.2
+    - GHCVER=head
 
 matrix:
   allow_failures:
-    # Seems like Travis doesn't reliably have this yet
-    - env: GHCVER=7.10.2
+    # GHC head cannot not compile QuickCheck at this moment.
+    - env: GHCVER=head
 
 before_install:
+ - travis_retry sudo add-apt-repository -y ppa:hvr/ghc
+ - travis_retry sudo apt-get update
+ - travis_retry sudo apt-get install cabal-install-$CABALVER ghc-$GHCVER
  - export PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$HOME/.cabal/bin:$PATH
 
 install:
