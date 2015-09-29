@@ -1,3 +1,7 @@
+## 0.3.14
+
+* Don't include source location for defaultLoc [#69](https://github.com/kazu-yamamoto/logger/issues/69)
+
 ## 0.3.13.1
 
 * Allow fast-logger 2.3

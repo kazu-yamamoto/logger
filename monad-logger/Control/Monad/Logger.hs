@@ -518,9 +518,12 @@ defaultLogStr loc src level msg =
         else "#" `mappend` toLogStr src) `mappend`
     "] " `mappend`
     msg `mappend`
-    " @(" `mappend`
-    toLogStr (S8.pack fileLocStr) `mappend`
-    ")\n"
+    (if isDefaultLoc loc
+        then "\n"
+        else
+            " @(" `mappend`
+            toLogStr (S8.pack fileLocStr) `mappend`
+            ")\n")
 #else
     S8.concat
         [ S8.pack "["
@@ -649,6 +652,10 @@ instance MonadWriter w m => MonadWriter w (NoLoggingT m) where
 
 defaultLoc :: Loc
 defaultLoc = Loc "<unknown>" "<unknown>" "<unknown>" (0,0) (0,0)
+
+isDefaultLoc :: Loc -> Bool
+isDefaultLoc (Loc "<unknown>" "<unknown>" "<unknown>" (0,0) (0,0)) = True
+isDefaultLoc _ = False
 
 logWithoutLoc :: (MonadLogger m, ToLogStr msg) => LogSource -> LogLevel -> msg -> m ()
 logWithoutLoc = monadLoggerLog defaultLoc
