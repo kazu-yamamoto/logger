@@ -1,4 +1,4 @@
-resolver: lts-2.18
+resolver: lts-3.11
 packages:
 - monad-logger/
 - wai-logger/
