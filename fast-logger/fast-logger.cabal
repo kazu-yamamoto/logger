@@ -19,7 +19,7 @@ Library
                         System.Log.FastLogger.IORef
                         System.Log.FastLogger.LogStr
                         System.Log.FastLogger.Logger
-  Build-Depends:        base >= 4.4 && < 5
+  Build-Depends:        base >= 4.5 && < 5
                       , array
                       , auto-update >= 0.1.2
                       , bytestring
