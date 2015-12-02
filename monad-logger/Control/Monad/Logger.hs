@@ -36,6 +36,8 @@ module Control.Monad.Logger
     , LoggingT (..)
     , runStderrLoggingT
     , runStdoutLoggingT
+    , runChanLoggingT
+    , unChanLoggingT
     , withChannelLogger
     , filterLogger
     , NoLoggingT (..)
@@ -80,10 +82,11 @@ import Language.Haskell.TH.Syntax (Lift (lift), Q, Exp, Loc (..), qLocation)
 import Data.Monoid (Monoid)
 
 import Control.Applicative (Applicative (..))
+import Control.Concurrent.Chan (Chan(),writeChan,readChan)
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TBChan
 import Control.Exception.Lifted (onException)
-import Control.Monad (liftM, ap, when, void)
+import Control.Monad (liftM, ap, when, void, forever)
 import Control.Monad.Base (MonadBase (liftBase))
 import Control.Monad.Loops (untilM)
 import Control.Monad.Trans.Control (MonadBaseControl (..), MonadTransControl (..))
@@ -575,6 +578,22 @@ runStderrLoggingT = (`runLoggingT` defaultOutput stderr)
 -- Since 0.2.2
 runStdoutLoggingT :: MonadIO m => LoggingT m a -> m a
 runStdoutLoggingT = (`runLoggingT` defaultOutput stdout)
+
+-- | Run a block using a @MonadLogger@ instance which writes tuples to an unbounded channel.
+--
+-- Since VERSION
+runChanLoggingT :: MonadIO m => Chan (Loc, LogSource, LogLevel, LogStr) -> LoggingT m a -> m a
+runChanLoggingT chan = (`runLoggingT` sink chan)
+    where
+        sink chan loc src lvl msg = writeChan chan (loc,src,lvl,msg)
+
+-- | Read tuples from an unbounded channel and log them, forever.
+--
+-- Since VERSION
+unChanLoggingT :: MonadLoggerIO m => Chan (Loc, LogSource, LogLevel, LogStr) -> m ()
+unChanLoggingT chan = forever $ do
+    (loc,src,lvl,msg) <- liftIO $ readChan chan
+    monadLoggerLog loc src lvl msg
 
 -- | Within the 'LoggingT' monad, capture all log messages to a bounded
 --   channel of the indicated size, and only actually log them if there is an
