@@ -1,6 +1,6 @@
 -- | This module provides a fast logging system which
 --   scales on multicore environments (i.e. +RTS -N\<x\>).
-{-# LANGUAGE BangPatterns, CPP #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Safe #-}
 
 module System.Log.FastLogger (
