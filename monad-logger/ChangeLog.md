@@ -1,3 +1,11 @@
+## 0.3.16
+
+* Provide default monadLoggerLog implementation [#72](https://github.com/kazu-yamamoto/logger/pull/72)
+
+## 0.3.15
+
+* Expose Loc constructor [#70](https://github.com/kazu-yamamoto/logger/pull/70)
+
 ## 0.3.14
 
 * Don't include source location for defaultLoc [#69](https://github.com/kazu-yamamoto/logger/issues/69)
