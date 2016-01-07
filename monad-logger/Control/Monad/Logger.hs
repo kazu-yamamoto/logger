@@ -582,7 +582,11 @@ runStderrLoggingT = (`runLoggingT` defaultOutput stderr)
 runStdoutLoggingT :: MonadIO m => LoggingT m a -> m a
 runStdoutLoggingT = (`runLoggingT` defaultOutput stdout)
 
--- | Run a block using a @MonadLogger@ instance which writes tuples to an unbounded channel.
+-- | Run a block using a @MonadLogger@ instance which writes tuples to an
+--   unbounded channel.
+--
+--   The tuples can be extracted (ie. in another thread) with `unChanLoggingT`
+--   or a custom extraction funtion, and written to a destination.
 --
 -- Since VERSION
 runChanLoggingT :: MonadIO m => Chan (Loc, LogSource, LogLevel, LogStr) -> LoggingT m a -> m a
@@ -590,7 +594,10 @@ runChanLoggingT chan = (`runLoggingT` sink chan)
     where
         sink chan loc src lvl msg = writeChan chan (loc,src,lvl,msg)
 
--- | Read tuples from an unbounded channel and log them, forever.
+-- | Read logging tuples from an unbounded channel and log them into a
+--   `MonadLoggerIO` monad, forever.
+--
+--   For use in a dedicated thread with a channel fed by `runChanLoggingT`.
 --
 -- Since VERSION
 unChanLoggingT :: MonadLoggerIO m => Chan (Loc, LogSource, LogLevel, LogStr) -> m ()
