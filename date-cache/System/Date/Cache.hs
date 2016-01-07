@@ -40,7 +40,7 @@ newDate setting tm = DateCache tm <$> formatDate setting tm
 ondemandDateCacher :: Eq t => DateCacheConf t -> IO (DateCacheGetter, DateCacheCloser)
 ondemandDateCacher setting = do
     ref <- getTime setting >>= newDate setting >>= newIORef
-    return $! (getter ref, closer)
+    return (getter ref, closer)
   where
     getter ref = do
         newTm <- getTime setting
@@ -61,7 +61,7 @@ clockDateCacher :: Eq t => DateCacheConf t -> IO (DateCacheGetter, DateCacheClos
 clockDateCacher setting = do
     ref <- getTime setting >>= newDate setting >>= newIORef
     tid <- forkIO $ clock ref
-    return $! (getter ref, closer tid)
+    return (getter ref, closer tid)
   where
     getter ref = formattedDate <$> readIORef ref
     clock ref = do
