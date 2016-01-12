@@ -30,5 +30,5 @@ script:
  # First install all packages with dependencies. Have to jump through these
  # hoops because of problems with wai-extra, see:
  # https://github.com/kazu-yamamoto/logger/issues/42
- - cabal install --enable-tests --enable-benchmarks --force-reinstalls wai-extra $PACKAGE_LIST
+ - cabal install --enable-tests --enable-benchmarks --force-reinstalls --reorder-goals --max-backjumps=-1 wai-extra $PACKAGE_LIST
  - cabal install --run-tests --force-reinstalls $PACKAGE_LIST
