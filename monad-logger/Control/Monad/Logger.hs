@@ -600,7 +600,7 @@ runChanLoggingT chan = (`runLoggingT` sink chan)
 --   For use in a dedicated thread with a channel fed by `runChanLoggingT`.
 --
 -- Since VERSION
-unChanLoggingT :: MonadLoggerIO m => Chan (Loc, LogSource, LogLevel, LogStr) -> m ()
+unChanLoggingT :: (MonadLogger m, MonadIO m) => Chan (Loc, LogSource, LogLevel, LogStr) -> m ()
 unChanLoggingT chan = forever $ do
     (loc,src,lvl,msg) <- liftIO $ readChan chan
     monadLoggerLog loc src lvl msg
