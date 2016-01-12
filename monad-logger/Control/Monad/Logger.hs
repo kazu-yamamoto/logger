@@ -588,7 +588,7 @@ runStdoutLoggingT = (`runLoggingT` defaultOutput stdout)
 --   The tuples can be extracted (ie. in another thread) with `unChanLoggingT`
 --   or a custom extraction funtion, and written to a destination.
 --
--- Since VERSION
+-- @since 0.3.17
 runChanLoggingT :: MonadIO m => Chan (Loc, LogSource, LogLevel, LogStr) -> LoggingT m a -> m a
 runChanLoggingT chan = (`runLoggingT` sink chan)
     where
@@ -599,7 +599,7 @@ runChanLoggingT chan = (`runLoggingT` sink chan)
 --
 --   For use in a dedicated thread with a channel fed by `runChanLoggingT`.
 --
--- Since VERSION
+-- @since 0.3.17
 unChanLoggingT :: (MonadLogger m, MonadIO m) => Chan (Loc, LogSource, LogLevel, LogStr) -> m ()
 unChanLoggingT chan = forever $ do
     (loc,src,lvl,msg) <- liftIO $ readChan chan

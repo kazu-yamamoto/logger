@@ -1,3 +1,7 @@
+## 0.3.17
+
+* log to a chan [#74](https://github.com/kazu-yamamoto/logger/pull/74)
+
 ## 0.3.16
 
 * Provide default monadLoggerLog implementation [#72](https://github.com/kazu-yamamoto/logger/pull/72)
