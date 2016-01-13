@@ -8,6 +8,9 @@ module Network.Wai.Logger.Apache (
 #ifndef MIN_VERSION_base
 #define MIN_VERSION_base(x,y,z) 1
 #endif
+#ifndef MIN_VERSION_wai
+#define MIN_VERSION_wai(x,y,z) 1
+#endif
 
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
@@ -55,17 +58,21 @@ apacheLogStr ipsrc tmstr req status msize =
   <> " "
   <> toLogStr (maybe "-" show msize)
   <> " \""
-  <> toLogStr (lookupRequestField' "referer" req)
+  <> toLogStr (fromMaybe "" mr)
   <> "\" \""
-  <> toLogStr (lookupRequestField' "user-agent" req)
+  <> toLogStr (fromMaybe "" mua)
   <> "\"\n"
   where
 #if !MIN_VERSION_base(4,5,0)
     (<>) = mappend
 #endif
-
-lookupRequestField' :: CI ByteString -> Request -> ByteString
-lookupRequestField' k req = fromMaybe "" . lookup k $ requestHeaders req
+#if MIN_VERSION_wai(3,2,0)
+    mr  = requestHeaderReferer req
+    mua = requestHeaderUserAgent req
+#else
+    mr  = lookup "referer" $ requestHeaders req
+    mua = lookup "user-agent" $ requestHeaders req
+#endif
 
 -- getSourceIP = getSourceIP fromString fromByteString
 
