@@ -48,6 +48,12 @@ module Control.Monad.Logger
     , logWarn
     , logError
     , logOther
+    -- * TH logging of showable values
+    , logDebugSH
+    , logInfoSH
+    , logWarnSH
+    , logErrorSH
+    , logOtherSH
     -- * TH logging with source
     , logDebugS
     , logInfoS
@@ -246,7 +252,13 @@ instance (MonadLoggerIO m, Monoid w) => MonadLoggerIO (Strict.RWST r w s m)
 #if WITH_TEMPLATE_HASKELL
 logTH :: LogLevel -> Q Exp
 logTH level =
-    [|monadLoggerLog $(qLocation >>= liftLoc) (pack "") $(lift level) . (id :: Text -> Text)|]
+    [|monadLoggerLog $(qLocation >>= liftLoc) (pack "") $(lift level)
+     . (id :: Text -> Text)|]
+
+logTHShow :: LogLevel -> Q Exp
+logTHShow level =
+    [|monadLoggerLog $(qLocation >>= liftLoc) (pack "") $(lift level)
+      . ((pack . show) :: Show a => a -> Text)|]
 
 -- | Generates a function that takes a 'Text' and logs a 'LevelDebug' message. Usage:
 --
@@ -269,6 +281,29 @@ logError = logTH LevelError
 -- > $(logOther "My new level") "This is a log message"
 logOther :: Text -> Q Exp
 logOther = logTH . LevelOther
+
+
+-- | Generates a function that takes a 'Show a => a' and logs a 'LevelDebug' message. Usage:
+--
+-- > $(logDebug) "This is a debug log message"
+logDebugSH :: Q Exp
+logDebugSH = logTHShow LevelDebug
+
+-- | See 'logDebugSH'
+logInfoSH :: Q Exp
+logInfoSH = logTHShow LevelInfo
+-- | See 'logDebugSH'
+logWarnSH :: Q Exp
+logWarnSH = logTHShow LevelWarn
+-- | See 'logDebugSH'
+logErrorSH :: Q Exp
+logErrorSH = logTHShow LevelError
+
+-- | Generates a function that takes a 'Show a => a' and logs a 'LevelOther' message. Usage:
+--
+-- > $(logOtherSH "My new level") "This is a log message"
+logOtherSH :: Text -> Q Exp
+logOtherSH = logTH . LevelOther
 
 -- | Lift a location into an Exp.
 --
