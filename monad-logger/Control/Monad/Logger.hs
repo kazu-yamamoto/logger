@@ -255,6 +255,9 @@ logTH level =
     [|monadLoggerLog $(qLocation >>= liftLoc) (pack "") $(lift level)
      . (id :: Text -> Text)|]
 
+-- | Generates a function that takes a 'LogLevel' and a 'Show a => a'.
+--
+-- @since 0.3.18
 logTHShow :: LogLevel -> Q Exp
 logTHShow level =
     [|monadLoggerLog $(qLocation >>= liftLoc) (pack "") $(lift level)
@@ -285,7 +288,9 @@ logOther = logTH . LevelOther
 
 -- | Generates a function that takes a 'Show a => a' and logs a 'LevelDebug' message. Usage:
 --
--- > $(logDebug) "This is a debug log message"
+-- > $(logDebugSH) (Just "This is a debug log message")
+--
+-- @since 0.3.18
 logDebugSH :: Q Exp
 logDebugSH = logTHShow LevelDebug
 
