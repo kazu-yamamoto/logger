@@ -308,7 +308,7 @@ logErrorSH = logTHShow LevelError
 --
 -- > $(logOtherSH "My new level") "This is a log message"
 logOtherSH :: Text -> Q Exp
-logOtherSH = logTH . LevelOther
+logOtherSH = logTHShow . LevelOther
 
 -- | Lift a location into an Exp.
 --
