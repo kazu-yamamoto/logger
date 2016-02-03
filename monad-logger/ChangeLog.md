@@ -1,3 +1,7 @@
+## 0.3.18
+
+* Added logTHShow and logDebugSH, logInfoSH, etc. Accepts an argument of `Show a => a` instead of just `Text`.
+
 ## 0.3.17
 
 * log to a chan [#74](https://github.com/kazu-yamamoto/logger/pull/74)
