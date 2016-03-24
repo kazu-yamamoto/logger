@@ -38,20 +38,12 @@ import Control.Concurrent (getNumCapabilities, myThreadId, threadCapability, tak
 import Control.Monad (when, replicateM)
 import Data.Array (Array, listArray, (!), bounds)
 import Data.Maybe (isJust)
-import GHC.IO.Device (close)
-import GHC.IO.FD (FD(..), openFile, stderr, stdout)
-import GHC.IO.IOMode (IOMode(..))
 import System.Log.FastLogger.File
 import System.Log.FastLogger.IO
+import System.Log.FastLogger.FileIO
 import System.Log.FastLogger.IORef
 import System.Log.FastLogger.LogStr
 import System.Log.FastLogger.Logger
-
-----------------------------------------------------------------
-
--- | Opening a log file.
-logOpen :: FilePath -> IO FD
-logOpen file = fst <$> openFile file AppendMode False
 
 ----------------------------------------------------------------
 
@@ -63,15 +55,15 @@ data LoggerSet = LoggerSet (Maybe FilePath) (IORef FD) (Array Int Logger) (IO ()
 
 -- | Creating a new 'LoggerSet' using a file.
 newFileLoggerSet :: BufSize -> FilePath -> IO LoggerSet
-newFileLoggerSet size file = logOpen file >>= newFDLoggerSet size (Just file)
+newFileLoggerSet size file = openFileFD file >>= newFDLoggerSet size (Just file)
 
 -- | Creating a new 'LoggerSet' using stdout.
 newStdoutLoggerSet :: BufSize -> IO LoggerSet
-newStdoutLoggerSet size = newFDLoggerSet size Nothing stdout
+newStdoutLoggerSet size = getStdoutFD >>= newFDLoggerSet size Nothing
 
 -- | Creating a new 'LoggerSet' using stderr.
 newStderrLoggerSet :: BufSize -> IO LoggerSet
-newStderrLoggerSet size = newFDLoggerSet size Nothing stderr
+newStderrLoggerSet size = getStderrFD >>= newFDLoggerSet size Nothing
 
 {-# DEPRECATED newLoggerSet "Use newFileLoggerSet etc instead" #-}
 -- | Creating a new 'LoggerSet'.
@@ -139,9 +131,9 @@ flushLogStrRaw fref arr = do
 renewLoggerSet :: LoggerSet -> IO ()
 renewLoggerSet (LoggerSet Nothing     _    _ _) = return ()
 renewLoggerSet (LoggerSet (Just file) fref _ _) = do
-    newfd <- logOpen file
+    newfd <- openFileFD file
     oldfd <- atomicModifyIORef' fref (\fd -> (newfd, fd))
-    close oldfd
+    closeFD oldfd
 
 -- | Flushing the buffers, closing the internal file information
 --   and freeing the buffers.
@@ -152,7 +144,7 @@ rmLoggerSet (LoggerSet mfile fref arr _) = do
     let nums = [l .. u]
     mapM_ (flushIt fd) nums
     mapM_ freeIt nums
-    when (isJust mfile) $ close fd
+    when (isJust mfile) $ closeFD fd
   where
     flushIt fd i = flushLog fd (arr ! i)
     freeIt i = do

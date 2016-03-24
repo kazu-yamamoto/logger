@@ -11,7 +11,7 @@ module System.Log.FastLogger.Logger (
 import Control.Concurrent (MVar, newMVar, withMVar)
 import Control.Monad (when)
 import Foreign.Ptr (plusPtr)
-import GHC.IO.FD (FD, writeRawBufferPtr)
+import System.Log.FastLogger.FileIO
 import System.Log.FastLogger.IO
 import System.Log.FastLogger.LogStr
 import System.Log.FastLogger.IORef
@@ -77,6 +77,6 @@ write :: FD -> Buffer -> Int -> IO ()
 write fd buf len' = loop buf (fromIntegral len')
   where
     loop bf !len = do
-        written <- writeRawBufferPtr "write" fd bf 0 (fromIntegral len)
+        written <- writeRawBufferPtr2FD fd bf len
         when (written < len) $
             loop (bf `plusPtr` fromIntegral written) (len - written)
