@@ -25,7 +25,11 @@ spec = describe "pushLogMsg" $ do
     it "logs all messages" logAllMsgs
 
 nullLogger :: IO LoggerSet
+#ifdef mingw32_HOST_OS
+nullLogger = newFileLoggerSet 4096 "nul"
+#else
 nullLogger = newFileLoggerSet 4096 "/dev/null"
+#endif
 
 safeForLarge :: [Int] -> IO ()
 safeForLarge ns = mapM_ safeForLarge' ns
