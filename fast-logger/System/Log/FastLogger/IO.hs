@@ -38,6 +38,5 @@ toBufIOWith buf !size io builder = loop $ BBE.runBuilder builder
              More minSize writer'
                | size < minSize -> error "toBufIOWith: More: minSize"
                | otherwise      -> loop writer'
-             Chunk (PS fptr off siz) writer'
-               | len == 0  -> loop writer' -- flushing
-               | otherwise -> withForeignPtr fptr $ \ptr -> io (ptr `plusPtr` off) siz >> loop writer'
+             Chunk (PS fptr off siz) writer' ->
+               withForeignPtr fptr $ \ptr -> io (ptr `plusPtr` off) siz >> loop writer'
