@@ -40,4 +40,4 @@ toBufIOWith buf !size io builder = loop $ BBE.runBuilder builder
                | otherwise      -> loop writer'
              Chunk (PS fptr off siz) writer'
                | len == 0  -> loop writer' -- flushing
-               | otherwise -> withForeignPtr fptr $ \ptr -> io (ptr `plusPtr` off) siz
+               | otherwise -> withForeignPtr fptr $ \ptr -> io (ptr `plusPtr` off) siz >> loop writer'
