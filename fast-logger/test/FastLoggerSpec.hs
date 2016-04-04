@@ -5,7 +5,7 @@ module FastLoggerSpec where
 #if __GLASGOW_HASKELL__ < 709
 import Control.Applicative ((<$>))
 #endif
-import Control.Exception (bracket, finally)
+import Control.Exception (finally)
 import Control.Monad (when)
 import qualified Data.ByteString.Char8 as BS
 import Data.Monoid ((<>))
@@ -35,19 +35,28 @@ safeForLarge :: [Int] -> IO ()
 safeForLarge ns = mapM_ safeForLarge' ns
 
 safeForLarge' :: Int -> IO ()
-safeForLarge' n = bracket nullLogger rmLoggerSet $ \lgrset -> do
-    let xs = toLogStr $ BS.pack $ replicate (abs n) 'x'
+safeForLarge' n = flip finally (cleanup tmpfile) $ do
+    cleanup tmpfile
+    lgrset <- newFileLoggerSet defaultBufSize tmpfile
+    let xs = toLogStr $ BS.pack $ take (abs n) (cycle ['a'..'z'])
         lf = "x"
     pushLogStr lgrset $ xs <> lf
     flushLogStr lgrset
+    rmLoggerSet lgrset
+    bs <- BS.readFile tmpfile
+    bs `shouldBe` BS.pack (take (abs n) (cycle ['a'..'z']) <> "x")
+    where
+        tmpfile = "test/temp"
+
+cleanup :: FilePath -> IO ()
+cleanup file = do
+    exist <- doesFileExist file
+    when exist $ removeFile file
 
 logAllMsgs :: IO ()
 logAllMsgs = logAll "LICENSE" `finally` cleanup tmpfile
   where
     tmpfile = "test/temp"
-    cleanup file = do
-        exist <- doesFileExist file
-        when exist $ removeFile file
     logAll file = do
         cleanup tmpfile
         lgrset <- newFileLoggerSet 512 tmpfile
