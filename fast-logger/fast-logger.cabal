@@ -16,6 +16,7 @@ Library
   Exposed-Modules:      System.Log.FastLogger
                         System.Log.FastLogger.File
   Other-Modules:        System.Log.FastLogger.IO
+                        System.Log.FastLogger.FileIO
                         System.Log.FastLogger.IORef
                         System.Log.FastLogger.LogStr
                         System.Log.FastLogger.Logger
@@ -27,6 +28,9 @@ Library
                       , directory
                       , filepath
                       , text
+  if os(windows)
+    Build-Depends:
+                      Win32
 
 Test-Suite spec
     Main-Is:         Spec.hs
