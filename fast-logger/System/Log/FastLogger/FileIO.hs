@@ -3,7 +3,6 @@
 module System.Log.FastLogger.FileIO where
 
 import Foreign.Ptr (Ptr)
-import Foreign.C.Types (CInt)
 import Data.Word (Word8)
 
 #ifdef mingw32_HOST_OS
@@ -47,6 +46,7 @@ type FD = POSIX.FD
 closeFD :: FD -> IO ()
 closeFD = close
 
+openFileFD :: FilePath -> IO FD
 openFileFD f = fst `fmap` openFile f AppendMode False
 
 getStderrFD :: IO FD
