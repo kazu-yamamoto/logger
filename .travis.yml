@@ -3,7 +3,6 @@ env:
     - CABALVER=1.22
     - PACKAGE_LIST="./monad-logger ./wai-logger ./fast-logger"
   matrix:
-    - GHCVER=7.4.2
     - GHCVER=7.6.3
     - GHCVER=7.8.4
     - GHCVER=7.10.1
