@@ -6,19 +6,23 @@ import Foreign.Ptr (Ptr)
 import Data.Word (Word8)
 
 #ifdef mingw32_HOST_OS
-import System.Win32.Types (HANDLE)
+import System.Win32.Types (HANDLE, UINT)
 import System.Win32.File
 import Graphics.Win32.Misc (getStdHandle, sTD_OUTPUT_HANDLE, sTD_ERROR_HANDLE)
 import Data.Bits ((.|.))
 
 type FD = HANDLE
 
+-- This flag is not defined in System.Win32.File
+fILE_APPEND_DATA :: UINT
+fILE_APPEND_DATA = 0x0004
+
 closeFD :: FD -> IO ()
 closeFD = closeHandle
 
 openFileFD :: FilePath -> IO FD
 openFileFD f = createFile f
-                         (gENERIC_READ .|. gENERIC_WRITE)
+                         fILE_APPEND_DATA
                          (fILE_SHARE_READ .|. fILE_SHARE_DELETE)
                          Nothing
                          oPEN_ALWAYS
