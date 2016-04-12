@@ -1,3 +1,7 @@
+## 2.4.3
+
+* Opening files in the append mode on Windows.
+
 ## 2.4.2
 
 * Fixing a buf of long log messages [#80](https://github.com/kazu-yamamoto/logger/pull/80)
