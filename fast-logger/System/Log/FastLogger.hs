@@ -30,7 +30,9 @@ module System.Log.FastLogger (
   , FastLogger(..)
   , LogType(..)
   , newFastLogger
+  , withFastLogger
   , newTimedFastLogger
+  , withTimedFastLogger
   , simpleAppendTime
   , simpleTimeFormat
   -- * Date cache
@@ -196,6 +198,8 @@ newFastLogger LogNone = return FastLogger{
     logger = const $ return ()
   , releaseLogger = return ()
   }
+
+
 newFastLogger typ = case typ of
     LogStdout bsize -> newStdoutLoggerSet bsize >>= stdLoggerInit
     LogStderr bsize -> newStderrLoggerSet bsize >>= stdLoggerInit
@@ -220,6 +224,10 @@ newFastLogger typ = case typ of
                 pushLogStr lgrset str
                 when (cnt <= 0) $ tryRotate lgrset fspec ref mvar
         return $ FastLogger logger' (rmLoggerSet lgrset)
+
+-- | 'bracket' version of 'newFastLogger'
+withFastLogger :: LogType -> (FastLogger -> IO a) -> IO ()
+withFastLogger typ log = bracket (newFastLogger typ) log (\fl -> releaseLogger fl)
 
 -- | Initialize a 'FastLogger' with timestamp attached to each message.
 newTimedFastLogger :: TimeFormat               -- ^ for example: 'simpleTimeFormat'
@@ -260,6 +268,11 @@ newTimedFastLogger fmt logf typ = do
                 when (cnt <= 0) $ tryRotate lgrset fspec ref mvar
         return $ FastLogger logger' (rmLoggerSet lgrset)
 
+-- | 'bracket' version of 'newTimeFastLogger'
+withTimedFastLogger ::  TimeFormat
+    -> (FormattedTime -> LogStr -> LogStr)
+    -> LogType -> (FastLogger -> IO a) -> IO ()
+withTimedFastLogger fmt logf typ log = bracket (newTimedFastLogger fmt logf typ) log (\fl -> releaseLogger fl)
 
 -- | Append formatted time at the end of the message, seperated with \"@"\.
 simpleAppendTime :: FormattedTime -> LogStr -> LogStr
