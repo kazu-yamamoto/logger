@@ -28,9 +28,11 @@ module System.Log.FastLogger (
   , flushLogStr
   -- * FastLogger
   , FastLogger(..)
+  , LogType(..)
   , newFastLogger
   , newTimedFastLogger
   , simpleAppendTime
+  , simpleTimeFormat
   -- * Date cache
   , module System.Log.FastLogger.Date
   -- * File rotation
@@ -221,7 +223,7 @@ newFastLogger typ = case typ of
         return $ FastLogger logger' (rmLoggerSet lgrset)
 
 -- | Initialize a 'FastLogger' with timestamp attached to each message.
-newTimedFastLogger :: TimeFormat               -- ^ for example: @\"%d/%b/%Y:%T %z\"@
+newTimedFastLogger :: TimeFormat               -- ^ for example: 'simpleTimeFormat'
     -> (FormattedTime -> LogStr -> LogStr)     -- ^ How do we attach formatted time with message?
     -> LogType -> IO FastLogger
 newTimedFastLogger _ _ LogNone = newFastLogger LogNone
@@ -264,6 +266,9 @@ newTimedFastLogger fmt logf typ = do
 simpleAppendTime :: FormattedTime -> LogStr -> LogStr
 simpleAppendTime t l = l <> "@" <> (toLogStr t)
 
+-- | A simple time format: @simpleTimeFormat = "%d/%b/%Y:%T %z"@
+simpleTimeFormat :: TimeFormat
+simpleTimeFormat = "%d/%b/%Y:%T %z"
 ----------------------------------------------------------------
 
 decrease :: IORef Int -> IO Int
