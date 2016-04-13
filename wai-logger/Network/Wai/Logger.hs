@@ -57,7 +57,7 @@ import Control.Monad (when, void)
 import Network.HTTP.Types (Status)
 import Network.Wai (Request)
 import System.EasyFile (getFileSize)
-import System.Log.FastLogger hiding (LogType(..)) -- TODO: use new FastLogger when ready
+import System.Log.FastLogger
 
 import Network.Wai.Logger.Apache
 import Network.Wai.Logger.Date
@@ -96,17 +96,6 @@ data ApacheLoggerActions = ApacheLoggerActions {
   , logRemover :: IO ()
   }
 
--- | Logger Type.
-data LogType = LogNone                     -- ^ No logging.
-             | LogStdout BufSize           -- ^ Logging to stdout.
-                                           --   'BufSize' is a buffer size
-                                           --   for each capability.
-             | LogFile FileLogSpec BufSize -- ^ Logging to a file.
-                                           --   'BufSize' is a buffer size
-                                           --   for each capability.
-                                           --   File rotation is done on-demand.
-             | LogCallback (LogStr -> IO ()) (IO ())
-
 ----------------------------------------------------------------
 
 -- |
@@ -114,8 +103,10 @@ data LogType = LogNone                     -- ^ No logging.
 initLogger :: IPAddrSource -> LogType -> DateCacheGetter
            -> IO ApacheLoggerActions
 initLogger _     LogNone             _       = noLoggerInit
-initLogger ipsrc (LogStdout size)    dateget = stdoutLoggerInit ipsrc size dateget
-initLogger ipsrc (LogFile spec size) dateget = fileLoggerInit ipsrc spec size dateget
+initLogger ipsrc (LogStdout size)    dateget = newStdoutLoggerSet size >>= stdLoggerInit ipsrc dateget
+initLogger ipsrc (LogStderr size)    dateget = newStderrLoggerSet size >>= stdLoggerInit ipsrc dateget
+initLogger ipsrc (LogFile fp size)   dateget = newFileLoggerSet size fp >>= stdLoggerInit ipsrc dateget
+initLogger ipsrc (LogFileAutoRotate spec size) dateget = fileLoggerInit ipsrc spec size dateget
 initLogger ipsrc (LogCallback cb flush) dateget = callbackLoggerInit ipsrc cb flush dateget
 
 ----------------------------------------------------------------
@@ -131,10 +122,9 @@ noLoggerInit = return ApacheLoggerActions {
     noRotator = return ()
     noRemover = return ()
 
-stdoutLoggerInit :: IPAddrSource -> BufSize -> DateCacheGetter
-                 -> IO ApacheLoggerActions
-stdoutLoggerInit ipsrc size dateget = do
-    lgrset <- newStdoutLoggerSet size
+stdLoggerInit :: IPAddrSource -> DateCacheGetter
+                 -> LoggerSet -> IO ApacheLoggerActions
+stdLoggerInit ipsrc dateget lgrset = do
     let logger = apache (pushLogStr lgrset) ipsrc dateget
         noRotator = return ()
         remover = rmLoggerSet lgrset
@@ -226,5 +216,7 @@ tryRotate lgrset spec ref mvar = bracket lock unlock rotateFiles
 logCheck :: LogType -> IO ()
 logCheck LogNone          = return ()
 logCheck (LogStdout _)    = return ()
-logCheck (LogFile spec _) = check spec
+logCheck (LogStderr _)    = return ()
+logCheck (LogFile fp _)   = check fp
+logCheck (LogFileAutoRotate spec _) = check (log_file spec)
 logCheck (LogCallback _ _) = return ()
