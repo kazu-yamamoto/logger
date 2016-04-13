@@ -57,7 +57,7 @@ import Control.Monad (when, void)
 import Network.HTTP.Types (Status)
 import Network.Wai (Request)
 import System.EasyFile (getFileSize)
-import System.Log.FastLogger
+import System.Log.FastLogger hiding (LogType(..)) -- TODO: use new FastLogger when ready
 
 import Network.Wai.Logger.Apache
 import Network.Wai.Logger.Date

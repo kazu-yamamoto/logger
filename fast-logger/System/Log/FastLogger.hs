@@ -174,21 +174,22 @@ type FastLogger = LogStr -> IO ()
 type TimedFastLogger = (FormattedTime -> LogStr) -> IO ()
 
 -- | Logger Type.
-data LogType = LogNone                     -- ^ No logging.
-             | LogStdout BufSize           -- ^ Logging to stdout.
-                                           --   'BufSize' is a buffer size
-             | LogStderr BufSize           -- ^ Logging to stdout.
-                                           --   'BufSize' is a buffer size
-                                           --   for each capability.
-             | LogFile FilePath BufSize    -- ^ Logging to a file.
-                                           --   'BufSize' is a buffer size
-                                           --   for each capability.
-             | LogFileAutoRotate FileLogSpec BufSize -- ^ Logging to a file.
-                                           --   'BufSize' is a buffer size
-                                           --   for each capability.
-                                           --   File rotation is done on-demand.
-             | LogCallback (LogStr -> IO ()) (IO ()) -- ^ Logging with a log and flush action.
-                                           -- run flush after log each message.
+data LogType
+    = LogNone                     -- ^ No logging.
+    | LogStdout BufSize           -- ^ Logging to stdout.
+                                  --   'BufSize' is a buffer size
+    | LogStderr BufSize           -- ^ Logging to stdout.
+                                  --   'BufSize' is a buffer size
+                                  --   for each capability.
+    | LogFile FilePath BufSize    -- ^ Logging to a file.
+                                  --   'BufSize' is a buffer size
+                                  --   for each capability.
+    | LogFileAutoRotate FileLogSpec BufSize -- ^ Logging to a file.
+                                  --   'BufSize' is a buffer size
+                                  --   for each capability.
+                                  --   File rotation is done on-demand.
+    | LogCallback (LogStr -> IO ()) (IO ()) -- ^ Logging with a log and flush action.
+                                               -- run flush after log each message.
 
 -- | Initialize a 'FastLogger' without attaching timestamp
 -- a tuple of logger and clean up action are returned.
