@@ -48,7 +48,6 @@ import Control.Exception (handle, SomeException(..), bracket)
 import Control.Monad (when, replicateM)
 import Data.Array (Array, listArray, (!), bounds)
 import Data.Maybe (isJust)
-import Data.Text (Text)
 import System.EasyFile (getFileSize)
 import System.Log.FastLogger.File
 import System.Log.FastLogger.IO
@@ -117,7 +116,7 @@ pushLogStr (LoggerSet _ fref arr flush) logmsg = do
 
 -- | Same as 'pushLogStr' but also appends a newline.
 pushLogStrLn :: LoggerSet -> LogStr -> IO ()
-pushLogStrLn loggerSet logStr = pushLogStr loggerSet (logStr <> toLogStr ("\n" :: Text))
+pushLogStrLn loggerSet logStr = pushLogStr loggerSet (logStr <> "\n")
 
 -- | Flushing log messages in buffers.
 --   This function must be called explicitly when the program is
