@@ -15,16 +15,13 @@ Library
   GHC-Options:          -Wall
   Exposed-Modules:      Network.Wai.Logger
   Other-Modules:        Network.Wai.Logger.Apache
-                        Network.Wai.Logger.Date
                         Network.Wai.Logger.IP
                         Network.Wai.Logger.IORef
   Build-Depends:        base >= 4 && < 5
-                      , auto-update
                       , blaze-builder
                       , byteorder
                       , bytestring
                       , case-insensitive
-                      , easy-file >= 0.2
                       , fast-logger >= 2.2
                       , http-types
                       , network

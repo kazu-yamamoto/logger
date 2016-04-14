@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -- |
 -- Formatting time is slow.
@@ -8,7 +9,8 @@ module System.Log.FastLogger.Date (
     TimeFormat
   , FormattedTime
   -- * Date cacher
-  , newTimeCacher
+  , newTimeCache
+  , simpleTimeCache
   ) where
 
 import Control.AutoUpdate (mkAutoUpdate, defaultUpdateSettings, updateAction)
@@ -55,7 +57,14 @@ formatDate fmt = formatUnixTime fmt . fromEpochTime
 ----------------------------------------------------------------
 
 -- |  Make 'IO' action which get cached formatted local time.
-newTimeCacher :: TimeFormat -> IO (IO FormattedTime)
-newTimeCacher fmt = mkAutoUpdate defaultUpdateSettings{
+-- Use this to avoid the cost of frequently time formatting by caching an
+-- auto updating formatted time, this cache update every 1 second.
+-- more detail in "Control.AutoUpdate"
+newTimeCache :: TimeFormat -> IO (IO FormattedTime)
+newTimeCache fmt = mkAutoUpdate defaultUpdateSettings{
         updateAction = getTime >>= formatDate fmt
     }
+
+-- | A simple time cache using format @"%d/%b/%Y:%T %z"@
+simpleTimeCache :: IO FormattedTime
+simpleTimeCache = newTimeCache "%d/%b/%Y:%T %z" >>= id

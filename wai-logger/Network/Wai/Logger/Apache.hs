@@ -24,7 +24,6 @@ import Data.Monoid (mappend)
 #endif
 import Network.HTTP.Types (Status, statusCode)
 import Network.Wai (Request(..))
-import Network.Wai.Logger.Date
 import Network.Wai.Logger.IP
 import System.Log.FastLogger
 
@@ -42,7 +41,7 @@ data IPAddrSource =
   | FromFallback
 
 -- | Apache style log format.
-apacheLogStr :: IPAddrSource -> ZonedDate -> Request -> Status -> Maybe Integer -> LogStr
+apacheLogStr :: IPAddrSource -> FormattedTime -> Request -> Status -> Maybe Integer -> LogStr
 apacheLogStr ipsrc tmstr req status msize =
       toLogStr (getSourceIP ipsrc req)
   <> " - - ["
