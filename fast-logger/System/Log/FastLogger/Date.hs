@@ -27,6 +27,7 @@ import System.Locale (defaultTimeLocale)
 import Data.UnixTime (formatUnixTime, fromEpochTime)
 import System.Posix (EpochTime, epochTime)
 #endif
+import System.IO.Unsafe (unsafePerformIO)
 
 ----------------------------------------------------------------
 
@@ -67,4 +68,5 @@ newTimeCache fmt = mkAutoUpdate defaultUpdateSettings{
 
 -- | A simple time cache using format @"%d/%b/%Y:%T %z"@
 simpleTimeCache :: IO FormattedTime
-simpleTimeCache = newTimeCache "%d/%b/%Y:%T %z" >>= id
+simpleTimeCache = unsafePerformIO $ newTimeCache "%d/%b/%Y:%T %z"
+{-# NOINLINE simpleTimeCache #-}
