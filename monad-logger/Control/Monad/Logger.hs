@@ -30,12 +30,15 @@ module Control.Monad.Logger
     , LogLevel(..)
     , LogSource
     -- * Re-export from fast-logger
-    , LogStr
-    , ToLogStr(..)
+    , module System.Log.FastLogger
+    , module System.Log.FastLogger.Date
+    , module System.Log.FastLogger.File
     -- * Helper transformer
     , LoggingT (..)
     , runStderrLoggingT
     , runStdoutLoggingT
+    , runFastLoggerLoggingT
+    , runTimedFastLoggerLoggingT
     , runChanLoggingT
     , unChanLoggingT
     , withChannelLogger
@@ -78,7 +81,9 @@ module Control.Monad.Logger
 
     -- * utilities for defining your own loggers
     , defaultLogStr
+    , defaultTimedLogStr
     , Loc (..)
+    , fileLocStr
     ) where
 
 #if WITH_TEMPLATE_HASKELL
@@ -133,6 +138,8 @@ import qualified Data.ByteString.Char8 as S8
 
 import Data.Monoid (mappend, mempty)
 import System.Log.FastLogger
+import System.Log.FastLogger.Date
+import System.Log.FastLogger.File
 import System.IO (Handle, stdout, stderr)
 
 import Control.Monad.Cont.Class   ( MonadCont (..) )
@@ -568,7 +575,7 @@ defaultLogStr loc src level msg =
         then "\n"
         else
             " @(" `mappend`
-            toLogStr (S8.pack fileLocStr) `mappend`
+            toLogStr (S8.pack (fileLocStr loc)) `mappend`
             ")\n")
 #else
     S8.concat
@@ -584,19 +591,67 @@ defaultLogStr loc src level msg =
             LS s -> encodeUtf8 $ pack s
             LB b -> b
         , S8.pack " @("
-        , encodeUtf8 $ pack fileLocStr
+        , encodeUtf8 $ pack (fileLocStr loc)
         , S8.pack ")\n"
         ]
 #endif
+
+-- taken from file-location package
+-- turn the TH Loc loaction information into a human readable string
+-- leaving out the loc_end parameter
+fileLocStr :: Loc -> String
+fileLocStr loc = (loc_package loc) ++ ':' : (loc_module loc) ++
+  ' ' : (loc_filename loc) ++ ':' : (line loc) ++ ':' : (char loc)
   where
-    -- taken from file-location package
-    -- turn the TH Loc loaction information into a human readable string
-    -- leaving out the loc_end parameter
-    fileLocStr = (loc_package loc) ++ ':' : (loc_module loc) ++
-      ' ' : (loc_filename loc) ++ ':' : (line loc) ++ ':' : (char loc)
-      where
-        line = show . fst . loc_start
-        char = show . snd . loc_start
+    line = show . fst . loc_start
+    char = show . snd . loc_start
+
+defaultTimedLogStr :: Loc
+              -> LogSource
+              -> LogLevel
+              -> LogStr
+              -> FormattedTime
+#if MIN_VERSION_fast_logger(0, 2, 0)
+              -> LogStr
+#else
+              -> S8.ByteString
+#endif
+defaultTimedLogStr loc src level msg time =
+#if MIN_VERSION_fast_logger(0, 2, 0)
+    "[" `mappend` defaultLogLevelStr level `mappend`
+    (if T.null src
+        then mempty
+        else "#" `mappend` toLogStr src) `mappend`
+    "] " `mappend` "[" `mappend` toLogStr time `mappend` "] " `mappend`
+    msg `mappend`
+    (if isDefaultLoc loc
+        then "\n"
+        else
+            " @(" `mappend`
+            toLogStr (S8.pack (fileLocStr loc)) `mappend`
+            ")\n")
+#else
+    S8.concat
+        [ S8.pack "["
+        , case level of
+            LevelOther t -> encodeUtf8 t
+            _ -> encodeUtf8 $ pack $ drop 5 $ show level
+        , if T.null src
+            then S8.empty
+            else encodeUtf8 $ '#' `T.cons` src
+        , S8.pack "] "
+        , S8.pack "["
+        , time
+        , S8.pack "] "
+        , case msg of
+            LS s -> encodeUtf8 $ pack s
+            LB b -> b
+        , S8.pack " @("
+        , encodeUtf8 $ pack (fileLocStr loc)
+        , S8.pack ")\n"
+        ]
+#endif
+
 {-
 defaultLogStrWithoutLoc ::
     LogSource -> LogLevel -> LogStr -> LogStr
@@ -665,6 +720,14 @@ withChannelLogger size action = LoggingT $ \logger -> do
 
     dumpLogs chan = liftIO $
         sequence_ =<< atomically (untilM (readTBChan chan) (isEmptyTBChan chan))
+
+-- | Run a block using a 'FastLogger'.
+runFastLoggerLoggingT :: MonadIO m => FastLogger -> LoggingT m a -> m a
+runFastLoggerLoggingT fl m = runLoggingT m $ \a b c d -> fl (defaultLogStr a b c d)
+
+-- | Run a block using a 'TimedFastLogger'.
+runTimedFastLoggerLoggingT :: MonadIO m => TimedFastLogger -> LoggingT m a -> m a
+runTimedFastLoggerLoggingT tfl m = runLoggingT m $ \a b c d -> tfl (defaultTimedLogStr a b c d)
 
 -- | Only log messages passing the given predicate function.
 --
@@ -758,3 +821,4 @@ logErrorNS src = logWithoutLoc src LevelError
 
 logOtherNS :: MonadLogger m => Text -> LogLevel -> Text -> m ()
 logOtherNS = logWithoutLoc
+
