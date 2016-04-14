@@ -15,6 +15,7 @@ Library
   GHC-Options:          -Wall
   Exposed-Modules:      System.Log.FastLogger
                         System.Log.FastLogger.File
+                        System.Log.FastLogger.Date
   Other-Modules:        System.Log.FastLogger.IO
                         System.Log.FastLogger.FileIO
                         System.Log.FastLogger.IORef
@@ -23,14 +24,20 @@ Library
   Build-Depends:        base >= 4.5 && < 5
                       , array
                       , auto-update >= 0.1.2
+                      , easy-file >= 0.2
                       , bytestring
                       , bytestring-builder
                       , directory
                       , filepath
                       , text
   if os(windows)
-    Build-Depends:
-                      Win32
+      Cpp-Options:      -DWINDOWS
+      Build-Depends:    time
+                      , Win32
+                      , old-locale
+  else
+      Build-Depends:    unix
+                      , unix-time >= 0.2.2
 
 Test-Suite spec
     Main-Is:         Spec.hs

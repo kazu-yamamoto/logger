@@ -14,8 +14,8 @@ data FileLogSpec = FileLogSpec {
   }
 
 -- | Checking if a log file can be written.
-check :: FileLogSpec -> IO ()
-check spec = do
+check :: FilePath -> IO ()
+check file = do
     dirExist <- doesDirectoryExist dir
     unless dirExist $ fail $ dir ++ " does not exist or is not a directory."
     dirPerm <- getPermissions dir
@@ -25,7 +25,6 @@ check spec = do
         perm <- getPermissions file
         unless (writable perm) $ fail $ file ++ " is not writable."
   where
-    file = log_file spec
     dir = takeDirectory file
 
 -- | Rotating log files.

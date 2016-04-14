@@ -1,7 +1,7 @@
 -- | This module provides a fast logging system which
 --   scales on multicore environments (i.e. +RTS -N\<x\>).
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE Safe #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module System.Log.FastLogger (
   -- * Creating a logger set
@@ -26,6 +26,17 @@ module System.Log.FastLogger (
   , pushLogStrLn
   -- * Flushing buffered log messages
   , flushLogStr
+  -- * FastLogger
+  , FastLogger
+  , TimedFastLogger
+  , LogType(..)
+  , newFastLogger
+  , withFastLogger
+  , newTimedFastLogger
+  , withTimedFastLogger
+  , simpleTimeFormat
+  -- * Date cache
+  , module System.Log.FastLogger.Date
   -- * File rotation
   , module System.Log.FastLogger.File
   ) where
@@ -34,16 +45,19 @@ module System.Log.FastLogger (
 import Control.Applicative ((<$>))
 #endif
 import Control.Debounce (mkDebounce, defaultDebounceSettings, debounceAction)
-import Control.Concurrent (getNumCapabilities, myThreadId, threadCapability, takeMVar)
+import Control.Concurrent (getNumCapabilities, myThreadId, threadCapability, takeMVar, MVar, newMVar, tryTakeMVar, putMVar)
+import Control.Exception (handle, SomeException(..), bracket)
 import Control.Monad (when, replicateM)
 import Data.Array (Array, listArray, (!), bounds)
 import Data.Maybe (isJust)
+import System.EasyFile (getFileSize)
 import System.Log.FastLogger.File
 import System.Log.FastLogger.IO
 import System.Log.FastLogger.FileIO
 import System.Log.FastLogger.IORef
 import System.Log.FastLogger.LogStr
 import System.Log.FastLogger.Logger
+import System.Log.FastLogger.Date
 
 ----------------------------------------------------------------
 
@@ -104,7 +118,7 @@ pushLogStr (LoggerSet _ fref arr flush) logmsg = do
 
 -- | Same as 'pushLogStr' but also appends a newline.
 pushLogStrLn :: LoggerSet -> LogStr -> IO ()
-pushLogStrLn loggerSet logStr = pushLogStr loggerSet (logStr <> toLogStr "\n")
+pushLogStrLn loggerSet logStr = pushLogStr loggerSet (logStr <> "\n")
 
 -- | Flushing log messages in buffers.
 --   This function must be called explicitly when the program is
@@ -150,3 +164,125 @@ rmLoggerSet (LoggerSet mfile fref arr _) = do
     freeIt i = do
         let (Logger mbuf _ _) = arr ! i
         takeMVar mbuf >>= freeBuffer
+
+----------------------------------------------------------------
+
+-- | 'FastLogger' simply log 'logStr'.
+type FastLogger = LogStr -> IO ()
+-- | 'TimedFastLogger' pass 'FormattedTime' to callback and simply log its result.
+-- this can be used to customize how to log timestamp.
+type TimedFastLogger = (FormattedTime -> LogStr) -> IO ()
+
+-- | Logger Type.
+data LogType
+    = LogNone                     -- ^ No logging.
+    | LogStdout BufSize           -- ^ Logging to stdout.
+                                  --   'BufSize' is a buffer size
+    | LogStderr BufSize           -- ^ Logging to stdout.
+                                  --   'BufSize' is a buffer size
+                                  --   for each capability.
+    | LogFile FilePath BufSize    -- ^ Logging to a file.
+                                  --   'BufSize' is a buffer size
+                                  --   for each capability.
+    | LogFileAutoRotate FileLogSpec BufSize -- ^ Logging to a file.
+                                  --   'BufSize' is a buffer size
+                                  --   for each capability.
+                                  --   File rotation is done on-demand.
+    | LogCallback (LogStr -> IO ()) (IO ()) -- ^ Logging with a log and flush action.
+                                               -- run flush after log each message.
+
+-- | Initialize a 'FastLogger' without attaching timestamp
+-- a tuple of logger and clean up action are returned.
+newFastLogger :: LogType -> IO (FastLogger, IO ())
+newFastLogger typ = case typ of
+    LogNone         -> return (const noOp, noOp)
+    LogStdout bsize -> newStdoutLoggerSet bsize >>= stdLoggerInit
+    LogStderr bsize -> newStderrLoggerSet bsize >>= stdLoggerInit
+    LogFile fp bsize ->  newFileLoggerSet bsize fp >>= stdLoggerInit
+    LogFileAutoRotate fspec bsize -> rotateLoggerInit fspec bsize
+    LogCallback cb flush -> return (\ str -> cb str >> flush, noOp )
+  where
+    stdLoggerInit lgrset = return (pushLogStr lgrset, noOp)
+    rotateLoggerInit fspec bsize = do
+        lgrset <- newFileLoggerSet bsize $ log_file fspec
+        ref <- newIORef (0 :: Int)
+        mvar <- newMVar ()
+        let logger str = do
+                cnt <- decrease ref
+                pushLogStr lgrset str
+                when (cnt <= 0) $ tryRotate lgrset fspec ref mvar
+        return (logger, rmLoggerSet lgrset)
+
+-- | 'bracket' version of 'newFastLogger'
+withFastLogger :: LogType -> (FastLogger -> IO a) -> IO ()
+withFastLogger typ log' = bracket (newFastLogger typ) (log' . fst) snd
+
+-- | Initialize a 'FastLogger' with timestamp attached to each message.
+-- a tuple of logger and clean up action are returned.
+newTimedFastLogger :: TimeFormat -> LogType -> IO (TimedFastLogger, IO ())
+newTimedFastLogger  _ LogNone = return (const noOp, noOp)
+newTimedFastLogger fmt typ = do
+    tgetter <- newTimeCacher fmt
+    case typ of
+        LogStdout bsize -> newStdoutLoggerSet bsize >>= stdLoggerInit tgetter
+        LogStderr bsize -> newStderrLoggerSet bsize >>= stdLoggerInit tgetter
+        LogFile fp bsize ->  newFileLoggerSet bsize fp >>= stdLoggerInit tgetter
+        LogFileAutoRotate fspec bsize -> rotateLoggerInit fspec bsize tgetter
+        LogCallback cb flush -> return (\ f -> tgetter >>= cb . f >> flush, noOp )
+  where
+    stdLoggerInit tgetter lgrset = return ( \f -> tgetter >>= pushLogStr lgrset . f, noOp)
+    rotateLoggerInit fspec bsize tgetter = do
+        lgrset <- newFileLoggerSet bsize $ log_file fspec
+        ref <- newIORef (0 :: Int)
+        mvar <- newMVar ()
+        let logger f = do
+                cnt <- decrease ref
+                t <- tgetter
+                pushLogStr lgrset (f t)
+                when (cnt <= 0) $ tryRotate lgrset fspec ref mvar
+        return (logger, rmLoggerSet lgrset)
+
+-- | 'bracket' version of 'newTimeFastLogger'
+withTimedFastLogger ::  TimeFormat -> LogType -> (TimedFastLogger -> IO a) -> IO ()
+withTimedFastLogger fmt typ log' = bracket (newTimedFastLogger fmt typ) (log' . fst) snd
+
+-- | A simple time format: @simpleTimeFormat = "%d/%b/%Y:%T %z"@
+simpleTimeFormat :: TimeFormat
+simpleTimeFormat = "%d/%b/%Y:%T %z"
+----------------------------------------------------------------
+
+noOp :: IO ()
+noOp = return ()
+
+decrease :: IORef Int -> IO Int
+decrease ref = atomicModifyIORef' ref (\x -> (x - 1, x - 1))
+
+tryRotate :: LoggerSet -> FileLogSpec -> IORef Int -> MVar () -> IO ()
+tryRotate lgrset spec ref mvar = bracket lock unlock rotateFiles
+  where
+    lock           = tryTakeMVar mvar
+    unlock Nothing = return ()
+    unlock _       = putMVar mvar ()
+    rotateFiles Nothing = return ()
+    rotateFiles _       = do
+        msiz <- getSize
+        case msiz of
+            -- A file is not available.
+            -- So, let's set a big value to the counter so that
+            -- this function is not called frequently.
+            Nothing -> writeIORef ref 1000000
+            Just siz
+                | siz > limit -> do
+                    rotate spec
+                    renewLoggerSet lgrset
+                    writeIORef ref $ estimate limit
+                | otherwise -> do
+                    writeIORef ref $ estimate (limit - siz)
+    file = log_file spec
+    limit = log_file_size spec
+    getSize = handle (\(SomeException _) -> return Nothing) $ do
+        -- The log file is locked by GHC.
+        -- We need to get its file size by the way not using locks.
+        Just . fromIntegral <$> getFileSize file
+    -- 200 is an ad-hoc value for the length of log line.
+    estimate x = fromInteger (x `div` 200)
