@@ -6,6 +6,7 @@ module System.Log.FastLogger.IORef (
      , newIORef
      , readIORef
      , atomicModifyIORef'
+     , writeIORef
      ) where
 
 import Data.IORef
