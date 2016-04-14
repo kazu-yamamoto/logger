@@ -34,7 +34,6 @@ module System.Log.FastLogger (
   , withFastLogger
   , newTimedFastLogger
   , withTimedFastLogger
-  , simpleTimeFormat
   -- * Date cache
   , module System.Log.FastLogger.Date
   -- * File rotation
@@ -219,19 +218,20 @@ withFastLogger typ log' = bracket (newFastLogger typ) (log' . fst) snd
 
 -- | Initialize a 'FastLogger' with timestamp attached to each message.
 -- a tuple of logger and clean up action are returned.
-newTimedFastLogger :: TimeFormat -> LogType -> IO (TimedFastLogger, IO ())
-newTimedFastLogger  _ LogNone = return (const noOp, noOp)
-newTimedFastLogger fmt typ = do
-    tgetter <- newTimeCacher fmt
-    case typ of
-        LogStdout bsize -> newStdoutLoggerSet bsize >>= stdLoggerInit tgetter
-        LogStderr bsize -> newStderrLoggerSet bsize >>= stdLoggerInit tgetter
-        LogFile fp bsize ->  newFileLoggerSet bsize fp >>= stdLoggerInit tgetter
-        LogFileAutoRotate fspec bsize -> rotateLoggerInit fspec bsize tgetter
-        LogCallback cb flush -> return (\ f -> tgetter >>= cb . f >> flush, noOp )
+newTimedFastLogger ::
+    (IO FormattedTime)    -- ^ How do we get 'FormattedTime'?
+                          -- "System.Log.FastLogger.Date" provide cached formatted time.
+    -> LogType -> IO (TimedFastLogger, IO ())
+newTimedFastLogger tgetter typ = case typ of
+    LogNone -> return (const noOp, noOp)
+    LogStdout bsize -> newStdoutLoggerSet bsize >>= stdLoggerInit
+    LogStderr bsize -> newStderrLoggerSet bsize >>= stdLoggerInit
+    LogFile fp bsize ->  newFileLoggerSet bsize fp >>= stdLoggerInit
+    LogFileAutoRotate fspec bsize -> rotateLoggerInit fspec bsize
+    LogCallback cb flush -> return (\ f -> tgetter >>= cb . f >> flush, noOp )
   where
-    stdLoggerInit tgetter lgrset = return ( \f -> tgetter >>= pushLogStr lgrset . f, noOp)
-    rotateLoggerInit fspec bsize tgetter = do
+    stdLoggerInit lgrset = return ( \f -> tgetter >>= pushLogStr lgrset . f, noOp)
+    rotateLoggerInit fspec bsize = do
         lgrset <- newFileLoggerSet bsize $ log_file fspec
         ref <- newIORef (0 :: Int)
         mvar <- newMVar ()
@@ -243,12 +243,9 @@ newTimedFastLogger fmt typ = do
         return (logger, rmLoggerSet lgrset)
 
 -- | 'bracket' version of 'newTimeFastLogger'
-withTimedFastLogger ::  TimeFormat -> LogType -> (TimedFastLogger -> IO a) -> IO ()
-withTimedFastLogger fmt typ log' = bracket (newTimedFastLogger fmt typ) (log' . fst) snd
+withTimedFastLogger :: (IO FormattedTime) -> LogType -> (TimedFastLogger -> IO a) -> IO ()
+withTimedFastLogger tgetter typ log' = bracket (newTimedFastLogger tgetter typ) (log' . fst) snd
 
--- | A simple time format: @simpleTimeFormat = "%d/%b/%Y:%T %z"@
-simpleTimeFormat :: TimeFormat
-simpleTimeFormat = "%d/%b/%Y:%T %z"
 ----------------------------------------------------------------
 
 noOp :: IO ()
@@ -286,3 +283,5 @@ tryRotate lgrset spec ref mvar = bracket lock unlock rotateFiles
         Just . fromIntegral <$> getFileSize file
     -- 200 is an ad-hoc value for the length of log line.
     estimate x = fromInteger (x `div` 200)
+
+
