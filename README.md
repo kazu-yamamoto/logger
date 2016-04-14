@@ -2,7 +2,7 @@ Efficient, versatile logging tools for Haskell.
 
 fast-logger
 -----------
-low-level and extremely fast logging tools
+low-level and extremely fast logging tools.
 All Haskell logging tools that log to a Handle or generate formatted dates should depend on these.
 
 monad-logger
