@@ -10,7 +10,8 @@ module System.Log.FastLogger.Date (
   , FormattedTime
   -- * Date cacher
   , newTimeCache
-  , simpleTimeCache
+  , simpleTimeFormat
+  , simpleTimeFormat'
   ) where
 
 import Control.AutoUpdate (mkAutoUpdate, defaultUpdateSettings, updateAction)
@@ -27,7 +28,6 @@ import System.Locale (defaultTimeLocale)
 import Data.UnixTime (formatUnixTime, fromEpochTime)
 import System.Posix (EpochTime, epochTime)
 #endif
-import System.IO.Unsafe (unsafePerformIO)
 
 ----------------------------------------------------------------
 
@@ -67,6 +67,9 @@ newTimeCache fmt = mkAutoUpdate defaultUpdateSettings{
     }
 
 -- | A simple time cache using format @"%d/%b/%Y:%T %z"@
-simpleTimeCache :: IO FormattedTime
-simpleTimeCache = unsafePerformIO $ newTimeCache "%d/%b/%Y:%T %z"
-{-# NOINLINE simpleTimeCache #-}
+simpleTimeFormat :: TimeFormat
+simpleTimeFormat = "%d/%b/%Y:%T %z"
+
+-- | A simple time cache using format @"%d-%b-%Y %T"@
+simpleTimeFormat' :: TimeFormat
+simpleTimeFormat' = "%d-%b-%Y %T"

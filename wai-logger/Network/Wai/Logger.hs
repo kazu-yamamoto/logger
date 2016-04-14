@@ -67,7 +67,8 @@ withStdoutLogger app = bracket setup teardown $ \(aplogger, _) ->
     app aplogger
   where
     setup = do
-        apf <- initLogger FromFallback (LogStdout 4096) simpleTimeCache
+        tgetter <- newTimeCache simpleTimeFormat
+        apf <- initLogger FromFallback (LogStdout 4096) tgetter
         let aplogger = apacheLogger apf
             remover = logRemover apf
         return (aplogger, remover)
@@ -118,4 +119,6 @@ apache cb ipsrc dateget req st mlen = do
 type ZonedDate = FormattedTime
 
 clockDateCacher :: IO (IO ZonedDate, IO ())
-clockDateCacher = return (simpleTimeCache, return ())
+clockDateCacher = do
+    tgetter <- newTimeCache simpleTimeFormat
+    return (tgetter, return ())
