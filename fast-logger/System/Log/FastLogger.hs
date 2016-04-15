@@ -197,11 +197,12 @@ newFastLogger typ = case typ of
     LogNone         -> return (const noOp, noOp)
     LogStdout bsize -> newStdoutLoggerSet bsize >>= stdLoggerInit
     LogStderr bsize -> newStderrLoggerSet bsize >>= stdLoggerInit
-    LogFile fp bsize ->  newFileLoggerSet bsize fp >>= stdLoggerInit
+    LogFile fp bsize ->  newFileLoggerSet bsize fp >>= fileLoggerInit
     LogFileAutoRotate fspec bsize -> rotateLoggerInit fspec bsize
     LogCallback cb flush -> return (\ str -> cb str >> flush, noOp )
   where
     stdLoggerInit lgrset = return (pushLogStr lgrset, noOp)
+    fileLoggerInit lgrset = return (pushLogStr lgrset, rmLoggerSet lgrset)
     rotateLoggerInit fspec bsize = do
         lgrset <- newFileLoggerSet bsize $ log_file fspec
         ref <- newIORef (0 :: Int)
@@ -213,8 +214,8 @@ newFastLogger typ = case typ of
         return (logger, rmLoggerSet lgrset)
 
 -- | 'bracket' version of 'newFastLogger'
-withFastLogger :: LogType -> (FastLogger -> IO a) -> IO ()
-withFastLogger typ log' = bracket (newFastLogger typ) (log' . fst) snd
+withFastLogger :: LogType -> (FastLogger -> IO a) -> IO a
+withFastLogger typ log' = bracket (newFastLogger typ) snd (log' . fst)
 
 -- | Initialize a 'FastLogger' with timestamp attached to each message.
 -- a tuple of logger and clean up action are returned.
@@ -226,11 +227,12 @@ newTimedFastLogger tgetter typ = case typ of
     LogNone -> return (const noOp, noOp)
     LogStdout bsize -> newStdoutLoggerSet bsize >>= stdLoggerInit
     LogStderr bsize -> newStderrLoggerSet bsize >>= stdLoggerInit
-    LogFile fp bsize ->  newFileLoggerSet bsize fp >>= stdLoggerInit
+    LogFile fp bsize ->  newFileLoggerSet bsize fp >>= fileLoggerInit
     LogFileAutoRotate fspec bsize -> rotateLoggerInit fspec bsize
     LogCallback cb flush -> return (\ f -> tgetter >>= cb . f >> flush, noOp )
   where
     stdLoggerInit lgrset = return ( \f -> tgetter >>= pushLogStr lgrset . f, noOp)
+    fileLoggerInit lgrset = return (\f -> tgetter >>= pushLogStr lgrset . f, rmLoggerSet lgrset)
     rotateLoggerInit fspec bsize = do
         lgrset <- newFileLoggerSet bsize $ log_file fspec
         ref <- newIORef (0 :: Int)
@@ -243,8 +245,8 @@ newTimedFastLogger tgetter typ = case typ of
         return (logger, rmLoggerSet lgrset)
 
 -- | 'bracket' version of 'newTimeFastLogger'
-withTimedFastLogger :: (IO FormattedTime) -> LogType -> (TimedFastLogger -> IO a) -> IO ()
-withTimedFastLogger tgetter typ log' = bracket (newTimedFastLogger tgetter typ) (log' . fst) snd
+withTimedFastLogger :: (IO FormattedTime) -> LogType -> (TimedFastLogger -> IO a) -> IO a
+withTimedFastLogger tgetter typ log' = bracket (newTimedFastLogger tgetter typ) snd (log' . fst)
 
 ----------------------------------------------------------------
 
