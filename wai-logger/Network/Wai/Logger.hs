@@ -96,7 +96,7 @@ data ApacheLoggerActions = ApacheLoggerActions {
 ----------------------------------------------------------------
 
 -- | Creating 'ApacheLogger' according to 'LogType'.
-initLogger :: IPAddrSource -> LogType -> (IO FormattedTime)
+initLogger :: IPAddrSource -> LogType -> IO FormattedTime
            -> IO ApacheLoggerActions
 initLogger ipsrc typ tgetter = do
     (fl, cleanUp) <- newFastLogger typ
@@ -113,7 +113,7 @@ logCheck (LogCallback _ _) = return ()
 
 ----------------------------------------------------------------
 
-apache :: (LogStr -> IO ()) -> IPAddrSource -> (IO FormattedTime) -> ApacheLogger
+apache :: (LogStr -> IO ()) -> IPAddrSource -> IO FormattedTime -> ApacheLogger
 apache cb ipsrc dateget req st mlen = do
     zdata <- dateget
     cb (apacheLogStr ipsrc zdata req st mlen)
