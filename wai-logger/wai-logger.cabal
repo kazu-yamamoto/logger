@@ -1,5 +1,5 @@
 Name:                   wai-logger
-Version:                2.2.5
+Version:                2.2.6
 Author:                 Kazu Yamamoto <kazu@iij.ad.jp>
 Maintainer:             Kazu Yamamoto <kazu@iij.ad.jp>
 License:                BSD3
@@ -22,7 +22,7 @@ Library
                       , byteorder
                       , bytestring
                       , case-insensitive
-                      , fast-logger >= 2.2
+                      , fast-logger >= 2.4.4
                       , http-types
                       , network
                       , wai >= 2.0.0
