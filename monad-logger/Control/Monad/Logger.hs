@@ -30,7 +30,15 @@ module Control.Monad.Logger
     , LogLevel(..)
     , LogSource
     -- * Re-export from fast-logger
-    , module System.Log.FastLogger
+    , LogStr
+    , ToLogStr(..)
+    , FastLogger
+    , TimedFastLogger
+    , LogType
+    , newFastLogger
+    , withFastLogger
+    , newTimedFastLogger
+    , withTimedFastLogger
     , module System.Log.FastLogger.Date
     , module System.Log.FastLogger.File
     -- * Helper transformer
