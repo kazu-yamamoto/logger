@@ -22,7 +22,7 @@ Library
                       , byteorder
                       , bytestring
                       , case-insensitive
-                      , fast-logger >= 2.4.4
+                      , fast-logger >= 2.4.5
                       , http-types
                       , network
                       , wai >= 2.0.0
