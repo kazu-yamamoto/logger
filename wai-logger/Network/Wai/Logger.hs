@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 -- | Apache style logger for WAI applications.
 --
 -- An example:
@@ -47,7 +49,9 @@ module Network.Wai.Logger (
   , clockDateCacher
   ) where
 
+#if __GLASGOW_HASKELL__ < 709
 import Control.Applicative ((<$>))
+#endif
 import Control.Exception (bracket)
 import Control.Monad (void)
 import Network.HTTP.Types (Status)
