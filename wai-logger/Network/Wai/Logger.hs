@@ -102,13 +102,13 @@ initLogger ipsrc typ tgetter = do
     (fl, cleanUp) <- newFastLogger typ
     return $ ApacheLoggerActions (apache fl ipsrc tgetter) (return ()) cleanUp
 
---- | Checking if a log file can be written if 'LogType' is 'LogFile'.
+--- | Checking if a log file can be written if 'LogType' is 'LogFileNoRotate' or 'LogFile'.
 logCheck :: LogType -> IO ()
 logCheck LogNone          = return ()
 logCheck (LogStdout _)    = return ()
 logCheck (LogStderr _)    = return ()
-logCheck (LogFile fp _)   = check fp
-logCheck (LogFileAutoRotate spec _) = check (log_file spec)
+logCheck (LogFileNoRotate fp _)  = check fp
+logCheck (LogFile spec _)        = check (log_file spec)
 logCheck (LogCallback _ _) = return ()
 
 ----------------------------------------------------------------

@@ -180,10 +180,11 @@ data LogType
     | LogStderr BufSize           -- ^ Logging to stdout.
                                   --   'BufSize' is a buffer size
                                   --   for each capability.
-    | LogFile FilePath BufSize    -- ^ Logging to a file.
+    | LogFileNoRotate FilePath BufSize
+                                  -- ^ Logging to a file.
                                   --   'BufSize' is a buffer size
                                   --   for each capability.
-    | LogFileAutoRotate FileLogSpec BufSize -- ^ Logging to a file.
+    | LogFile FileLogSpec BufSize -- ^ Logging to a file.
                                   --   'BufSize' is a buffer size
                                   --   for each capability.
                                   --   File rotation is done on-demand.
@@ -197,8 +198,8 @@ newFastLogger typ = case typ of
     LogNone         -> return (const noOp, noOp)
     LogStdout bsize -> newStdoutLoggerSet bsize >>= stdLoggerInit
     LogStderr bsize -> newStderrLoggerSet bsize >>= stdLoggerInit
-    LogFile fp bsize ->  newFileLoggerSet bsize fp >>= fileLoggerInit
-    LogFileAutoRotate fspec bsize -> rotateLoggerInit fspec bsize
+    LogFileNoRotate fp bsize ->  newFileLoggerSet bsize fp >>= fileLoggerInit
+    LogFile fspec bsize -> rotateLoggerInit fspec bsize
     LogCallback cb flush -> return (\ str -> cb str >> flush, noOp )
   where
     stdLoggerInit lgrset = return (pushLogStr lgrset, noOp)
@@ -227,8 +228,8 @@ newTimedFastLogger tgetter typ = case typ of
     LogNone -> return (const noOp, noOp)
     LogStdout bsize -> newStdoutLoggerSet bsize >>= stdLoggerInit
     LogStderr bsize -> newStderrLoggerSet bsize >>= stdLoggerInit
-    LogFile fp bsize ->  newFileLoggerSet bsize fp >>= fileLoggerInit
-    LogFileAutoRotate fspec bsize -> rotateLoggerInit fspec bsize
+    LogFileNoRotate fp bsize ->  newFileLoggerSet bsize fp >>= fileLoggerInit
+    LogFile fspec bsize -> rotateLoggerInit fspec bsize
     LogCallback cb flush -> return (\ f -> tgetter >>= cb . f >> flush, noOp )
   where
     stdLoggerInit lgrset = return ( \f -> tgetter >>= pushLogStr lgrset . f, noOp)
