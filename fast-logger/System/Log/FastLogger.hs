@@ -180,10 +180,11 @@ data LogType
     | LogStderr BufSize           -- ^ Logging to stdout.
                                   --   'BufSize' is a buffer size
                                   --   for each capability.
-    | LogFile FilePath BufSize    -- ^ Logging to a file.
+    | LogFileNoRotate FilePath BufSize
+                                  -- ^ Logging to a file.
                                   --   'BufSize' is a buffer size
                                   --   for each capability.
-    | LogFileAutoRotate FileLogSpec BufSize -- ^ Logging to a file.
+    | LogFile FileLogSpec BufSize -- ^ Logging to a file.
                                   --   'BufSize' is a buffer size
                                   --   for each capability.
                                   --   File rotation is done on-demand.
@@ -197,11 +198,12 @@ newFastLogger typ = case typ of
     LogNone         -> return (const noOp, noOp)
     LogStdout bsize -> newStdoutLoggerSet bsize >>= stdLoggerInit
     LogStderr bsize -> newStderrLoggerSet bsize >>= stdLoggerInit
-    LogFile fp bsize ->  newFileLoggerSet bsize fp >>= stdLoggerInit
-    LogFileAutoRotate fspec bsize -> rotateLoggerInit fspec bsize
+    LogFileNoRotate fp bsize ->  newFileLoggerSet bsize fp >>= fileLoggerInit
+    LogFile fspec bsize -> rotateLoggerInit fspec bsize
     LogCallback cb flush -> return (\ str -> cb str >> flush, noOp )
   where
     stdLoggerInit lgrset = return (pushLogStr lgrset, noOp)
+    fileLoggerInit lgrset = return (pushLogStr lgrset, rmLoggerSet lgrset)
     rotateLoggerInit fspec bsize = do
         lgrset <- newFileLoggerSet bsize $ log_file fspec
         ref <- newIORef (0 :: Int)
@@ -213,24 +215,25 @@ newFastLogger typ = case typ of
         return (logger, rmLoggerSet lgrset)
 
 -- | 'bracket' version of 'newFastLogger'
-withFastLogger :: LogType -> (FastLogger -> IO a) -> IO ()
-withFastLogger typ log' = bracket (newFastLogger typ) (log' . fst) snd
+withFastLogger :: LogType -> (FastLogger -> IO a) -> IO a
+withFastLogger typ log' = bracket (newFastLogger typ) snd (log' . fst)
 
 -- | Initialize a 'FastLogger' with timestamp attached to each message.
 -- a tuple of logger and clean up action are returned.
 newTimedFastLogger ::
-    (IO FormattedTime)    -- ^ How do we get 'FormattedTime'?
-                          -- "System.Log.FastLogger.Date" provide cached formatted time.
+    IO FormattedTime    -- ^ How do we get 'FormattedTime'?
+                        -- "System.Log.FastLogger.Date" provide cached formatted time.
     -> LogType -> IO (TimedFastLogger, IO ())
 newTimedFastLogger tgetter typ = case typ of
     LogNone -> return (const noOp, noOp)
     LogStdout bsize -> newStdoutLoggerSet bsize >>= stdLoggerInit
     LogStderr bsize -> newStderrLoggerSet bsize >>= stdLoggerInit
-    LogFile fp bsize ->  newFileLoggerSet bsize fp >>= stdLoggerInit
-    LogFileAutoRotate fspec bsize -> rotateLoggerInit fspec bsize
+    LogFileNoRotate fp bsize ->  newFileLoggerSet bsize fp >>= fileLoggerInit
+    LogFile fspec bsize -> rotateLoggerInit fspec bsize
     LogCallback cb flush -> return (\ f -> tgetter >>= cb . f >> flush, noOp )
   where
     stdLoggerInit lgrset = return ( \f -> tgetter >>= pushLogStr lgrset . f, noOp)
+    fileLoggerInit lgrset = return (\f -> tgetter >>= pushLogStr lgrset . f, rmLoggerSet lgrset)
     rotateLoggerInit fspec bsize = do
         lgrset <- newFileLoggerSet bsize $ log_file fspec
         ref <- newIORef (0 :: Int)
@@ -243,8 +246,8 @@ newTimedFastLogger tgetter typ = case typ of
         return (logger, rmLoggerSet lgrset)
 
 -- | 'bracket' version of 'newTimeFastLogger'
-withTimedFastLogger :: (IO FormattedTime) -> LogType -> (TimedFastLogger -> IO a) -> IO ()
-withTimedFastLogger tgetter typ log' = bracket (newTimedFastLogger tgetter typ) (log' . fst) snd
+withTimedFastLogger :: (IO FormattedTime) -> LogType -> (TimedFastLogger -> IO a) -> IO a
+withTimedFastLogger tgetter typ log' = bracket (newTimedFastLogger tgetter typ) snd (log' . fst)
 
 ----------------------------------------------------------------
 
@@ -273,15 +276,13 @@ tryRotate lgrset spec ref mvar = bracket lock unlock rotateFiles
                     rotate spec
                     renewLoggerSet lgrset
                     writeIORef ref $ estimate limit
-                | otherwise -> do
+                | otherwise ->
                     writeIORef ref $ estimate (limit - siz)
     file = log_file spec
     limit = log_file_size spec
-    getSize = handle (\(SomeException _) -> return Nothing) $ do
+    getSize = handle (\(SomeException _) -> return Nothing) $
         -- The log file is locked by GHC.
         -- We need to get its file size by the way not using locks.
         Just . fromIntegral <$> getFileSize file
     -- 200 is an ad-hoc value for the length of log line.
     estimate x = fromInteger (x `div` 200)
-
-

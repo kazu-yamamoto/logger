@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 -- | Apache style logger for WAI applications.
 --
 -- An example:
@@ -47,7 +49,9 @@ module Network.Wai.Logger (
   , clockDateCacher
   ) where
 
+#if __GLASGOW_HASKELL__ < 709
 import Control.Applicative ((<$>))
+#endif
 import Control.Exception (bracket)
 import Control.Monad (void)
 import Network.HTTP.Types (Status)
@@ -92,24 +96,24 @@ data ApacheLoggerActions = ApacheLoggerActions {
 ----------------------------------------------------------------
 
 -- | Creating 'ApacheLogger' according to 'LogType'.
-initLogger :: IPAddrSource -> LogType -> (IO FormattedTime)
+initLogger :: IPAddrSource -> LogType -> IO FormattedTime
            -> IO ApacheLoggerActions
 initLogger ipsrc typ tgetter = do
     (fl, cleanUp) <- newFastLogger typ
     return $ ApacheLoggerActions (apache fl ipsrc tgetter) (return ()) cleanUp
 
---- | Checking if a log file can be written if 'LogType' is 'LogFile'.
+--- | Checking if a log file can be written if 'LogType' is 'LogFileNoRotate' or 'LogFile'.
 logCheck :: LogType -> IO ()
 logCheck LogNone          = return ()
 logCheck (LogStdout _)    = return ()
 logCheck (LogStderr _)    = return ()
-logCheck (LogFile fp _)   = check fp
-logCheck (LogFileAutoRotate spec _) = check (log_file spec)
+logCheck (LogFileNoRotate fp _)  = check fp
+logCheck (LogFile spec _)        = check (log_file spec)
 logCheck (LogCallback _ _) = return ()
 
 ----------------------------------------------------------------
 
-apache :: (LogStr -> IO ()) -> IPAddrSource -> (IO FormattedTime) -> ApacheLogger
+apache :: (LogStr -> IO ()) -> IPAddrSource -> IO FormattedTime -> ApacheLogger
 apache cb ipsrc dateget req st mlen = do
     zdata <- dateget
     cb (apacheLogStr ipsrc zdata req st mlen)

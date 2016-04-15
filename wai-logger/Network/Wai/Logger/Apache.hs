@@ -14,7 +14,6 @@ module Network.Wai.Logger.Apache (
 
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
-import Data.CaseInsensitive (CI)
 import Data.List (find)
 import Data.Maybe (fromMaybe)
 #if MIN_VERSION_base(4,5,0)
