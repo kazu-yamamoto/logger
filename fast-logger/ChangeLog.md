@@ -1,3 +1,8 @@
+## 2.4.4
+
+* New API: newFastLogger and ewTimedFastLogger.
+* LogType and date cache are transferred from wai-logger.
+
 ## 2.4.3
 
 * Opening files in the append mode on Windows.
