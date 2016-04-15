@@ -283,5 +283,3 @@ tryRotate lgrset spec ref mvar = bracket lock unlock rotateFiles
         Just . fromIntegral <$> getFileSize file
     -- 200 is an ad-hoc value for the length of log line.
     estimate x = fromInteger (x `div` 200)
-
-

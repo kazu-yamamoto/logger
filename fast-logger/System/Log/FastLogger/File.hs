@@ -40,4 +40,3 @@ rotate spec = mapM_ move srcdsts
     move (src,dst) = do
         exist <- doesFileExist src
         when exist $ renameFile src dst
-
