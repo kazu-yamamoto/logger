@@ -219,8 +219,8 @@ withFastLogger typ log' = bracket (newFastLogger typ) (log' . fst) snd
 -- | Initialize a 'FastLogger' with timestamp attached to each message.
 -- a tuple of logger and clean up action are returned.
 newTimedFastLogger ::
-    (IO FormattedTime)    -- ^ How do we get 'FormattedTime'?
-                          -- "System.Log.FastLogger.Date" provide cached formatted time.
+    IO FormattedTime    -- ^ How do we get 'FormattedTime'?
+                        -- "System.Log.FastLogger.Date" provide cached formatted time.
     -> LogType -> IO (TimedFastLogger, IO ())
 newTimedFastLogger tgetter typ = case typ of
     LogNone -> return (const noOp, noOp)
@@ -243,7 +243,7 @@ newTimedFastLogger tgetter typ = case typ of
         return (logger, rmLoggerSet lgrset)
 
 -- | 'bracket' version of 'newTimeFastLogger'
-withTimedFastLogger :: (IO FormattedTime) -> LogType -> (TimedFastLogger -> IO a) -> IO ()
+withTimedFastLogger :: IO FormattedTime -> LogType -> (TimedFastLogger -> IO a) -> IO ()
 withTimedFastLogger tgetter typ log' = bracket (newTimedFastLogger tgetter typ) (log' . fst) snd
 
 ----------------------------------------------------------------
@@ -273,11 +273,11 @@ tryRotate lgrset spec ref mvar = bracket lock unlock rotateFiles
                     rotate spec
                     renewLoggerSet lgrset
                     writeIORef ref $ estimate limit
-                | otherwise -> do
+                | otherwise ->
                     writeIORef ref $ estimate (limit - siz)
     file = log_file spec
     limit = log_file_size spec
-    getSize = handle (\(SomeException _) -> return Nothing) $ do
+    getSize = handle (\(SomeException _) -> return Nothing) $
         -- The log file is locked by GHC.
         -- We need to get its file size by the way not using locks.
         Just . fromIntegral <$> getFileSize file
