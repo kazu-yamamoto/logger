@@ -45,8 +45,10 @@ module Network.Wai.Logger (
   , showSockAddr
   , logCheck
   -- * Backward compability
-  , ZonedDate
   , clockDateCacher
+  , ZonedDate
+  , DateCacheGetter
+  , DateCacheUpdater
   ) where
 
 #if __GLASGOW_HASKELL__ < 709
@@ -120,9 +122,23 @@ apache cb ipsrc dateget req st mlen = do
 
 ---------------------------------------------------------------
 
+-- | Getting cached 'ZonedDate'.
+type DateCacheGetter = IO ZonedDate
+
+-- | Updateing cached 'ZonedDate'. This should be called every second.
+--   See the source code of 'withStdoutLogger'.
+type DateCacheUpdater = IO ()
+
+-- | A type for zoned date.
 type ZonedDate = FormattedTime
 
-clockDateCacher :: IO (IO ZonedDate, IO ())
+-- |
+-- Returning 'DateCacheGetter' and 'DateCacheUpdater'.
+--
+-- Note: Since version 2.1.2, this function uses the auto-update package
+-- internally, and therefore the @DateCacheUpdater@ value returned need
+-- not be called. To wit, the return value is in fact an empty action.
+clockDateCacher :: IO (DateCacheGetter, DateCacheUpdater)
 clockDateCacher = do
     tgetter <- newTimeCache simpleTimeFormat
     return (tgetter, return ())
