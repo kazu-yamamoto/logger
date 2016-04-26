@@ -202,7 +202,7 @@ newFastLogger typ = case typ of
     LogFile fspec bsize -> rotateLoggerInit fspec bsize
     LogCallback cb flush -> return (\ str -> cb str >> flush, noOp )
   where
-    stdLoggerInit lgrset = return (pushLogStr lgrset, noOp)
+    stdLoggerInit lgrset = return (pushLogStr lgrset, rmLoggerSet lgrset)
     fileLoggerInit lgrset = return (pushLogStr lgrset, rmLoggerSet lgrset)
     rotateLoggerInit fspec bsize = do
         lgrset <- newFileLoggerSet bsize $ log_file fspec
@@ -232,7 +232,7 @@ newTimedFastLogger tgetter typ = case typ of
     LogFile fspec bsize -> rotateLoggerInit fspec bsize
     LogCallback cb flush -> return (\ f -> tgetter >>= cb . f >> flush, noOp )
   where
-    stdLoggerInit lgrset = return ( \f -> tgetter >>= pushLogStr lgrset . f, noOp)
+    stdLoggerInit lgrset = return ( \f -> tgetter >>= pushLogStr lgrset . f, rmLoggerSet lgrset)
     fileLoggerInit lgrset = return (\f -> tgetter >>= pushLogStr lgrset . f, rmLoggerSet lgrset)
     rotateLoggerInit fspec bsize = do
         lgrset <- newFileLoggerSet bsize $ log_file fspec
