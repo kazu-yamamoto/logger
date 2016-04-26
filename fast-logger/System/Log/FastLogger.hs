@@ -195,12 +195,12 @@ data LogType
 -- a tuple of logger and clean up action are returned.
 newFastLogger :: LogType -> IO (FastLogger, IO ())
 newFastLogger typ = case typ of
-    LogNone         -> return (const noOp, noOp)
-    LogStdout bsize -> newStdoutLoggerSet bsize >>= stdLoggerInit
-    LogStderr bsize -> newStderrLoggerSet bsize >>= stdLoggerInit
-    LogFileNoRotate fp bsize ->  newFileLoggerSet bsize fp >>= fileLoggerInit
-    LogFile fspec bsize -> rotateLoggerInit fspec bsize
-    LogCallback cb flush -> return (\ str -> cb str >> flush, noOp )
+    LogNone                  -> return (const noOp, noOp)
+    LogStdout bsize          -> newStdoutLoggerSet bsize >>= stdLoggerInit
+    LogStderr bsize          -> newStderrLoggerSet bsize >>= stdLoggerInit
+    LogFileNoRotate fp bsize -> newFileLoggerSet bsize fp >>= fileLoggerInit
+    LogFile fspec bsize      -> rotateLoggerInit fspec bsize
+    LogCallback cb flush     -> return (\str -> cb str >> flush, noOp)
   where
     stdLoggerInit lgrset = return (pushLogStr lgrset, rmLoggerSet lgrset)
     fileLoggerInit lgrset = return (pushLogStr lgrset, rmLoggerSet lgrset)
@@ -225,12 +225,12 @@ newTimedFastLogger ::
                         -- "System.Log.FastLogger.Date" provide cached formatted time.
     -> LogType -> IO (TimedFastLogger, IO ())
 newTimedFastLogger tgetter typ = case typ of
-    LogNone -> return (const noOp, noOp)
-    LogStdout bsize -> newStdoutLoggerSet bsize >>= stdLoggerInit
-    LogStderr bsize -> newStderrLoggerSet bsize >>= stdLoggerInit
-    LogFileNoRotate fp bsize ->  newFileLoggerSet bsize fp >>= fileLoggerInit
-    LogFile fspec bsize -> rotateLoggerInit fspec bsize
-    LogCallback cb flush -> return (\ f -> tgetter >>= cb . f >> flush, noOp )
+    LogNone                  -> return (const noOp, noOp)
+    LogStdout bsize          -> newStdoutLoggerSet bsize >>= stdLoggerInit
+    LogStderr bsize          -> newStderrLoggerSet bsize >>= stdLoggerInit
+    LogFileNoRotate fp bsize -> newFileLoggerSet bsize fp >>= fileLoggerInit
+    LogFile fspec bsize      -> rotateLoggerInit fspec bsize
+    LogCallback cb flush     -> return (\f -> tgetter >>= cb . f >> flush, noOp)
   where
     stdLoggerInit lgrset = return ( \f -> tgetter >>= pushLogStr lgrset . f, rmLoggerSet lgrset)
     fileLoggerInit lgrset = return (\f -> tgetter >>= pushLogStr lgrset . f, rmLoggerSet lgrset)
