@@ -246,7 +246,7 @@ newTimedFastLogger tgetter typ = case typ of
         return (logger, rmLoggerSet lgrset)
 
 -- | 'bracket' version of 'newTimeFastLogger'
-withTimedFastLogger :: (IO FormattedTime) -> LogType -> (TimedFastLogger -> IO a) -> IO a
+withTimedFastLogger :: IO FormattedTime -> LogType -> (TimedFastLogger -> IO a) -> IO a
 withTimedFastLogger tgetter typ log' = bracket (newTimedFastLogger tgetter typ) snd (log' . fst)
 
 ----------------------------------------------------------------
