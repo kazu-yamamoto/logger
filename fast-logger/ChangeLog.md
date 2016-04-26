@@ -1,3 +1,11 @@
+## 2.4.6
+
+* Ensuring that stdio is flushed. [#92](https://github.com/kazu-yamamoto/logger/pull/92)
+
+## 2.4.5
+
+* Bringing backward compatibility back.
+
 ## 2.4.4
 
 * New API: newFastLogger and ewTimedFastLogger.
