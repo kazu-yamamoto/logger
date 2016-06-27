@@ -1,5 +1,8 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DefaultSignatures #-}
+#if WITH_CALLSTACK
+{-# LANGUAGE ImplicitParams #-}
+#endif
 #if WITH_TEMPLATE_HASKELL
 {-# LANGUAGE TemplateHaskell #-}
 #endif
@@ -75,7 +78,14 @@ module Control.Monad.Logger
     , logWarnNS
     , logErrorNS
     , logOtherNS
-
+#if WITH_CALLSTACK
+    -- * Callstack logging
+    , logDebugCS
+    , logInfoCS
+    , logWarnCS
+    , logErrorCS
+    , logOtherCS
+#endif
     -- * utilities for defining your own loggers
     , defaultLogStr
     , Loc (..)
@@ -141,6 +151,10 @@ import Control.Monad.RWS.Class    ( MonadRWS )
 import Control.Monad.Reader.Class ( MonadReader (..) )
 import Control.Monad.State.Class  ( MonadState (..) )
 import Control.Monad.Writer.Class ( MonadWriter (..) )
+
+#if WITH_CALLSTACK
+import GHC.Stack as GHC
+#endif
 
 import Prelude hiding (catch)
 
@@ -758,3 +772,55 @@ logErrorNS src = logWithoutLoc src LevelError
 
 logOtherNS :: MonadLogger m => Text -> LogLevel -> Text -> m ()
 logOtherNS = logWithoutLoc
+
+#if WITH_CALLSTACK
+-- Callstack based logging
+
+mkLoggerLoc :: GHC.SrcLoc -> Loc
+mkLoggerLoc loc =
+  Loc { loc_filename = GHC.srcLocFile loc
+      , loc_package  = GHC.srcLocPackage loc
+      , loc_module   = GHC.srcLocModule loc
+      , loc_start    = ( GHC.srcLocStartLine loc
+                       , GHC.srcLocStartCol loc)
+      , loc_end      = ( GHC.srcLocEndLine loc
+                       , GHC.srcLocEndCol loc)
+      }
+
+locFromCS :: GHC.CallStack -> Loc
+locFromCS cs = case getCallStack cs of
+                 ((_, loc):_) -> mkLoggerLoc loc
+                 _            -> defaultLoc
+
+logCS :: (MonadLogger m, ToLogStr msg)
+      => GHC.CallStack
+      -> LogSource
+      -> LogLevel
+      -> msg
+      -> m ()
+logCS cs src lvl msg =
+  monadLoggerLog (locFromCS cs) src lvl msg
+
+-- | Logs a message with location given by 'CallStack'.
+-- See 'Control.Monad.Logger.CallStack' for more convenient
+-- functions for 'CallStack' based logging.
+logDebugCS :: MonadLogger m => GHC.CallStack -> Text -> m ()
+logDebugCS cs msg = logCS cs "" LevelDebug msg
+
+-- | See 'logDebugCS'
+logInfoCS :: MonadLogger m => GHC.CallStack -> Text -> m ()
+logInfoCS cs msg = logCS cs "" LevelInfo msg
+
+-- | See 'logDebugCS'
+logWarnCS :: MonadLogger m => GHC.CallStack -> Text -> m ()
+logWarnCS cs msg = logCS cs "" LevelWarn msg
+
+-- | See 'logDebugCS'
+logErrorCS :: MonadLogger m => GHC.CallStack -> Text -> m ()
+logErrorCS cs msg = logCS cs "" LevelError msg
+
+-- | See 'logDebugCS'
+logOtherCS :: MonadLogger m => GHC.CallStack -> LogLevel -> Text -> m ()
+logOtherCS cs lvl msg = logCS cs "" lvl msg
+
+#endif
