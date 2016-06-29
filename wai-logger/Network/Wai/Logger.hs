@@ -34,9 +34,11 @@ module Network.Wai.Logger (
   -- * High level functions
     ApacheLogger
   , withStdoutLogger
+  , ServerPushLogger
   -- * Creating a logger
   , ApacheLoggerActions
   , apacheLogger
+  , serverpushLogger
   , logRotator
   , logRemover
   , initLogger
@@ -59,7 +61,9 @@ import Control.Applicative ((<$>))
 #endif
 import Control.Exception (bracket)
 import Control.Monad (void)
+import Data.ByteString (ByteString)
 import Network.HTTP.Types (Status)
+import Network.Socket (SockAddr)
 import Network.Wai (Request)
 import System.Log.FastLogger
 
@@ -88,10 +92,15 @@ withStdoutLogger app = bracket setup teardown $ \(aplogger, _) ->
 -- | Apache style logger.
 type ApacheLogger = Request -> Status -> Maybe Integer -> IO ()
 
+-- | HTTP/2 server push logger in Apache style.
+type ServerPushLogger = SockAddr -> ByteString -> Integer -> ByteString -> Maybe ByteString -> IO ()
+
 -- | Function set of Apache style logger.
 data ApacheLoggerActions = ApacheLoggerActions {
     -- | The Apache logger.
     apacheLogger :: ApacheLogger
+    -- | The HTTP/2 server push logger.
+  , serverpushLogger :: ServerPushLogger
     -- | This is obsoleted. Rotation is done on-demand.
     --   So, this is now an empty action.
   , logRotator :: IO ()
@@ -107,7 +116,12 @@ initLogger :: IPAddrSource -> LogType -> IO FormattedTime
            -> IO ApacheLoggerActions
 initLogger ipsrc typ tgetter = do
     (fl, cleanUp) <- newFastLogger typ
-    return $ ApacheLoggerActions (apache fl ipsrc tgetter) (return ()) cleanUp
+    return $ ApacheLoggerActions {
+        apacheLogger     = apache fl ipsrc tgetter
+      , serverpushLogger = serverpush fl tgetter
+      , logRotator       = return ()
+      , logRemover       = cleanUp
+      }
 
 --- | Checking if a log file can be written if 'LogType' is 'LogFileNoRotate' or 'LogFile'.
 logCheck :: LogType -> IO ()
@@ -124,6 +138,11 @@ apache :: (LogStr -> IO ()) -> IPAddrSource -> IO FormattedTime -> ApacheLogger
 apache cb ipsrc dateget req st mlen = do
     zdata <- dateget
     cb (apacheLogStr ipsrc zdata req st mlen)
+
+serverpush :: (LogStr -> IO ()) -> IO FormattedTime -> ServerPushLogger
+serverpush cb dateget sa path size ref mua = do
+    zdata <- dateget
+    cb (serverpushLogStr zdata sa path size ref mua)
 
 ---------------------------------------------------------------
 
