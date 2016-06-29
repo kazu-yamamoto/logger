@@ -35,7 +35,10 @@ module Network.Wai.Logger (
     ApacheLogger
   , withStdoutLogger
   -- * Creating a logger
-  , ApacheLoggerActions(..)
+  , ApacheLoggerActions
+  , apacheLogger
+  , logRotator
+  , logRemover
   , initLogger
   -- * Types
   , IPAddrSource(..)
@@ -85,12 +88,14 @@ withStdoutLogger app = bracket setup teardown $ \(aplogger, _) ->
 -- | Apache style logger.
 type ApacheLogger = Request -> Status -> Maybe Integer -> IO ()
 
+-- | Function set of Apache style logger.
 data ApacheLoggerActions = ApacheLoggerActions {
+    -- | The Apache logger.
     apacheLogger :: ApacheLogger
     -- | This is obsoleted. Rotation is done on-demand.
     --   So, this is now an empty action.
   , logRotator :: IO ()
-    -- | Removing resources relating Apache logger.
+    -- | Removing resources relating to Apache logger.
     --   E.g. flushing and deallocating internal buffers.
   , logRemover :: IO ()
   }
