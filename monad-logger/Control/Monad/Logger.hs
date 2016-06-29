@@ -804,22 +804,32 @@ logCS cs src lvl msg =
 -- | Logs a message with location given by 'CallStack'.
 -- See 'Control.Monad.Logger.CallStack' for more convenient
 -- functions for 'CallStack' based logging.
+--
+-- @since 0.3.19
 logDebugCS :: MonadLogger m => GHC.CallStack -> Text -> m ()
 logDebugCS cs msg = logCS cs "" LevelDebug msg
 
 -- | See 'logDebugCS'
+--
+-- @since 0.3.19
 logInfoCS :: MonadLogger m => GHC.CallStack -> Text -> m ()
 logInfoCS cs msg = logCS cs "" LevelInfo msg
 
 -- | See 'logDebugCS'
+--
+-- @since 0.3.19
 logWarnCS :: MonadLogger m => GHC.CallStack -> Text -> m ()
 logWarnCS cs msg = logCS cs "" LevelWarn msg
 
 -- | See 'logDebugCS'
+--
+-- @since 0.3.19
 logErrorCS :: MonadLogger m => GHC.CallStack -> Text -> m ()
 logErrorCS cs msg = logCS cs "" LevelError msg
 
 -- | See 'logDebugCS'
+--
+-- @since 0.3.19
 logOtherCS :: MonadLogger m => GHC.CallStack -> LogLevel -> Text -> m ()
 logOtherCS cs lvl msg = logCS cs "" lvl msg
 

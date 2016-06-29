@@ -1,3 +1,7 @@
+## 0.3.19
+
+* Add CallStack-based functions and `Control.Monad.Logger.CallStack` module
+
 ## 0.3.18
 
 * Added logTHShow and logDebugSH, logInfoSH, etc. Accepts an argument of `Show a => a` instead of just `Text`.
