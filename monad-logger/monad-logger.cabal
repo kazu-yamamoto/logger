@@ -25,6 +25,7 @@ flag template_haskell {
 
 library
   exposed-modules:     Control.Monad.Logger
+
   build-depends:       base                >= 4         && < 5
                      , transformers
                      , transformers-compat >= 0.3
@@ -43,6 +44,11 @@ library
                      , bytestring
                      , blaze-builder
                      , exceptions
+
+  if impl(ghc >= 8.0.1)
+     cpp-options: -DWITH_CALLSTACK
+     exposed-modules:  Control.Monad.Logger.CallStack
+
   if flag(template_haskell)
      build-depends:     template-haskell
 
