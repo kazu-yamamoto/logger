@@ -23,7 +23,6 @@ import Data.Monoid ((<>))
 import Data.Monoid (mappend)
 #endif
 import Network.HTTP.Types (Status, statusCode)
-import Network.Socket (SockAddr)
 import Network.Wai (Request(..))
 import Network.Wai.Logger.IP
 import System.Log.FastLogger
@@ -75,15 +74,9 @@ apacheLogStr ipsrc tmstr req status msize =
 #endif
 
 -- | HTTP/2 Push log format in the Apache style.
-serverpushLogStr :: FormattedTime
-    -> SockAddr
-    -> ByteString -- ^ path
-    -> Integer -- ^ file size
-    -> ByteString -- ^ referer path
-    -> Maybe ByteString -- ^ user-agent
-    -> LogStr
-serverpushLogStr tmstr sa path size ref mua =
-      toLogStr (BS.pack (showSockAddr sa))
+serverpushLogStr :: IPAddrSource -> FormattedTime -> Request -> ByteString -> Integer -> LogStr
+serverpushLogStr ipsrc tmstr req path size =
+      toLogStr (getSourceIP ipsrc req)
   <> " - - ["
   <> toLogStr tmstr
   <> "] \"PUSH "
@@ -96,8 +89,14 @@ serverpushLogStr tmstr sa path size ref mua =
   <> toLogStr (fromMaybe "" mua)
   <> "\"\n"
   where
+    ref  = rawPathInfo req
 #if !MIN_VERSION_base(4,5,0)
     (<>) = mappend
+#endif
+#if MIN_VERSION_wai(3,2,0)
+    mua = requestHeaderUserAgent req
+#else
+    mua = lookup "user-agent" $ requestHeaders req
 #endif
 
 -- getSourceIP = getSourceIP fromString fromByteString

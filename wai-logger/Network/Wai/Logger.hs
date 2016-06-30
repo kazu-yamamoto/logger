@@ -63,7 +63,6 @@ import Control.Exception (bracket)
 import Control.Monad (void)
 import Data.ByteString (ByteString)
 import Network.HTTP.Types (Status)
-import Network.Socket (SockAddr)
 import Network.Wai (Request)
 import System.Log.FastLogger
 
@@ -93,7 +92,7 @@ withStdoutLogger app = bracket setup teardown $ \(aplogger, _) ->
 type ApacheLogger = Request -> Status -> Maybe Integer -> IO ()
 
 -- | HTTP/2 server push logger in Apache style.
-type ServerPushLogger = SockAddr -> ByteString -> Integer -> ByteString -> Maybe ByteString -> IO ()
+type ServerPushLogger = Request -> ByteString -> Integer -> IO ()
 
 -- | Function set of Apache style logger.
 data ApacheLoggerActions = ApacheLoggerActions {
@@ -118,7 +117,7 @@ initLogger ipsrc typ tgetter = do
     (fl, cleanUp) <- newFastLogger typ
     return $ ApacheLoggerActions {
         apacheLogger     = apache fl ipsrc tgetter
-      , serverpushLogger = serverpush fl tgetter
+      , serverpushLogger = serverpush fl ipsrc tgetter
       , logRotator       = return ()
       , logRemover       = cleanUp
       }
@@ -139,10 +138,10 @@ apache cb ipsrc dateget req st mlen = do
     zdata <- dateget
     cb (apacheLogStr ipsrc zdata req st mlen)
 
-serverpush :: (LogStr -> IO ()) -> IO FormattedTime -> ServerPushLogger
-serverpush cb dateget sa path size ref mua = do
+serverpush :: (LogStr -> IO ()) -> IPAddrSource -> IO FormattedTime -> ServerPushLogger
+serverpush cb ipsrc dateget req path size = do
     zdata <- dateget
-    cb (serverpushLogStr zdata sa path size ref mua)
+    cb (serverpushLogStr ipsrc zdata req path size)
 
 ---------------------------------------------------------------
 
