@@ -34,8 +34,13 @@ module Network.Wai.Logger (
   -- * High level functions
     ApacheLogger
   , withStdoutLogger
+  , ServerPushLogger
   -- * Creating a logger
-  , ApacheLoggerActions(..)
+  , ApacheLoggerActions
+  , apacheLogger
+  , serverpushLogger
+  , logRotator
+  , logRemover
   , initLogger
   -- * Types
   , IPAddrSource(..)
@@ -56,6 +61,7 @@ import Control.Applicative ((<$>))
 #endif
 import Control.Exception (bracket)
 import Control.Monad (void)
+import Data.ByteString (ByteString)
 import Network.HTTP.Types (Status)
 import Network.Wai (Request)
 import System.Log.FastLogger
@@ -85,12 +91,19 @@ withStdoutLogger app = bracket setup teardown $ \(aplogger, _) ->
 -- | Apache style logger.
 type ApacheLogger = Request -> Status -> Maybe Integer -> IO ()
 
+-- | HTTP/2 server push logger in Apache style.
+type ServerPushLogger = Request -> ByteString -> Integer -> IO ()
+
+-- | Function set of Apache style logger.
 data ApacheLoggerActions = ApacheLoggerActions {
+    -- | The Apache logger.
     apacheLogger :: ApacheLogger
+    -- | The HTTP/2 server push logger.
+  , serverpushLogger :: ServerPushLogger
     -- | This is obsoleted. Rotation is done on-demand.
     --   So, this is now an empty action.
   , logRotator :: IO ()
-    -- | Removing resources relating Apache logger.
+    -- | Removing resources relating to Apache logger.
     --   E.g. flushing and deallocating internal buffers.
   , logRemover :: IO ()
   }
@@ -102,7 +115,12 @@ initLogger :: IPAddrSource -> LogType -> IO FormattedTime
            -> IO ApacheLoggerActions
 initLogger ipsrc typ tgetter = do
     (fl, cleanUp) <- newFastLogger typ
-    return $ ApacheLoggerActions (apache fl ipsrc tgetter) (return ()) cleanUp
+    return $ ApacheLoggerActions {
+        apacheLogger     = apache fl ipsrc tgetter
+      , serverpushLogger = serverpush fl ipsrc tgetter
+      , logRotator       = return ()
+      , logRemover       = cleanUp
+      }
 
 --- | Checking if a log file can be written if 'LogType' is 'LogFileNoRotate' or 'LogFile'.
 logCheck :: LogType -> IO ()
@@ -119,6 +137,11 @@ apache :: (LogStr -> IO ()) -> IPAddrSource -> IO FormattedTime -> ApacheLogger
 apache cb ipsrc dateget req st mlen = do
     zdata <- dateget
     cb (apacheLogStr ipsrc zdata req st mlen)
+
+serverpush :: (LogStr -> IO ()) -> IPAddrSource -> IO FormattedTime -> ServerPushLogger
+serverpush cb ipsrc dateget req path size = do
+    zdata <- dateget
+    cb (serverpushLogStr ipsrc zdata req path size)
 
 ---------------------------------------------------------------
 

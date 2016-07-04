@@ -3,6 +3,7 @@
 module Network.Wai.Logger.Apache (
     IPAddrSource(..)
   , apacheLogStr
+  , serverpushLogStr
   ) where
 
 #ifndef MIN_VERSION_base
@@ -69,6 +70,32 @@ apacheLogStr ipsrc tmstr req status msize =
     mua = requestHeaderUserAgent req
 #else
     mr  = lookup "referer" $ requestHeaders req
+    mua = lookup "user-agent" $ requestHeaders req
+#endif
+
+-- | HTTP/2 Push log format in the Apache style.
+serverpushLogStr :: IPAddrSource -> FormattedTime -> Request -> ByteString -> Integer -> LogStr
+serverpushLogStr ipsrc tmstr req path size =
+      toLogStr (getSourceIP ipsrc req)
+  <> " - - ["
+  <> toLogStr tmstr
+  <> "] \"PUSH "
+  <> toLogStr path
+  <> " HTTP/2\" 200 "
+  <> toLogStr (show size)
+  <> " \""
+  <> toLogStr ref
+  <> "\" \""
+  <> toLogStr (fromMaybe "" mua)
+  <> "\"\n"
+  where
+    ref  = rawPathInfo req
+#if !MIN_VERSION_base(4,5,0)
+    (<>) = mappend
+#endif
+#if MIN_VERSION_wai(3,2,0)
+    mua = requestHeaderUserAgent req
+#else
     mua = lookup "user-agent" $ requestHeaders req
 #endif
 
