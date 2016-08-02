@@ -6,6 +6,7 @@ License:                BSD3
 License-File:           LICENSE
 Synopsis:               A fast logging system
 Description:            A fast logging system
+Homepage:               https://github.com/kazu-yamamoto/logger
 Category:               System
 Cabal-Version:          >= 1.8
 Build-Type:             Simple

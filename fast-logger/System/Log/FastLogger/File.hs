@@ -9,8 +9,8 @@ import System.FilePath (takeDirectory)
 -- | The spec for logging files
 data FileLogSpec = FileLogSpec {
     log_file :: FilePath
-  , log_file_size :: Integer
-  , log_backup_number :: Int
+  , log_file_size :: Integer -- ^ Max log file size (in bytes) before requiring rotation.
+  , log_backup_number :: Int -- ^ Max number of rotated log files to keep around before overwriting the oldest one.
   }
 
 -- | Checking if a log file can be written.
