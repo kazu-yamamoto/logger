@@ -73,6 +73,7 @@ module Control.Monad.Logger
     , logErrorN
     , logOtherN
     -- * Non-TH logging with source
+    , logWithoutLoc
     , logDebugNS
     , logInfoNS
     , logWarnNS
@@ -89,6 +90,7 @@ module Control.Monad.Logger
     -- * utilities for defining your own loggers
     , defaultLogStr
     , Loc (..)
+    , defaultLoc
     ) where
 
 #if WITH_TEMPLATE_HASKELL
