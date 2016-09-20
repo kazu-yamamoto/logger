@@ -10,6 +10,7 @@ module System.Log.FastLogger.Logger (
 
 import Control.Concurrent (MVar, newMVar, withMVar)
 import Control.Monad (when)
+import Foreign.Marshal.Alloc (allocaBytes)
 import Foreign.Ptr (plusPtr)
 import System.Log.FastLogger.FileIO
 import System.Log.FastLogger.IO
@@ -35,7 +36,13 @@ pushLog :: FD -> Logger -> LogStr -> IO ()
 pushLog fd logger@(Logger mbuf size ref) nlogmsg@(LogStr nlen nbuilder)
   | nlen > size = do
       flushLog fd logger
-      withMVar mbuf $ \buf -> toBufIOWith buf size (write fd) nbuilder
+
+      -- Make sure we have a large enough buffer to hold the entire
+      -- contents, thereby allowing for a single write system call and
+      -- avoiding interleaving. This does not address the possibility
+      -- of write not writing the entire buffer at once.
+      allocaBytes nlen $ \buf -> withMVar mbuf $ \_ ->
+        toBufIOWith buf nlen (write fd) nbuilder
   | otherwise = do
     mmsg <- atomicModifyIORef' ref checkBuf
     case mmsg of
