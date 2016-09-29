@@ -1,3 +1,7 @@
+## 2.4.7
+
+* Fixing interleaved log output when messages are larger than buffer size. [#103](https://github.com/kazu-yamamoto/logger/pull/103)
+
 ## 2.4.6
 
 * Ensuring that stdio is flushed. [#92](https://github.com/kazu-yamamoto/logger/pull/92)
