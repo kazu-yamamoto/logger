@@ -1,5 +1,5 @@
 name:                monad-logger
-version:             0.3.19
+version:             0.3.20
 synopsis:            A class of monads which can log messages.
 description:         Hackage documentation generation is not reliable. For up to date documentation, please see: <http://www.stackage.org/package/monad-logger>.
 homepage:            https://github.com/kazu-yamamoto/logger
