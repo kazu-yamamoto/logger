@@ -215,8 +215,8 @@ class (MonadLogger m, MonadIO m) => MonadLoggerIO m where
     --
     -- Since 0.3.10
     askLoggerIO :: m (Loc -> LogSource -> LogLevel -> LogStr -> IO ())
-    default askLoggerIO :: (Trans.MonadTrans t, MonadLogger (t m), MonadIO (t m))
-                        => t m (Loc -> LogSource -> LogLevel -> LogStr -> IO ())
+    default askLoggerIO :: (Trans.MonadTrans t, MonadLoggerIO n, m ~ t n)
+                        => m (Loc -> LogSource -> LogLevel -> LogStr -> IO ())
     askLoggerIO = Trans.lift askLoggerIO
 
 
