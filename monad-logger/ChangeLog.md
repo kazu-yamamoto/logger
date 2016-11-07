@@ -1,3 +1,7 @@
+## 0.3.20.1
+
+* Fix #106 by correcting the default signature for MonadLoggerIO [#108](https://github.com/kazu-yamamoto/logger/pull/108)
+
 ## 0.3.20
 
 * Generalize the type of `unChanLoggingT`
