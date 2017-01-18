@@ -24,6 +24,9 @@ import Data.Monoid (Monoid, mempty, mappend)
 #if MIN_VERSION_base(4,5,0)
 import Data.Monoid ((<>))
 #endif
+#if MIN_VERSION_base(4,9,0)
+import Data.Semigroup (Semigroup)
+#endif
 import Data.String (IsString(..))
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -51,6 +54,10 @@ fromBuilder = BS.concat . BL.toChunks . B.toLazyByteString
 
 -- | Log message builder. Use ('<>') to append two LogStr in O(1).
 data LogStr = LogStr !Int Builder
+
+#if MIN_VERSION_base(4,9,0)
+instance Semigroup LogStr
+#endif
 
 instance Monoid LogStr where
     mempty = LogStr 0 (toBuilder BS.empty)
