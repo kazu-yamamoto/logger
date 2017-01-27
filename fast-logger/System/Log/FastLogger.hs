@@ -1,5 +1,10 @@
 -- | This module provides a fast logging system which
 --   scales on multicore environments (i.e. +RTS -N\<x\>).
+--
+--   Note: This library does not guarantee correct ordering of log messages
+--   when program is run on more than one core thus users
+--   should rely more on message timestamps than on their order in the
+--   log.
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 

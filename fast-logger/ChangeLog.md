@@ -12,7 +12,7 @@
 
 ## 2.4.4
 
-* New API: newFastLogger and ewTimedFastLogger.
+* New API: newFastLogger and newTimedFastLogger.
 * LogType and date cache are transferred from wai-logger.
 
 ## 2.4.3

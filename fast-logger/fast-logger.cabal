@@ -27,10 +27,11 @@ Library
                       , auto-update >= 0.1.2
                       , easy-file >= 0.2
                       , bytestring
-                      , bytestring-builder
                       , directory
                       , filepath
                       , text
+  if impl(ghc < 7.8)
+      Build-Depends:    bytestring-builder
   if os(windows)
       Cpp-Options:      -DWINDOWS
       Build-Depends:    time
