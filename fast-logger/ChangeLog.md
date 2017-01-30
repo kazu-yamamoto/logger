@@ -1,3 +1,12 @@
+## 2.4.9
+
+* Fixing build on Windows. [#118](https://github.com/kazu-yamamoto/logger/pull/118)
+
+## 2.4.8
+
+* Add Semigroup instance to LogStr [#115](https://github.com/kazu-yamamoto/logger/pull/115)
+* Added note on log message ordering [#116](https://github.com/kazu-yamamoto/logger/pull/116)
+
 ## 2.4.7
 
 * Fixing interleaved log output when messages are larger than buffer size. [#103](https://github.com/kazu-yamamoto/logger/pull/103)
