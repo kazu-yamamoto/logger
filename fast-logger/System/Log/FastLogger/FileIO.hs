@@ -12,15 +12,11 @@ import Graphics.Win32.Misc (getStdHandle, sTD_OUTPUT_HANDLE, sTD_ERROR_HANDLE)
 import Data.Bits ((.|.))
 
 type FD = HANDLE
-#if !MIN_VERSION_Win32(2,3,1)
+#if !MIN_VERSION_Win32(2,4,0)
 -- This flag is not defined in System.Win32.File
 fILE_APPEND_DATA :: UINT
 fILE_APPEND_DATA = 0x0004
 #endif
-
--- This flag is not defined in System.Win32.File
-fILE_APPEND_DATA :: UINT
-fILE_APPEND_DATA = 0x0004
 
 closeFD :: FD -> IO ()
 closeFD = closeHandle
