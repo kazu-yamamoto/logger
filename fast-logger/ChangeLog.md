@@ -1,3 +1,7 @@
+## 2.4.10
+
+* Fix Windows build on GHC 7.8. [#121](https://github.com/kazu-yamamoto/logger/pull/121)
+
 ## 2.4.9
 
 * Fixing build on Windows. [#118](https://github.com/kazu-yamamoto/logger/pull/118)
