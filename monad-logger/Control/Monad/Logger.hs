@@ -200,8 +200,8 @@ type CharPos = (Int, Int)
 -- | A @Monad@ which has the ability to log messages in some manner.
 class Monad m => MonadLogger m where
     monadLoggerLog :: ToLogStr msg => Loc -> LogSource -> LogLevel -> msg -> m ()
-    default monadLoggerLog :: (Trans.MonadTrans t, MonadLogger (t m), ToLogStr msg)
-                           => Loc -> LogSource -> LogLevel -> msg -> t m ()
+    default monadLoggerLog :: (MonadLogger m', Trans.MonadTrans t, MonadLogger (t m'), ToLogStr msg, m ~ t m')
+                           => Loc -> LogSource -> LogLevel -> msg -> m ()
     monadLoggerLog loc src lvl msg = Trans.lift $ monadLoggerLog loc src lvl msg
 
 -- | An extension of @MonadLogger@ for the common case where the logging action
