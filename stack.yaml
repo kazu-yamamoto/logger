@@ -1,8 +1,6 @@
-resolver: lts-3.11
+resolver: lts-8.0
 packages:
 - monad-logger/
 - wai-logger/
 - date-cache/
 - fast-logger/
-extra-deps:
-- doctest-0.10.1
