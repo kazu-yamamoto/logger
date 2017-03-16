@@ -1,3 +1,7 @@
+## 0.3.21
+
+* Reimplemented Functor & Applicative for LoggingT & NoLoggingT [#125](https://github.com/kazu-yamamoto/logger/issues/125) [#126](https://github.com/kazu-yamamoto/logger/pull/126)
+
 ## 0.3.20.2
 
 * Support for GHC 8.2
