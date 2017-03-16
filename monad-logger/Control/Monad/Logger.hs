@@ -364,6 +364,14 @@ logOtherS = [|\src level msg -> monadLoggerLog $(qLocation >>= liftLoc) src (Lev
 -- Since 0.2.4
 newtype NoLoggingT m a = NoLoggingT { runNoLoggingT :: m a }
 
+#if __GLASGOW_HASKELL__ < 710
+instance Monad m => Functor (NoLoggingT m) where
+    fmap = liftM
+
+instance Monad m => Applicative (NoLoggingT m) where
+    pure = return
+    (<*>) = ap
+#else
 instance Functor m => Functor (NoLoggingT m) where
     fmap f = NoLoggingT . fmap f . runNoLoggingT
     {-# INLINE fmap #-}
@@ -373,6 +381,7 @@ instance Applicative m => Applicative (NoLoggingT m) where
     {-# INLINE pure #-}
     f <*> a = NoLoggingT (runNoLoggingT f <*> runNoLoggingT a)
     {-# INLINE (<*>) #-}
+#endif
 
 instance Monad m => Monad (NoLoggingT m) where
     return = NoLoggingT . return
@@ -455,6 +464,14 @@ instance MonadIO m => MonadLoggerIO (NoLoggingT m) where
 -- Since 0.2.2
 newtype LoggingT m a = LoggingT { runLoggingT :: (Loc -> LogSource -> LogLevel -> LogStr -> IO ()) -> m a }
 
+#if __GLASGOW_HASKELL__ < 710
+instance Monad m => Functor (LoggingT m) where
+    fmap = liftM
+
+instance Monad m => Applicative (LoggingT m) where
+    pure = return
+    (<*>) = ap
+#else
 instance Functor m => Functor (LoggingT m) where
     fmap f logger = LoggingT $ \loggerFn -> fmap f $ (runLoggingT logger) loggerFn
     {-# INLINE fmap #-}
@@ -466,6 +483,7 @@ instance Applicative m => Applicative (LoggingT m) where
                                        (runLoggingT loggerF) loggerFn
                                        <*> (runLoggingT loggerA) loggerFn
     {-# INLINE (<*>) #-}
+#endif
 
 instance Monad m => Monad (LoggingT m) where
     return = LoggingT . const . return
