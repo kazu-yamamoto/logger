@@ -364,12 +364,15 @@ logOtherS = [|\src level msg -> monadLoggerLog $(qLocation >>= liftLoc) src (Lev
 -- Since 0.2.4
 newtype NoLoggingT m a = NoLoggingT { runNoLoggingT :: m a }
 
-instance Monad m => Functor (NoLoggingT m) where
-    fmap = liftM
+instance Functor m => Functor (NoLoggingT m) where
+    fmap f = NoLoggingT . fmap f . runNoLoggingT
+    {-# INLINE fmap #-}
 
-instance Monad m => Applicative (NoLoggingT m) where
-    pure = return
-    (<*>) = ap
+instance Applicative m => Applicative (NoLoggingT m) where
+    pure = NoLoggingT . pure
+    {-# INLINE pure #-}
+    f <*> a = NoLoggingT (runNoLoggingT f <*> runNoLoggingT a)
+    {-# INLINE (<*>) #-}
 
 instance Monad m => Monad (NoLoggingT m) where
     return = NoLoggingT . return
@@ -452,12 +455,17 @@ instance MonadIO m => MonadLoggerIO (NoLoggingT m) where
 -- Since 0.2.2
 newtype LoggingT m a = LoggingT { runLoggingT :: (Loc -> LogSource -> LogLevel -> LogStr -> IO ()) -> m a }
 
-instance Monad m => Functor (LoggingT m) where
-    fmap = liftM
+instance Functor m => Functor (LoggingT m) where
+    fmap f logger = LoggingT $ \loggerFn -> fmap f $ (runLoggingT logger) loggerFn
+    {-# INLINE fmap #-}
 
-instance Monad m => Applicative (LoggingT m) where
-    pure = return
-    (<*>) = ap
+instance Applicative m => Applicative (LoggingT m) where
+    pure = LoggingT . const . pure
+    {-# INLINE pure #-}
+    loggerF <*> loggerA = LoggingT $ \loggerFn ->
+                                       (runLoggingT loggerF) loggerFn
+                                       <*> (runLoggingT loggerA) loggerFn
+    {-# INLINE (<*>) #-}
 
 instance Monad m => Monad (LoggingT m) where
     return = LoggingT . const . return
