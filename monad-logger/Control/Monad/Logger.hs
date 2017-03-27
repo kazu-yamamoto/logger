@@ -653,7 +653,7 @@ defaultLogStrWithoutLoc loc src level msg =
 
 -- | Run a block using a @MonadLogger@ instance which appends to the specified file.
 --
--- Since 0.3.22
+-- @since 0.3.22
 runFileLoggingT :: MonadBaseControl IO m => FilePath -> LoggingT m a -> m a
 runFileLoggingT fp log = bracket
     (liftBase $ openFile fp AppendMode)
