@@ -40,6 +40,7 @@ module Control.Monad.Logger
     , runStderrLoggingT
     , runStdoutLoggingT
     , runChanLoggingT
+    , runFileLoggingT
     , unChanLoggingT
     , withChannelLogger
     , filterLogger
@@ -101,7 +102,7 @@ import Control.Applicative (Applicative (..))
 import Control.Concurrent.Chan (Chan(),writeChan,readChan)
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TBChan
-import Control.Exception.Lifted (onException)
+import Control.Exception.Lifted (onException, bracket)
 import Control.Monad (liftM, ap, when, void, forever)
 import Control.Monad.Base (MonadBase (liftBase))
 import Control.Monad.Loops (untilM)
@@ -143,7 +144,7 @@ import qualified Data.ByteString.Char8 as S8
 
 import Data.Monoid (mappend, mempty)
 import System.Log.FastLogger
-import System.IO (Handle, stdout, stderr)
+import System.IO (Handle, IOMode(AppendMode), openFile, hClose, stdout, stderr)
 
 import Control.Monad.Cont.Class   ( MonadCont (..) )
 import Control.Monad.Error.Class  ( MonadError (..) )
@@ -649,6 +650,15 @@ defaultLogStrWithoutLoc loc src level msg =
     msg `mappend` "\n"
 -}
 
+
+-- | Run a block using a @MonadLogger@ instance which appends to the specified file.
+--
+-- Since 0.3.22
+runFileLoggingT :: MonadBaseControl IO m => FilePath -> LoggingT m a -> m a
+runFileLoggingT fp log = bracket
+    (liftBase $ openFile fp AppendMode)
+    (liftBase . hClose)
+    $ \h -> (runLoggingT log) (defaultOutput h)
 
 -- | Run a block using a @MonadLogger@ instance which prints to stderr.
 --
