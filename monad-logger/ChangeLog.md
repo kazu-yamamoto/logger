@@ -1,3 +1,6 @@
+## 0.3.22
+* Added `runFileLoggingT`.
+
 ## 0.3.21
 
 * Reimplemented Functor & Applicative for LoggingT & NoLoggingT [#125](https://github.com/kazu-yamamoto/logger/issues/125) [#126](https://github.com/kazu-yamamoto/logger/pull/126)
