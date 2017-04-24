@@ -4,3 +4,4 @@ packages:
 - wai-logger/
 - date-cache/
 - fast-logger/
+- monad-logger-json/

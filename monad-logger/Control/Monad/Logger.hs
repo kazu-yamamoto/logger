@@ -90,6 +90,7 @@ module Control.Monad.Logger
     -- * utilities for defining your own loggers
     , defaultLogStr
     , Loc (..)
+    , isDefaultLoc
     ) where
 
 #if WITH_TEMPLATE_HASKELL

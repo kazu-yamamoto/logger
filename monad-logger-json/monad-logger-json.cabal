@@ -1,0 +1,24 @@
+name:                monad-logger-json
+version:             0.1.0.0
+synopsis:            json output for monad-logger
+description:         json output for monad-logger
+homepage:            https://github.com/kazu-yamomoto/logger
+license:             MIT
+license-file:        LICENSE
+author:              Greg Weber
+maintainer:          greg@gregweber.info
+category:            System
+build-type:          Simple
+extra-source-files:  README.md
+cabal-version:       >=1.10
+
+library
+  default-language:    Haskell2010
+  exposed-modules:     Control.Monad.Logger.Json
+  ghc-options:        -Wall
+  build-depends:       base >=4.6 && < 5
+                     , monad-logger >= 0.3.4.0
+                     , fast-logger >= 2.1
+                     , aeson >= 1.0.0.0
+                     , text
+                     , bytestring
