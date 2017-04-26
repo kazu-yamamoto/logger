@@ -144,7 +144,7 @@ import qualified Data.ByteString.Char8 as S8
 
 import Data.Monoid (mappend, mempty)
 import System.Log.FastLogger
-import System.IO (Handle, IOMode(AppendMode), openFile, hClose, stdout, stderr)
+import System.IO (Handle, IOMode(AppendMode), BufferMode(LineBuffering), openFile, hClose, hSetBuffering, stdout, stderr)
 
 import Control.Monad.Cont.Class   ( MonadCont (..) )
 import Control.Monad.Error.Class  ( MonadError (..) )
@@ -658,7 +658,7 @@ runFileLoggingT :: MonadBaseControl IO m => FilePath -> LoggingT m a -> m a
 runFileLoggingT fp log = bracket
     (liftBase $ openFile fp AppendMode)
     (liftBase . hClose)
-    $ \h -> (runLoggingT log) (defaultOutput h)
+    $ \h -> liftBase (hSetBuffering h LineBuffering) >> (runLoggingT log) (defaultOutput h)
 
 -- | Run a block using a @MonadLogger@ instance which prints to stderr.
 --

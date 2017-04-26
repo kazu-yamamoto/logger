@@ -1,3 +1,6 @@
+## 0.3.23
+* Changed `runFileLoggingT` buffering to line buffering.
+
 ## 0.3.22
 * Added `runFileLoggingT`.
 
