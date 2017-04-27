@@ -1,5 +1,6 @@
 ## 0.3.23
 * Changed `runFileLoggingT` buffering to line buffering.
+* Added `defaultLog` and `logWithoutLoc` to list of exported functions.
 
 ## 0.3.22
 * Added `runFileLoggingT`.

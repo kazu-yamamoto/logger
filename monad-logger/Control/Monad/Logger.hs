@@ -771,6 +771,9 @@ instance MonadWriter w m => MonadWriter w (NoLoggingT m) where
     listen = mapNoLoggingT listen
     pass   = mapNoLoggingT pass
 
+-- | dummy location, used with 'logWithoutLoc'
+--
+-- @since 0.3.23
 defaultLoc :: Loc
 defaultLoc = Loc "<unknown>" "<unknown>" "<unknown>" (0,0) (0,0)
 
@@ -778,6 +781,9 @@ isDefaultLoc :: Loc -> Bool
 isDefaultLoc (Loc "<unknown>" "<unknown>" "<unknown>" (0,0) (0,0)) = True
 isDefaultLoc _ = False
 
+-- |
+--
+-- @since 0.3.23
 logWithoutLoc :: (MonadLogger m, ToLogStr msg) => LogSource -> LogLevel -> msg -> m ()
 logWithoutLoc = monadLoggerLog defaultLoc
 
