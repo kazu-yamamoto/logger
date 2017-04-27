@@ -74,6 +74,7 @@ module Control.Monad.Logger
     , logErrorN
     , logOtherN
     -- * Non-TH logging with source
+    , logWithoutLoc
     , logDebugNS
     , logInfoNS
     , logWarnNS
@@ -90,6 +91,7 @@ module Control.Monad.Logger
     -- * utilities for defining your own loggers
     , defaultLogStr
     , Loc (..)
+    , defaultLoc
     ) where
 
 #if WITH_TEMPLATE_HASKELL
@@ -210,11 +212,11 @@ class Monad m => MonadLogger m where
 -- logging function itself can be extracted as a first-class value, which can
 -- make it easier to manipulate monad transformer stacks, as an example.
 --
--- Since 0.3.10
+-- @since 0.3.10
 class (MonadLogger m, MonadIO m) => MonadLoggerIO m where
     -- | Request the logging function itself.
     --
-    -- Since 0.3.10
+    -- @since 0.3.10
     askLoggerIO :: m (Loc -> LogSource -> LogLevel -> LogStr -> IO ())
     default askLoggerIO :: (Trans.MonadTrans t, MonadLoggerIO n, m ~ t n)
                         => m (Loc -> LogSource -> LogLevel -> LogStr -> IO ())
@@ -327,7 +329,7 @@ logOtherSH = logTHShow . LevelOther
 
 -- | Lift a location into an Exp.
 --
--- Since 0.3.1
+-- @since 0.3.1
 liftLoc :: Loc -> Q Exp
 liftLoc (Loc a b c (d1, d2) (e1, e2)) = [|Loc
     $(lift a)
@@ -362,7 +364,7 @@ logOtherS = [|\src level msg -> monadLoggerLog $(qLocation >>= liftLoc) src (Lev
 
 -- | Monad transformer that disables logging.
 --
--- Since 0.2.4
+-- @since 0.2.4
 newtype NoLoggingT m a = NoLoggingT { runNoLoggingT :: m a }
 
 #if __GLASGOW_HASKELL__ < 710
@@ -462,7 +464,7 @@ instance MonadIO m => MonadLoggerIO (NoLoggingT m) where
 
 -- | Monad transformer that adds a new logging function.
 --
--- Since 0.2.2
+-- @since 0.2.2
 newtype LoggingT m a = LoggingT { runLoggingT :: (Loc -> LogSource -> LogLevel -> LogStr -> IO ()) -> m a }
 
 #if __GLASGOW_HASKELL__ < 710
@@ -662,13 +664,13 @@ runFileLoggingT fp log = bracket
 
 -- | Run a block using a @MonadLogger@ instance which prints to stderr.
 --
--- Since 0.2.2
+-- @since 0.2.2
 runStderrLoggingT :: MonadIO m => LoggingT m a -> m a
 runStderrLoggingT = (`runLoggingT` defaultOutput stderr)
 
 -- | Run a block using a @MonadLogger@ instance which prints to stdout.
 --
--- Since 0.2.2
+-- @since 0.2.2
 runStdoutLoggingT :: MonadIO m => LoggingT m a -> m a
 runStdoutLoggingT = (`runLoggingT` defaultOutput stdout)
 
@@ -699,7 +701,7 @@ unChanLoggingT chan = forever $ do
 --   channel of the indicated size, and only actually log them if there is an
 --   exception.
 --
--- Since 0.3.2
+-- @since 0.3.2
 withChannelLogger :: (MonadBaseControl IO m, MonadIO m)
                   => Int         -- ^ Number of messages to keep
                   -> LoggingT m a
@@ -720,7 +722,7 @@ withChannelLogger size action = LoggingT $ \logger -> do
 --
 -- This can be a convenient way, for example, to ignore debug level messages.
 --
--- Since 0.3.13
+-- @since 0.3.13
 filterLogger :: (LogSource -> LogLevel -> Bool)
              -> LoggingT m a
              -> LoggingT m a
@@ -769,6 +771,9 @@ instance MonadWriter w m => MonadWriter w (NoLoggingT m) where
     listen = mapNoLoggingT listen
     pass   = mapNoLoggingT pass
 
+-- | dummy location, used with 'logWithoutLoc'
+--
+-- @since 0.3.23
 defaultLoc :: Loc
 defaultLoc = Loc "<unknown>" "<unknown>" "<unknown>" (0,0) (0,0)
 
@@ -776,6 +781,9 @@ isDefaultLoc :: Loc -> Bool
 isDefaultLoc (Loc "<unknown>" "<unknown>" "<unknown>" (0,0) (0,0)) = True
 isDefaultLoc _ = False
 
+-- |
+--
+-- @since 0.3.23
 logWithoutLoc :: (MonadLogger m, ToLogStr msg) => LogSource -> LogLevel -> msg -> m ()
 logWithoutLoc = monadLoggerLog defaultLoc
 
