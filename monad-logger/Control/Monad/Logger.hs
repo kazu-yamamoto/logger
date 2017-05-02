@@ -747,6 +747,10 @@ instance MonadReader r m => MonadReader r (LoggingT m) where
   ask = Trans.lift ask
   local = mapLoggingT . local
 
+instance MonadReader r m => MonadReader r (NoLoggingT m) where
+  ask = Trans.lift ask
+  local = mapNoLoggingT . local
+
 mapLoggingT :: (m a -> n b) -> LoggingT m a -> LoggingT n b
 mapLoggingT f = LoggingT . (f .) . runLoggingT
 
