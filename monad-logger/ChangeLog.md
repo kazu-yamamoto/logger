@@ -1,3 +1,6 @@
+## 0.3.24
+* Added `MonadReader` instance for `NoLoggingT`.
+
 ## 0.3.23
 * Changed `runFileLoggingT` buffering to line buffering.
 * Added `defaultLog` and `logWithoutLoc` to list of exported functions.
