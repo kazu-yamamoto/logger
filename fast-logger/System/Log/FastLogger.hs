@@ -182,7 +182,8 @@ data LogType
     = LogNone                     -- ^ No logging.
     | LogStdout BufSize           -- ^ Logging to stdout.
                                   --   'BufSize' is a buffer size
-    | LogStderr BufSize           -- ^ Logging to stdout.
+                                  --   for each capability.
+    | LogStderr BufSize           -- ^ Logging to stderr.
                                   --   'BufSize' is a buffer size
                                   --   for each capability.
     | LogFileNoRotate FilePath BufSize
