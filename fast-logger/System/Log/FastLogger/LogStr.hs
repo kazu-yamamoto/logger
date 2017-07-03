@@ -82,6 +82,12 @@ instance ToLogStr T.Text where
 instance ToLogStr TL.Text where
     toLogStr = toLogStr . TL.encodeUtf8
 
+instance Show LogStr where
+  show = show . T.decodeUtf8 . fromLogStr
+
+instance Eq LogStr where
+  a == b = fromLogStr a == fromLogStr b
+
 -- | Obtaining the length of 'LogStr'.
 logStrLength :: LogStr -> Int
 logStrLength (LogStr n _) = n
