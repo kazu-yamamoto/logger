@@ -47,6 +47,7 @@ Test-Suite spec
     Type:            exitcode-stdio-1.0
 
     Ghc-Options:     -Wall -threaded
+    Other-Modules:   FastLoggerSpec
     Build-Depends:   base >= 4 && < 5
                    , bytestring
                    , directory
