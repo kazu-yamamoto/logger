@@ -9,12 +9,26 @@ import Control.Exception (finally)
 import Control.Monad (when)
 import qualified Data.ByteString.Char8 as BS
 import Data.Monoid ((<>))
+import Data.String (IsString(fromString))
 import System.Directory (doesFileExist, removeFile)
 import System.Log.FastLogger
 import Test.Hspec
+import Test.Hspec.QuickCheck (prop)
 
 spec :: Spec
-spec = describe "pushLogMsg" $ do
+spec = do
+  describe "instance Show LogStr" $ do
+    prop "it should be consistent with instance IsString" $ \str ->
+      let logstr :: LogStr
+          logstr = fromString str
+      in show logstr == show str
+  describe "instance Eq LogStr" $ do
+    prop "it should be consistent with instance IsString" $ \str1 str2 ->
+      let logstr1, logstr2 :: LogStr
+          logstr1 = fromString str1
+          logstr2 = fromString str2
+      in (logstr1 == logstr2) == (str1 == str2)
+  describe "pushLogMsg" $ do
     it "is safe for a large message" $ safeForLarge [
         100
       , 1000
