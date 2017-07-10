@@ -2,6 +2,7 @@
 
 module Network.Wai.Logger.Apache (
     IPAddrSource(..)
+  , LoggedPathType(..)
   , apacheLogStr
   , serverpushLogStr
   ) where
@@ -40,16 +41,28 @@ data IPAddrSource =
   -- | From the peer address if header is not found.
   | FromFallback
 
+-- | How detailed path will be logged
+data LoggedPathType
+  = LogOnlyPath
+  | LogPathWithQueryString
+
 -- | Apache style log format.
-apacheLogStr :: IPAddrSource -> FormattedTime -> Request -> Status -> Maybe Integer -> LogStr
-apacheLogStr ipsrc tmstr req status msize =
+apacheLogStr ::
+     IPAddrSource
+  -> LoggedPathType
+  -> FormattedTime
+  -> Request
+  -> Status
+  -> Maybe Integer
+  -> LogStr
+apacheLogStr ipsrc pathType tmstr req status msize =
       toLogStr (getSourceIP ipsrc req)
   <> " - - ["
   <> toLogStr tmstr
   <> "] \""
   <> toLogStr (requestMethod req)
   <> " "
-  <> toLogStr (rawPathInfo req)
+  <> toLogStr path
   <> " "
   <> toLogStr (show (httpVersion req))
   <> "\" "
@@ -62,6 +75,11 @@ apacheLogStr ipsrc tmstr req status msize =
   <> toLogStr (fromMaybe "" mua)
   <> "\"\n"
   where
+    path =  case pathType of
+      LogOnlyPath ->
+        rawPathInfo req
+      LogPathWithQueryString ->
+        rawPathInfo req <> rawQueryString req
 #if !MIN_VERSION_base(4,5,0)
     (<>) = mappend
 #endif

@@ -44,6 +44,7 @@ module Network.Wai.Logger (
   , initLogger
   -- * Types
   , IPAddrSource(..)
+  , LoggedPathType(..)
   , LogType(..)
   , FileLogSpec(..)
   -- * Utilities
@@ -80,7 +81,7 @@ withStdoutLogger app = bracket setup teardown $ \(aplogger, _) ->
   where
     setup = do
         tgetter <- newTimeCache simpleTimeFormat
-        apf <- initLogger FromFallback (LogStdout 4096) tgetter
+        apf <- initLogger FromFallback LogOnlyPath (LogStdout 4096) tgetter
         let aplogger = apacheLogger apf
             remover = logRemover apf
         return (aplogger, remover)
@@ -111,12 +112,12 @@ data ApacheLoggerActions = ApacheLoggerActions {
 ----------------------------------------------------------------
 
 -- | Creating 'ApacheLogger' according to 'LogType'.
-initLogger :: IPAddrSource -> LogType -> IO FormattedTime
+initLogger :: IPAddrSource -> LoggedPathType -> LogType -> IO FormattedTime
            -> IO ApacheLoggerActions
-initLogger ipsrc typ tgetter = do
+initLogger ipsrc pathType typ tgetter = do
     (fl, cleanUp) <- newFastLogger typ
     return $ ApacheLoggerActions {
-        apacheLogger     = apache fl ipsrc tgetter
+        apacheLogger     = apache fl ipsrc pathType tgetter
       , serverpushLogger = serverpush fl ipsrc tgetter
       , logRotator       = return ()
       , logRemover       = cleanUp
@@ -133,10 +134,15 @@ logCheck (LogCallback _ _) = return ()
 
 ----------------------------------------------------------------
 
-apache :: (LogStr -> IO ()) -> IPAddrSource -> IO FormattedTime -> ApacheLogger
-apache cb ipsrc dateget req st mlen = do
+apache ::
+     (LogStr -> IO ())
+  -> IPAddrSource
+  -> LoggedPathType
+  -> IO FormattedTime
+  -> ApacheLogger
+apache cb ipsrc pathType dateget req st mlen = do
     zdata <- dateget
-    cb (apacheLogStr ipsrc zdata req st mlen)
+    cb (apacheLogStr ipsrc pathType zdata req st mlen)
 
 serverpush :: (LogStr -> IO ()) -> IPAddrSource -> IO FormattedTime -> ServerPushLogger
 serverpush cb ipsrc dateget req path size = do
