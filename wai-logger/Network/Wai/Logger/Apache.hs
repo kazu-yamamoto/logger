@@ -49,7 +49,7 @@ apacheLogStr ipsrc tmstr req status msize =
   <> "] \""
   <> toLogStr (requestMethod req)
   <> " "
-  <> toLogStr (rawPathInfo req)
+  <> toLogStr path
   <> " "
   <> toLogStr (show (httpVersion req))
   <> "\" "
@@ -62,6 +62,7 @@ apacheLogStr ipsrc tmstr req status msize =
   <> toLogStr (fromMaybe "" mua)
   <> "\"\n"
   where
+    path = rawPathInfo req <> rawQueryString req
 #if !MIN_VERSION_base(4,5,0)
     (<>) = mappend
 #endif
