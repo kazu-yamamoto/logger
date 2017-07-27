@@ -7,10 +7,18 @@ module Control.Monad.Logger.CallStack (
   , logInfo
   , logWarn
   , logError
+  , logOther
+  , logDebugSH
+  , logInfoSH
+  , logWarnSH
+  , logErrorSH
+  , logOtherSH
   ) where
 
-import           Control.Monad.Logger as Log hiding (logDebug, logError,
-                                              logInfo, logOther, logWarn)
+import           Control.Monad.Logger as Log hiding (logDebug, logDebugSH,
+                                              logError, logErrorSH, logInfo,
+                                              logInfoSH, logOther, logOtherSH,
+                                              logWarn, logWarnSH)
 import           Data.Text            (Text)
 import qualified Data.Text            as Text
 import           GHC.Stack
