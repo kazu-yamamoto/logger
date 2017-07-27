@@ -1,3 +1,7 @@
+## 0.3.25
+
+* Export all CallStack log functions [#143](https://github.com/kazu-yamamoto/logger/pull/143)
+
 ## 0.3.24
 * Added `MonadReader` instance for `NoLoggingT`.
 
