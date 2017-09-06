@@ -1,3 +1,7 @@
+## 0.3.25.1
+
+* Fix some incorrect `@since` comments
+
 ## 0.3.25
 
 * Export all CallStack log functions [#143](https://github.com/kazu-yamamoto/logger/pull/143)

@@ -50,37 +50,37 @@ logError = Log.logErrorCS callStack
 
 -- | See 'logDebug'
 --
--- @since 0.3.19
+-- @since 0.3.25
 logOther :: (HasCallStack, Log.MonadLogger m) => Log.LogLevel -> Text -> m ()
 logOther = Log.logOtherCS callStack
 
 -- | Logs a showable value with the location provided by
 -- an implicit 'CallStack'.
 --
--- @since 0.3.19
+-- @since 0.3.25
 logDebugSH :: (HasCallStack, Log.MonadLogger m, Show a) => a -> m ()
 logDebugSH = Log.logDebugCS callStack . Text.pack . show
 
 -- | See 'logDebugSH'
 --
--- @since 0.3.19
+-- @since 0.3.25
 logInfoSH :: (HasCallStack, Log.MonadLogger m, Show a) => a -> m ()
 logInfoSH = Log.logInfoCS callStack . Text.pack . show
 
 -- | See 'logDebugSH'
 --
--- @since 0.3.19
+-- @since 0.3.25
 logWarnSH :: (HasCallStack, Log.MonadLogger m, Show a) => a -> m ()
 logWarnSH = Log.logWarnCS callStack . Text.pack . show
 
 -- | See 'logDebugSH'
 --
--- @since 0.3.19
+-- @since 0.3.25
 logErrorSH :: (HasCallStack, Log.MonadLogger m, Show a) => a -> m ()
 logErrorSH = Log.logErrorCS callStack . Text.pack . show
 
 -- | See 'logDebugSH'
 --
--- @since 0.3.19
+-- @since 0.3.25
 logOtherSH :: (HasCallStack, Log.MonadLogger m, Show a) => Log.LogLevel -> a -> m ()
 logOtherSH lvl = Log.logOtherCS callStack lvl . Text.pack . show
