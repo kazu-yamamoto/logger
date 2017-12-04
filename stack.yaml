@@ -4,3 +4,5 @@ packages:
 - wai-logger/
 - date-cache/
 - fast-logger/
+extra-deps:
+- unliftio-core-0.1.0.0

@@ -107,6 +107,7 @@ import Control.Concurrent.STM.TBChan
 import Control.Exception.Lifted (onException, bracket)
 import Control.Monad (liftM, ap, when, void, forever)
 import Control.Monad.Base (MonadBase (liftBase))
+import Control.Monad.IO.Unlift
 import Control.Monad.Loops (untilM)
 import Control.Monad.Trans.Control (MonadBaseControl (..), MonadTransControl (..))
 import qualified Control.Monad.Trans.Class as Trans
@@ -462,6 +463,12 @@ instance Monad m => MonadLogger (NoLoggingT m) where
 instance MonadIO m => MonadLoggerIO (NoLoggingT m) where
     askLoggerIO = return $ \_ _ _ _ -> return ()
 
+-- | @since 0.3.26
+instance MonadUnliftIO m => MonadUnliftIO (NoLoggingT m) where
+  askUnliftIO = NoLoggingT $
+                withUnliftIO $ \u ->
+                return (UnliftIO (unliftIO u . runNoLoggingT))
+
 -- | Monad transformer that adds a new logging function.
 --
 -- @since 0.2.2
@@ -558,6 +565,12 @@ instance MonadIO m => MonadLogger (LoggingT m) where
     monadLoggerLog a b c d = LoggingT $ \f -> liftIO $ f a b c (toLogStr d)
 instance MonadIO m => MonadLoggerIO (LoggingT m) where
     askLoggerIO = LoggingT return
+
+-- | @since 0.3.26
+instance MonadUnliftIO m => MonadUnliftIO (LoggingT m) where
+  askUnliftIO = LoggingT $ \f ->
+                withUnliftIO $ \u ->
+                return (UnliftIO (unliftIO u . flip runLoggingT f))
 
 defaultOutput :: Handle
               -> Loc
