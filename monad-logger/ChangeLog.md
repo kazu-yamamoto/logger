@@ -1,3 +1,7 @@
+## 0.3.26
+
+* Add `MonadUnliftIO` instances
+
 ## 0.3.25.1
 
 * Fix some incorrect `@since` comments
