@@ -18,7 +18,7 @@
 -- The 'MonadLogger' class is implemented by monads that give access to a
 -- logging facility.  If you're defining a custom monad, then you may define an
 -- instance of 'MonadLogger' that routes the log messages to the appropriate
--- place (e.g., that's what @yesod-core@'s @GHandler@ does).  Otherwise, you
+-- place (e.g., that's what @yesod-core@'s @HandlerT@ does).  Otherwise, you
 -- may use the 'LoggingT' monad included in this module (see
 -- 'runStderrLoggingT'). To simply discard log message, use 'NoLoggingT'.
 --
