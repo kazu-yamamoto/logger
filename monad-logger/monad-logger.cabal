@@ -1,5 +1,5 @@
 name:                monad-logger
-version:             0.3.26
+version:             0.3.27
 synopsis:            A class of monads which can log messages.
 description:         Hackage documentation generation is not reliable. For up to date documentation, please see: <http://www.stackage.org/package/monad-logger>.
 homepage:            https://github.com/kazu-yamamoto/logger
@@ -33,17 +33,17 @@ library
                      , stm
                      , stm-chans
                      , lifted-base
-                     , resourcet           >= 0.4       && < 1.2
-                     , conduit             >= 1.0       && < 1.3
-                     , conduit-extra       >= 1.0       && < 1.3
-                     , fast-logger         >= 2.0       && < 2.5
+                     , resourcet           >= 1.1       && < 1.3
+                     , conduit             >= 1.0       && < 1.4
+                     , conduit-extra       >= 1.1       && < 1.4
+                     , fast-logger         >= 2.1       && < 2.5
                      , transformers-base
-                     , monad-control
+                     , monad-control       >= 1.0
                      , monad-loops
                      , mtl
-                     , bytestring
+                     , bytestring          >= 0.10.2
                      , blaze-builder
-                     , exceptions
+                     , exceptions          >= 0.6
                      , unliftio-core
 
   if impl(ghc >= 8.0.1)

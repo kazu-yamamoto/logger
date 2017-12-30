@@ -1,3 +1,7 @@
+## 0.3.27
+
+* Drop backwards compat with older library versions
+
 ## 0.3.26
 
 * Add `MonadUnliftIO` instances
