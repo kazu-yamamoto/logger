@@ -13,6 +13,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE TupleSections #-}
 -- |  This module provides the facilities needed for a decoupled logging system.
 --
 -- The 'MonadLogger' class is implemented by monads that give access to a
@@ -35,7 +36,7 @@ module Control.Monad.Logger
     -- * Re-export from fast-logger
     , LogStr
     , ToLogStr(..)
-    -- * Helper transformer
+    -- * Helper transformers
     , LoggingT (..)
     , runStderrLoggingT
     , runStdoutLoggingT
@@ -45,6 +46,9 @@ module Control.Monad.Logger
     , withChannelLogger
     , filterLogger
     , NoLoggingT (..)
+    , WriterLoggingT (..)
+    , execWriterLoggingT
+    , runWriterLoggingT
 #if WITH_TEMPLATE_HASKELL
     -- * TH logging
     , logDebug
@@ -106,10 +110,10 @@ import Control.Concurrent.STM
 import Control.Concurrent.STM.TBChan
 import Control.Exception.Lifted (onException, bracket)
 import Control.Monad (liftM, ap, when, void, forever)
-import Control.Monad.Base (MonadBase (liftBase))
+import Control.Monad.Base (MonadBase (liftBase), liftBaseDefault)
 import Control.Monad.IO.Unlift
 import Control.Monad.Loops (untilM)
-import Control.Monad.Trans.Control (MonadBaseControl (..), MonadTransControl (..))
+import Control.Monad.Trans.Control (MonadBaseControl (..), MonadTransControl (..), ComposeSt, defaultLiftBaseWith, defaultRestoreM)
 import qualified Control.Monad.Trans.Class as Trans
 
 import Control.Monad.IO.Class (MonadIO (liftIO))
@@ -428,6 +432,91 @@ instance MonadUnliftIO m => MonadUnliftIO (NoLoggingT m) where
                 withUnliftIO $ \u ->
                 return (UnliftIO (unliftIO u . runNoLoggingT))
 
+-- | @since 0.3.28
+type LogLine = (Loc, LogSource, LogLevel, LogStr)
+
+-- | @since 0.3.28
+newtype WriterLoggingT m a = WriterLoggingT { unWriterLoggingT :: m (a, DList LogLine) }
+
+-- | Simple implementation of a difference list to support WriterLoggingT
+newtype DList a = DList { unDList :: [a] -> [a] }
+
+emptyDList :: DList a
+emptyDList = DList id
+
+singleton :: a -> DList a
+singleton = DList . (:)
+
+dListToList :: DList a -> [a]
+dListToList (DList dl) = dl []
+
+appendDList :: DList a -> DList a -> DList a
+appendDList dl1 dl2 = DList (unDList dl1 . unDList dl2)
+
+-- | Run a block using a @MonadLogger@ instance. Return a value and logs in a list
+-- | @since 0.3.28
+runWriterLoggingT :: Functor m => WriterLoggingT m a -> m (a, [LogLine])
+runWriterLoggingT (WriterLoggingT ma) = fmap dListToList <$> ma
+
+-- | Run a block using a @MonadLogger@ instance. Return logs in a list
+-- | @since 0.3.28
+execWriterLoggingT :: Functor m => WriterLoggingT m a -> m [LogLine]
+execWriterLoggingT ma = snd <$> runWriterLoggingT ma
+
+instance Monad m => Monad (WriterLoggingT m) where
+  return = pure
+  (WriterLoggingT ma) >>= f = WriterLoggingT $ do
+    (a, msgs)   <- ma
+    (a', msgs') <- unWriterLoggingT $ f a
+    pure (a', appendDList msgs msgs')
+
+instance Applicative m => Applicative (WriterLoggingT m) where
+  pure a = WriterLoggingT . pure $ (a, emptyDList)
+  WriterLoggingT mf <*> WriterLoggingT ma = WriterLoggingT $
+    fmap (\((f, msgs), (a, msgs')) -> (f a, appendDList msgs msgs')) ((,) <$> mf <*> ma)
+
+instance Functor m => Functor (WriterLoggingT m) where
+  fmap f (WriterLoggingT ma) = WriterLoggingT $
+    fmap (\(a, msgs) -> (f a, msgs)) ma
+
+instance Monad m => MonadLogger (WriterLoggingT m) where
+  monadLoggerLog loc source level msg = WriterLoggingT . pure $ ((), singleton (loc, source, level, toLogStr msg))
+
+
+instance Trans.MonadTrans WriterLoggingT where
+  lift ma = WriterLoggingT $ (, emptyDList) <$> ma
+
+instance MonadIO m => MonadIO (WriterLoggingT m) where
+  liftIO ioa = WriterLoggingT $ (, emptyDList) <$> liftIO ioa
+
+instance MonadBase b m => MonadBase b (WriterLoggingT m) where
+  liftBase = liftBaseDefault
+
+instance MonadTransControl WriterLoggingT where
+  type StT WriterLoggingT a = (a, DList LogLine)
+  liftWith f = WriterLoggingT $ fmap (\x -> (x, emptyDList))
+                                      (f $ unWriterLoggingT)
+  restoreT = WriterLoggingT
+
+instance MonadBaseControl b m => MonadBaseControl b (WriterLoggingT m) where
+  type StM (WriterLoggingT m) a = ComposeSt WriterLoggingT m a
+  liftBaseWith = defaultLiftBaseWith
+  restoreM = defaultRestoreM
+
+instance MonadThrow m => MonadThrow (WriterLoggingT m) where
+    throwM = Trans.lift . throwM
+
+instance MonadCatch m => MonadCatch (WriterLoggingT m) where
+  catch (WriterLoggingT m) c =
+      WriterLoggingT $ m `catch` \e -> unWriterLoggingT (c e)
+
+instance MonadMask m => MonadMask (WriterLoggingT m) where
+  mask a = WriterLoggingT $ (mask $ \ u ->  unWriterLoggingT (a $ q u))
+    where q u b = WriterLoggingT $ u (unWriterLoggingT b)
+
+  uninterruptibleMask a = WriterLoggingT $ uninterruptibleMask $ \u -> unWriterLoggingT (a $ q u)
+    where q u b = WriterLoggingT $ u (unWriterLoggingT b)
+
 -- | Monad transformer that adds a new logging function.
 --
 -- @since 0.2.2
@@ -603,7 +692,7 @@ runStdoutLoggingT = (`runLoggingT` defaultOutput stdout)
 --   or a custom extraction funtion, and written to a destination.
 --
 -- @since 0.3.17
-runChanLoggingT :: MonadIO m => Chan (Loc, LogSource, LogLevel, LogStr) -> LoggingT m a -> m a
+runChanLoggingT :: MonadIO m => Chan LogLine -> LoggingT m a -> m a
 runChanLoggingT chan = (`runLoggingT` sink chan)
     where
         sink chan loc src lvl msg = writeChan chan (loc,src,lvl,msg)
@@ -614,7 +703,7 @@ runChanLoggingT chan = (`runLoggingT` sink chan)
 --   For use in a dedicated thread with a channel fed by `runChanLoggingT`.
 --
 -- @since 0.3.17
-unChanLoggingT :: (MonadLogger m, MonadIO m) => Chan (Loc, LogSource, LogLevel, LogStr) -> m void
+unChanLoggingT :: (MonadLogger m, MonadIO m) => Chan LogLine -> m void
 unChanLoggingT chan = forever $ do
     (loc,src,lvl,msg) <- liftIO $ readChan chan
     monadLoggerLog loc src lvl msg

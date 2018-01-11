@@ -1,3 +1,7 @@
+## 0.3.28
+
+* Added `WriterLoggingT` for collecting log lines and help with testing
+
 ## 0.3.27
 
 * Drop backwards compat with older library versions
