@@ -1,3 +1,7 @@
+## 0.3.28.1
+
+* Fix support for GHC 7.8 [#154](https://github.com/kazu-yamamoto/logger/pull/154)
+
 ## 0.3.28
 
 * Added `WriterLoggingT` for collecting log lines and help with testing
