@@ -102,9 +102,10 @@ module Control.Monad.Logger
 import Language.Haskell.TH.Syntax (Lift (lift), Q, Exp, Loc (..), qLocation)
 #endif
 
+import Data.Functor ((<$>))
 import Data.Monoid (Monoid)
 
-import Control.Applicative (Applicative (..))
+import Control.Applicative (Applicative (..), WrappedMonad(..))
 import Control.Concurrent.Chan (Chan(),writeChan,readChan)
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TBChan
@@ -464,11 +465,11 @@ execWriterLoggingT :: Functor m => WriterLoggingT m a -> m [LogLine]
 execWriterLoggingT ma = snd <$> runWriterLoggingT ma
 
 instance Monad m => Monad (WriterLoggingT m) where
-  return = pure
+  return = unwrapMonad . pure
   (WriterLoggingT ma) >>= f = WriterLoggingT $ do
     (a, msgs)   <- ma
     (a', msgs') <- unWriterLoggingT $ f a
-    pure (a', appendDList msgs msgs')
+    return (a', appendDList msgs msgs')
 
 instance Applicative m => Applicative (WriterLoggingT m) where
   pure a = WriterLoggingT . pure $ (a, emptyDList)
@@ -480,21 +481,21 @@ instance Functor m => Functor (WriterLoggingT m) where
     fmap (\(a, msgs) -> (f a, msgs)) ma
 
 instance Monad m => MonadLogger (WriterLoggingT m) where
-  monadLoggerLog loc source level msg = WriterLoggingT . pure $ ((), singleton (loc, source, level, toLogStr msg))
+  monadLoggerLog loc source level msg = WriterLoggingT . return $ ((), singleton (loc, source, level, toLogStr msg))
 
 
 instance Trans.MonadTrans WriterLoggingT where
-  lift ma = WriterLoggingT $ (, emptyDList) <$> ma
+  lift ma = WriterLoggingT $ (, emptyDList) `liftM` ma
 
 instance MonadIO m => MonadIO (WriterLoggingT m) where
-  liftIO ioa = WriterLoggingT $ (, emptyDList) <$> liftIO ioa
+  liftIO ioa = WriterLoggingT $ (, emptyDList) `liftM` liftIO ioa
 
 instance MonadBase b m => MonadBase b (WriterLoggingT m) where
   liftBase = liftBaseDefault
 
 instance MonadTransControl WriterLoggingT where
   type StT WriterLoggingT a = (a, DList LogLine)
-  liftWith f = WriterLoggingT $ fmap (\x -> (x, emptyDList))
+  liftWith f = WriterLoggingT $ liftM (\x -> (x, emptyDList))
                                       (f $ unWriterLoggingT)
   restoreT = WriterLoggingT
 
