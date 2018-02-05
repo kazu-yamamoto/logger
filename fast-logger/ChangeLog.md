@@ -1,3 +1,7 @@
+## 2.4.11
+
+* Give an explicit definition for (<>) in LogStr's Semigroup instance. [#155](https://github.com/kazu-yamamoto/logger/pull/155)
+
 ## 2.4.10
 
 * Fix Windows build on GHC 7.8. [#121](https://github.com/kazu-yamamoto/logger/pull/121)
