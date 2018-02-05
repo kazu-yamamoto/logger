@@ -25,7 +25,7 @@ import Data.Monoid (Monoid, mempty, mappend)
 import Data.Monoid ((<>))
 #endif
 #if MIN_VERSION_base(4,9,0)
-import Data.Semigroup (Semigroup)
+import qualified Data.Semigroup as Semi (Semigroup(..))
 #endif
 import Data.String (IsString(..))
 import qualified Data.Text as T
@@ -56,7 +56,8 @@ fromBuilder = BS.concat . BL.toChunks . B.toLazyByteString
 data LogStr = LogStr !Int Builder
 
 #if MIN_VERSION_base(4,9,0)
-instance Semigroup LogStr
+instance Semi.Semigroup LogStr where
+    LogStr s1 b1 <> LogStr s2 b2 = LogStr (s1 + s2) (b1 <> b2)
 #endif
 
 instance Monoid LogStr where
