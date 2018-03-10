@@ -1,5 +1,5 @@
 name:                monad-logger
-version:             0.3.28.1
+version:             0.3.28.2
 synopsis:            A class of monads which can log messages.
 description:         Hackage documentation generation is not reliable. For up to date documentation, please see: <http://www.stackage.org/package/monad-logger>.
 homepage:            https://github.com/kazu-yamamoto/logger
@@ -43,7 +43,7 @@ library
                      , mtl
                      , bytestring          >= 0.10.2
                      , blaze-builder
-                     , exceptions          >= 0.6
+                     , exceptions          >= 0.6       && < 0.10
                      , unliftio-core
 
   if impl(ghc >= 8.0.1)

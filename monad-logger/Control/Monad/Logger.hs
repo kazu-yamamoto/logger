@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DefaultSignatures #-}
 #if WITH_CALLSTACK
 {-# LANGUAGE ImplicitParams #-}
@@ -354,56 +355,10 @@ logOtherS = [|\src level msg -> monadLoggerLog $(qLocation >>= liftLoc) src (Lev
 --
 -- @since 0.2.4
 newtype NoLoggingT m a = NoLoggingT { runNoLoggingT :: m a }
+  deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadCatch, MonadMask, MonadActive, MonadResource, MonadBase b)
 
-#if __GLASGOW_HASKELL__ < 710
-instance Monad m => Functor (NoLoggingT m) where
-    fmap = liftM
-
-instance Monad m => Applicative (NoLoggingT m) where
-    pure = return
-    (<*>) = ap
-#else
-instance Functor m => Functor (NoLoggingT m) where
-    fmap f = NoLoggingT . fmap f . runNoLoggingT
-    {-# INLINE fmap #-}
-
-instance Applicative m => Applicative (NoLoggingT m) where
-    pure = NoLoggingT . pure
-    {-# INLINE pure #-}
-    f <*> a = NoLoggingT (runNoLoggingT f <*> runNoLoggingT a)
-    {-# INLINE (<*>) #-}
-#endif
-
-instance Monad m => Monad (NoLoggingT m) where
-    return = NoLoggingT . return
-    NoLoggingT ma >>= f = NoLoggingT $ ma >>= runNoLoggingT . f
-
-instance MonadIO m => MonadIO (NoLoggingT m) where
-    liftIO = Trans.lift . liftIO
-
-instance MonadThrow m => MonadThrow (NoLoggingT m) where
-    throwM = Trans.lift . throwM
-
-instance MonadCatch m => MonadCatch (NoLoggingT m) where
-    catch (NoLoggingT m) c =
-        NoLoggingT $ m `catch` \e -> runNoLoggingT (c e)
-instance MonadMask m => MonadMask (NoLoggingT m) where
-    mask a = NoLoggingT $ mask $ \u -> runNoLoggingT (a $ q u)
-      where q u (NoLoggingT b) = NoLoggingT $ u b
-    uninterruptibleMask a =
-        NoLoggingT $ uninterruptibleMask $ \u -> runNoLoggingT (a $ q u)
-      where q u (NoLoggingT b) = NoLoggingT $ u b
-
-instance MonadActive m => MonadActive (NoLoggingT m) where
-    monadActive = Trans.lift monadActive
 instance MonadActive m => MonadActive (LoggingT m) where
     monadActive = Trans.lift monadActive
-
-instance MonadResource m => MonadResource (NoLoggingT m) where
-    liftResourceT = Trans.lift . liftResourceT
-
-instance MonadBase b m => MonadBase b (NoLoggingT m) where
-    liftBase = Trans.lift . liftBase
 
 instance Trans.MonadTrans NoLoggingT where
     lift = NoLoggingT
@@ -518,6 +473,21 @@ instance MonadMask m => MonadMask (WriterLoggingT m) where
   uninterruptibleMask a = WriterLoggingT $ uninterruptibleMask $ \u -> unWriterLoggingT (a $ q u)
     where q u b = WriterLoggingT $ u (unWriterLoggingT b)
 
+#if MIN_VERSION_exceptions(0, 9, 0)
+  generalBracket acquire release releaseEx use =
+    WriterLoggingT $ generalBracket
+      (unWriterLoggingT acquire)
+      (\(x, w1) -> do
+          (y, w2) <- unWriterLoggingT (release x)
+          return (y, appendDList w1 w2))
+      (\(x, w1) ex -> do
+          (y, w2) <- unWriterLoggingT (releaseEx x ex)
+          return (y, appendDList w1 w2))
+      (\(x, w1) -> do
+          (y, w2) <- unWriterLoggingT (use x)
+          return (y, appendDList w1 w2))
+#endif
+
 -- | Monad transformer that adds a new logging function.
 --
 -- @since 0.2.2
@@ -565,6 +535,14 @@ instance MonadMask m => MonadMask (LoggingT m) where
   uninterruptibleMask a =
     LoggingT $ \e -> uninterruptibleMask $ \u -> runLoggingT (a $ q u) e
       where q u (LoggingT b) = LoggingT (u . b)
+#if MIN_VERSION_exceptions(0, 9, 0)
+  generalBracket acquire release releaseEx use =
+    LoggingT $ \e -> generalBracket
+      (runLoggingT acquire e)
+      (\x -> runLoggingT (release x) e)
+      (\x y -> runLoggingT (releaseEx x y) e)
+      (\x -> runLoggingT (use x) e)
+#endif
 
 instance MonadResource m => MonadResource (LoggingT m) where
     liftResourceT = Trans.lift . liftResourceT

@@ -1,3 +1,7 @@
+## 0.3.28.2
+
+* Support for exceptions 0.9 [#158](https://github.com/kazu-yamamoto/logger/issues/158)
+
 ## 0.3.28.1
 
 * Fix support for GHC 7.8 [#154](https://github.com/kazu-yamamoto/logger/pull/154)
