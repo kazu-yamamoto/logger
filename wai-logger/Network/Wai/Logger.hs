@@ -7,7 +7,7 @@
 -- > {-# LANGUAGE OverloadedStrings #-}
 -- > module Main where
 -- >
--- > import Blaze.ByteString.Builder (fromByteString)
+-- > import Data.ByteString.Builder (byteString)
 -- > import Control.Monad.IO.Class (liftIO)
 -- > import qualified Data.ByteString.Char8 as BS
 -- > import Network.HTTP.Types (status200)
@@ -27,7 +27,7 @@
 -- >     status = status200
 -- >     hdr = [("Content-Type", "text/plain")]
 -- >     pong = "PONG"
--- >     msg = fromByteString pong
+-- >     msg = byteString pong
 -- >     len = fromIntegral $ BS.length pong
 
 module Network.Wai.Logger (
