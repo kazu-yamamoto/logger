@@ -1,6 +1,6 @@
 ## 0.3.28.2
 
-* Support for exceptions 0.9 [#158](https://github.com/kazu-yamamoto/logger/issues/158)
+* Support for exceptions 0.9 and 0.10 [#158](https://github.com/kazu-yamamoto/logger/issues/158)
 * Drop blaze-builder dependency
 
 ## 0.3.28.1

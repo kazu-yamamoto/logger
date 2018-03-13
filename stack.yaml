@@ -6,4 +6,4 @@ packages:
 - fast-logger/
 extra-deps:
 - unliftio-core-0.1.0.0
-- exceptions-0.9.0
+- exceptions-0.10.0

@@ -120,7 +120,11 @@ import qualified Control.Monad.Trans.Class as Trans
 
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Control.Monad.Trans.Resource (MonadResource (liftResourceT))
-import Control.Monad.Catch (MonadThrow (..), MonadCatch (..), MonadMask (..))
+import Control.Monad.Catch (MonadThrow (..), MonadCatch (..), MonadMask (..)
+#if MIN_VERSION_exceptions(0, 10, 0)
+    , ExitCase (..)
+#endif
+                           )
 
 import Control.Monad.Trans.Identity ( IdentityT)
 import Control.Monad.Trans.List     ( ListT    )
@@ -473,7 +477,27 @@ instance MonadMask m => MonadMask (WriterLoggingT m) where
   uninterruptibleMask a = WriterLoggingT $ uninterruptibleMask $ \u -> unWriterLoggingT (a $ q u)
     where q u b = WriterLoggingT $ u (unWriterLoggingT b)
 
-#if MIN_VERSION_exceptions(0, 9, 0)
+#if MIN_VERSION_exceptions(0, 10, 0)
+  generalBracket acquire release use = WriterLoggingT $ do
+    ((b, _w12), (c, w123)) <- generalBracket
+      (unWriterLoggingT acquire)
+      (\(resource, w1) exitCase -> case exitCase of
+        ExitCaseSuccess (b, w12) -> do
+          (c, w3) <- unWriterLoggingT (release resource (ExitCaseSuccess b))
+          return (c, appendDList w12 w3)
+        -- In the two other cases, the base monad overrides @use@'s state
+        -- changes and the state reverts to @w1@.
+        ExitCaseException e -> do
+          (c, w3) <- unWriterLoggingT (release resource (ExitCaseException e))
+          return (c, appendDList w1 w3)
+        ExitCaseAbort -> do
+          (c, w3) <- unWriterLoggingT (release resource ExitCaseAbort)
+          return (c, appendDList w1 w3))
+      (\(resource, w1) -> do
+        (a, w2) <- unWriterLoggingT (use resource)
+        return (a, appendDList w1 w2))
+    return ((b, c), w123)
+#elif MIN_VERSION_exceptions(0, 9, 0)
   generalBracket acquire release releaseEx use =
     WriterLoggingT $ generalBracket
       (unWriterLoggingT acquire)
@@ -535,7 +559,13 @@ instance MonadMask m => MonadMask (LoggingT m) where
   uninterruptibleMask a =
     LoggingT $ \e -> uninterruptibleMask $ \u -> runLoggingT (a $ q u) e
       where q u (LoggingT b) = LoggingT (u . b)
-#if MIN_VERSION_exceptions(0, 9, 0)
+#if MIN_VERSION_exceptions(0, 10, 0)
+  generalBracket acquire release use =
+    LoggingT $ \e -> generalBracket
+      (runLoggingT acquire e)
+      (\x ec -> runLoggingT (release x ec) e)
+      (\x -> runLoggingT (use x) e)
+#elif MIN_VERSION_exceptions(0, 9, 0)
   generalBracket acquire release releaseEx use =
     LoggingT $ \e -> generalBracket
       (runLoggingT acquire e)
