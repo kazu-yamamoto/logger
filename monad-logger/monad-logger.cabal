@@ -42,7 +42,6 @@ library
                      , monad-loops
                      , mtl
                      , bytestring          >= 0.10.2
-                     , blaze-builder
                      , exceptions          >= 0.6       && < 0.10
                      , unliftio-core
 
