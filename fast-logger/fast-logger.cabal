@@ -11,7 +11,8 @@ Category:               System
 Cabal-Version:          >= 1.8
 Build-Type:             Simple
 extra-source-files:     README.md ChangeLog.md
-
+tested-with:            GHC ==7.8.4 || ==7.10.3 || ==8.0.2 || ==8.2.2 || ==8.4.1
+  
 Library
   GHC-Options:          -Wall
   Exposed-Modules:      System.Log.FastLogger
@@ -48,6 +49,7 @@ Test-Suite spec
 
     Ghc-Options:     -Wall -threaded
     Other-Modules:   FastLoggerSpec
+    build-tool-depends: hspec-discover:hspec-discover
     Build-Depends:   base >= 4 && < 5
                    , bytestring
                    , directory
