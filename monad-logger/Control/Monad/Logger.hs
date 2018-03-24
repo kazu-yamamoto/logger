@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE StandaloneDeriving #-}
 #if WITH_CALLSTACK
 {-# LANGUAGE ImplicitParams #-}
 #endif
@@ -359,7 +360,10 @@ logOtherS = [|\src level msg -> monadLoggerLog $(qLocation >>= liftLoc) src (Lev
 --
 -- @since 0.2.4
 newtype NoLoggingT m a = NoLoggingT { runNoLoggingT :: m a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadCatch, MonadMask, MonadActive, MonadResource, MonadBase b)
+  deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadCatch, MonadMask, MonadActive, MonadBase b)
+
+-- For some reason GND is a fool on GHC 7.10 and older, we have to help it by providing the context explicitly.
+deriving instance MonadResource m => MonadResource (NoLoggingT m)
 
 instance MonadActive m => MonadActive (LoggingT m) where
     monadActive = Trans.lift monadActive
