@@ -1,3 +1,7 @@
+## 0.3.28.3
+
+* Compat for older GHCs [#161](https://github.com/kazu-yamamoto/logger/pull/161)
+
 ## 0.3.28.2
 
 * Support for exceptions 0.9 and 0.10 [#158](https://github.com/kazu-yamamoto/logger/issues/158)
