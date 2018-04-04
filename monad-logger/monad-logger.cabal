@@ -12,6 +12,7 @@ build-type:          Simple
 cabal-version:       >=1.8
 extra-source-files:  ChangeLog.md
                      README.md
+tested-with:         GHC ==7.8.4 || ==7.10.3 || ==8.0.2 || ==8.2.2 || ==8.4.1
 
 source-repository head
   type:              git

@@ -29,7 +29,7 @@ import System.Log.FastLogger
 
 -- $setup
 -- >>> :set -XOverloadedStrings
--- >>> import Network.Wai.Test
+-- >>> import Network.Wai (defaultRequest)
 
 -- | Source from which the IP source address of the client is obtained.
 data IPAddrSource =
