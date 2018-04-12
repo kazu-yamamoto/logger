@@ -66,11 +66,8 @@ install:
   - "sed -i.bak 's/^jobs:/-- jobs:/' ${HOME}/.cabal/config"
   - rm -fv cabal.project cabal.project.local
   - grep -Ev -- '^\s*--' ${HOME}/.cabal/config | grep -Ev '^\s*$'
-  - "printf 'packages: \"monad-logger\" \"wai-logger\" \"date-cache\" \"fast-logger\"\\n' > cabal.project"
+  - "printf 'packages: \"wai-logger\" \"date-cache\" \"fast-logger\"\\n' > cabal.project"
   - cat cabal.project
-  - if [ -f "monad-logger/configure.ac" ]; then
-      (cd "monad-logger" && autoreconf -i);
-    fi
   - if [ -f "wai-logger/configure.ac" ]; then
       (cd "wai-logger" && autoreconf -i);
     fi
@@ -83,21 +80,20 @@ install:
   - rm -f cabal.project.freeze
   - cabal new-build -w ${HC} ${TEST} ${BENCH} --project-file="cabal.project" --dep -j2 all
   - cabal new-build -w ${HC} --disable-tests --disable-benchmarks --project-file="cabal.project" --dep -j2 all
-  - rm -rf .ghc.environment.* "monad-logger"/dist "wai-logger"/dist "date-cache"/dist "fast-logger"/dist
+  - rm -rf .ghc.environment.* "wai-logger"/dist "date-cache"/dist "fast-logger"/dist
   - DISTDIR=$(mktemp -d /tmp/dist-test.XXXX)
 
 # Here starts the actual work to be performed for the package under test;
 # any command which exits with a non-zero exit code causes the build to fail.
 script:
   # test that source-distributions can be generated
-  - (cd "monad-logger" && cabal sdist)
   - (cd "wai-logger" && cabal sdist)
   - (cd "date-cache" && cabal sdist)
   - (cd "fast-logger" && cabal sdist)
-  - mv "monad-logger"/dist/monad-logger-*.tar.gz "wai-logger"/dist/wai-logger-*.tar.gz "date-cache"/dist/date-cache-*.tar.gz "fast-logger"/dist/fast-logger-*.tar.gz ${DISTDIR}/
+  - mv "wai-logger"/dist/wai-logger-*.tar.gz "date-cache"/dist/date-cache-*.tar.gz "fast-logger"/dist/fast-logger-*.tar.gz ${DISTDIR}/
   - cd ${DISTDIR} || false
   - find . -maxdepth 1 -name '*.tar.gz' -exec tar -xvf '{}' \;
-  - "printf 'packages: monad-logger-*/*.cabal wai-logger-*/*.cabal date-cache-*/*.cabal fast-logger-*/*.cabal\\n' > cabal.project"
+  - "printf 'packages: wai-logger-*/*.cabal date-cache-*/*.cabal fast-logger-*/*.cabal\\n' > cabal.project"
   - cat cabal.project
   # this builds all libraries and executables (without tests/benchmarks)
   - cabal new-build -w ${HC} --disable-tests --disable-benchmarks all
