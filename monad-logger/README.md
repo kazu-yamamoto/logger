@@ -1,5 +1,0 @@
-## monad-logger
-
-A monad transformer approach for logging.
-
-This package provides Template Haskell functions for determining source code locations of messages.
