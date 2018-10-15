@@ -175,6 +175,15 @@ rmLoggerSet (LoggerSet mfile fref arr _) = do
 type FastLogger = LogStr -> IO ()
 -- | 'TimedFastLogger' pass 'FormattedTime' to callback and simply log its result.
 -- this can be used to customize how to log timestamp.
+-- 
+-- Usually, one would write a wrapper on top of 'TimedFastLogger', for example:
+--
+-- @
+-- {-# LANGUAGE OverloadedStrings #-}
+--
+-- log :: TimedFastLogger -> LogStr -> IO ()
+-- log logger msg = logger (\time -> toLogStr time <> " " <> msg <> "\n")
+-- @
 type TimedFastLogger = (FormattedTime -> LogStr) -> IO ()
 
 -- | Logger Type.
