@@ -50,7 +50,7 @@ import Control.Applicative ((<$>))
 #endif
 import Control.Debounce (mkDebounce, defaultDebounceSettings, debounceAction)
 import Control.Concurrent (getNumCapabilities, myThreadId, threadCapability, takeMVar, MVar, newMVar, tryTakeMVar, putMVar)
-import Control.Exception (handle, SomeException(..), bracket)
+import Control.Exception (handle, SomeException(..), bracket, bracketOnError)
 import Control.Monad (when, replicateM)
 import Data.Array (Array, listArray, (!), bounds)
 import Data.Maybe (isJust)
@@ -203,6 +203,10 @@ data LogType
                                   --   'BufSize' is a buffer size
                                   --   for each capability.
                                   --   File rotation is done on-demand.
+    | LogFileTimedRotate TimedFileLogSpec BufSize -- ^ Logging to a file.
+                                  --   'BufSize' is a buffer size
+                                  --   for each capability.
+                                  --   Rotation happens based on timeframes.
     | LogCallback (LogStr -> IO ()) (IO ()) -- ^ Logging with a log and flush action.
                                                -- run flush after log each message.
 
@@ -210,12 +214,13 @@ data LogType
 -- a tuple of logger and clean up action are returned.
 newFastLogger :: LogType -> IO (FastLogger, IO ())
 newFastLogger typ = case typ of
-    LogNone                  -> return (const noOp, noOp)
-    LogStdout bsize          -> newStdoutLoggerSet bsize >>= stdLoggerInit
-    LogStderr bsize          -> newStderrLoggerSet bsize >>= stdLoggerInit
-    LogFileNoRotate fp bsize -> newFileLoggerSet bsize fp >>= fileLoggerInit
-    LogFile fspec bsize      -> rotateLoggerInit fspec bsize
-    LogCallback cb flush     -> return (\str -> cb str >> flush, noOp)
+    LogNone                        -> return (const noOp, noOp)
+    LogStdout bsize                -> newStdoutLoggerSet bsize >>= stdLoggerInit
+    LogStderr bsize                -> newStderrLoggerSet bsize >>= stdLoggerInit
+    LogFileNoRotate fp bsize       -> newFileLoggerSet bsize fp >>= fileLoggerInit
+    LogFile fspec bsize            -> rotateLoggerInit fspec bsize
+    LogFileTimedRotate fspec bsize -> timeRotateLoggerInit fspec bsize
+    LogCallback cb flush           -> return (\str -> cb str >> flush, noOp)
   where
     stdLoggerInit lgrset = return (pushLogStr lgrset, rmLoggerSet lgrset)
     fileLoggerInit lgrset = return (pushLogStr lgrset, rmLoggerSet lgrset)
@@ -227,6 +232,18 @@ newFastLogger typ = case typ of
                 cnt <- decrease ref
                 pushLogStr lgrset str
                 when (cnt <= 0) $ tryRotate lgrset fspec ref mvar
+        return (logger, rmLoggerSet lgrset)
+    timeRotateLoggerInit fspec bsize = do
+        lgrset <- newFileLoggerSet bsize $ timed_log_file fspec
+        cache <- newTimeCache $ timed_log_format fspec
+        current_time <- cache
+        ref <- newIORef current_time
+        mvar <- newMVar [current_time]
+        let logger str = do
+                ct <- cache
+                updated <- updateTime ref ct
+                when updated $ tryTimedRotate lgrset fspec ref mvar
+                pushLogStr lgrset str
         return (logger, rmLoggerSet lgrset)
 
 -- | 'bracket' version of 'newFastLogger'
@@ -240,12 +257,13 @@ newTimedFastLogger ::
                         -- "System.Log.FastLogger.Date" provide cached formatted time.
     -> LogType -> IO (TimedFastLogger, IO ())
 newTimedFastLogger tgetter typ = case typ of
-    LogNone                  -> return (const noOp, noOp)
-    LogStdout bsize          -> newStdoutLoggerSet bsize >>= stdLoggerInit
-    LogStderr bsize          -> newStderrLoggerSet bsize >>= stdLoggerInit
-    LogFileNoRotate fp bsize -> newFileLoggerSet bsize fp >>= fileLoggerInit
-    LogFile fspec bsize      -> rotateLoggerInit fspec bsize
-    LogCallback cb flush     -> return (\f -> tgetter >>= cb . f >> flush, noOp)
+    LogNone                        -> return (const noOp, noOp)
+    LogStdout bsize                -> newStdoutLoggerSet bsize >>= stdLoggerInit
+    LogStderr bsize                -> newStderrLoggerSet bsize >>= stdLoggerInit
+    LogFileNoRotate fp bsize       -> newFileLoggerSet bsize fp >>= fileLoggerInit
+    LogFile fspec bsize            -> rotateLoggerInit fspec bsize
+    LogFileTimedRotate fspec bsize -> timeRotateLoggerInit fspec bsize
+    LogCallback cb flush           -> return (\f -> tgetter >>= cb . f >> flush, noOp)
   where
     stdLoggerInit lgrset = return ( \f -> tgetter >>= pushLogStr lgrset . f, rmLoggerSet lgrset)
     fileLoggerInit lgrset = return (\f -> tgetter >>= pushLogStr lgrset . f, rmLoggerSet lgrset)
@@ -259,6 +277,19 @@ newTimedFastLogger tgetter typ = case typ of
                 pushLogStr lgrset (f t)
                 when (cnt <= 0) $ tryRotate lgrset fspec ref mvar
         return (logger, rmLoggerSet lgrset)
+    timeRotateLoggerInit fspec bsize = do
+        lgrset <- newFileLoggerSet bsize $ timed_log_file fspec
+        cache <- newTimeCache $ timed_log_format fspec
+        current_time <- cache
+        ref <- newIORef current_time
+        mvar <- newMVar [current_time]
+        let logger f = do
+                ct <- cache
+                updated <- updateTime ref ct
+                when updated $ tryTimedRotate lgrset fspec ref mvar
+                t <- tgetter
+                pushLogStr lgrset (f t)
+        return (logger, rmLoggerSet lgrset)
 
 -- | 'bracket' version of 'newTimeFastLogger'
 withTimedFastLogger :: IO FormattedTime -> LogType -> (TimedFastLogger -> IO a) -> IO a
@@ -271,6 +302,10 @@ noOp = return ()
 
 decrease :: IORef Int -> IO Int
 decrease ref = atomicModifyIORef' ref (\x -> (x - 1, x - 1))
+
+-- updateTime returns whether the time has been updated
+updateTime :: IORef FormattedTime -> FormattedTime -> IO Bool
+updateTime ref newTime = atomicModifyIORef' ref (\x -> (newTime, newTime /= x))
 
 tryRotate :: LoggerSet -> FileLogSpec -> IORef Int -> MVar () -> IO ()
 tryRotate lgrset spec ref mvar = bracket lock unlock rotateFiles
@@ -301,3 +336,21 @@ tryRotate lgrset spec ref mvar = bracket lock unlock rotateFiles
         Just . fromIntegral <$> getFileSize file
     -- 200 is an ad-hoc value for the length of log line.
     estimate x = fromInteger (x `div` 200)
+
+
+tryTimedRotate :: LoggerSet -> TimedFileLogSpec -> IORef FormattedTime -> MVar [FormattedTime] -> IO ()
+tryTimedRotate lgrset spec ref mvar = bracketOnError lock unlock rotateFiles
+  where
+    lock            = tryTakeMVar mvar
+    unlock Nothing  = return ()
+    unlock (Just l) = putMVar mvar l
+    rotateFiles Nothing  = return ()
+    rotateFiles (Just l) = do
+        current_time <- readIORef ref
+        let new_l = current_time : l
+        timedRotate spec l
+        renewLoggerSet lgrset
+        -- Need to remember one more so we know which one
+        -- to delete on the next iteration
+        putMVar mvar $ take (number + 1) new_l
+    number = timed_log_backup_number spec

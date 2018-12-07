@@ -127,8 +127,9 @@ logCheck :: LogType -> IO ()
 logCheck LogNone          = return ()
 logCheck (LogStdout _)    = return ()
 logCheck (LogStderr _)    = return ()
-logCheck (LogFileNoRotate fp _)  = check fp
-logCheck (LogFile spec _)        = check (log_file spec)
+logCheck (LogFileNoRotate fp _)      = check fp
+logCheck (LogFile spec _)            = check (log_file spec)
+logCheck (LogFileTimedRotate spec _) = check (timed_log_file spec)
 logCheck (LogCallback _ _) = return ()
 
 ----------------------------------------------------------------
