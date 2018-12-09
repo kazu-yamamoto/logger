@@ -2,19 +2,19 @@
 
 module System.Log.FastLogger.File
     ( FileLogSpec(..)
-    , TimedFileLogSpec(..)
+    , DailyFileLogSpec (..)
     , check
     , rotate
     , timedRotate
     ) where
 
-import Control.Monad (unless, when)
+import Control.Concurrent (forkIO)
+import Control.Monad (unless, when, void)
 import Data.ByteString (ByteString)
 import Data.ByteString.Char8 (unpack)
-import System.Directory (doesFileExist, doesDirectoryExist, getPermissions, writable, renameFile, removeFile)
-import System.FilePath (takeDirectory)
+import System.Directory (doesFileExist, doesDirectoryExist, getPermissions, writable, renameFile)
+import System.FilePath (takeDirectory, dropFileName, takeFileName, (</>))
 
-type TimeFormat = ByteString -- redeclaration to allow for LANGUAGE Safe
 type FormattedTime = ByteString -- redeclaration to allow for LANGUAGE Safe
 
 -- | The spec for logging files
@@ -24,19 +24,12 @@ data FileLogSpec = FileLogSpec {
   , log_backup_number :: Int -- ^ Max number of rotated log files to keep around before overwriting the oldest one.
   }
 
--- | The spec for rotation base on timeframe
--- Note: This keeps track of former filenames to do the rotation. This means
--- that old log files will be ignored after a restart of the application.
-data TimedFileLogSpec = TimedFileLogSpec {
-    timed_log_file :: FilePath
-  , timed_log_format :: TimeFormat -- ^ Format that will cause a rotation whenever changed
-                                   --   You can use e.g. "%y" to get a yearly
-                                   --   rotation, "%d" (or "%m/%d/%y") to get a
-                                   --   daily rotation. This uses a time cache
-                                   --   for performance reasons, so anything
-                                   --   less than a minutely rotation will not
-                                   --   work reliably.
-  , timed_log_backup_number :: Int -- ^ Max number of rotated log files to keep around before overwriting the oldest one.
+-- | The spec for daily rotation base. It supports post processing of log files
+-- and will consider any file with an valid ISO 8601 format timestring and the
+-- daily_log_file specifier as part of the rotation.
+data DailyFileLogSpec = DailyFileLogSpec {
+    daily_log_file :: FilePath
+  , daily_post_process :: FilePath -> IO () -- ^ processing function called asynchronously after a file is added to the rotation
   }
 
 -- | Checking if a log file can be written.
@@ -68,19 +61,12 @@ rotate spec = mapM_ move srcdsts
         when exist $ renameFile src dst
 
 -- | Rotating log files based on time.
-timedRotate :: TimedFileLogSpec -> [FormattedTime] -> IO ()
-timedRotate spec times = do
-    move (path, newest)
-    when (length times > number) $ remove oldest
+timedRotate :: DailyFileLogSpec -> FormattedTime -> IO ()
+timedRotate spec oldTime = do
+    move (path, dropFileName path </> unpack oldTime ++ "_" ++ takeFileName path)
+    void $ forkIO $ daily_post_process spec path
   where
-    path = timed_log_file spec
-    oldest = path ++ '.' : unpack (last times)
-    newest = path ++ '.' : unpack (head times)
-
-    number = timed_log_backup_number spec
-    remove path_ = do
-        exists <- doesFileExist path_
-        when exists $ removeFile path_
+    path = daily_log_file spec
     move (src,dst) = do
         exist <- doesFileExist src
         when exist $ renameFile src dst
