@@ -30,12 +30,12 @@ Library
                       , directory
                       , filepath
                       , text
-                      , time
   if impl(ghc < 7.8)
       Build-Depends:    bytestring-builder
   if os(windows)
       Cpp-Options:      -DWINDOWS
-      Build-Depends:    Win32
+      Build-Depends:  time
+                      , Win32
                       , old-locale
   else
       Build-Depends:    unix
