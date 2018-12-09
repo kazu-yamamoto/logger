@@ -24,9 +24,8 @@ data FileLogSpec = FileLogSpec {
   , log_backup_number :: Int -- ^ Max number of rotated log files to keep around before overwriting the oldest one.
   }
 
--- | The spec for daily rotation base. It supports post processing of log files
--- and will consider any file with an valid ISO 8601 format timestring and the
--- daily_log_file specifier as part of the rotation.
+-- | The spec for daily rotation. It supports post processing of log files. Does
+-- not delete any logs.
 data DailyFileLogSpec = DailyFileLogSpec {
     daily_log_file :: FilePath
   , daily_post_process :: FilePath -> IO () -- ^ processing function called asynchronously after a file is added to the rotation
@@ -63,10 +62,11 @@ rotate spec = mapM_ move srcdsts
 -- | Rotating log files based on time.
 timedRotate :: DailyFileLogSpec -> FormattedTime -> IO ()
 timedRotate spec oldTime = do
-    move (path, dropFileName path </> unpack oldTime ++ "_" ++ takeFileName path)
-    void $ forkIO $ daily_post_process spec path
+    move (path, new_path)
+    void $ forkIO $ daily_post_process spec new_path
   where
     path = daily_log_file spec
+    new_path = dropFileName path </> unpack oldTime ++ "-" ++ takeFileName path
     move (src,dst) = do
         exist <- doesFileExist src
         when exist $ renameFile src dst

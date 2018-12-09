@@ -50,7 +50,7 @@ import Control.Applicative ((<$>))
 #endif
 import Control.Debounce (mkDebounce, defaultDebounceSettings, debounceAction)
 import Control.Concurrent (getNumCapabilities, myThreadId, threadCapability, takeMVar, MVar, newMVar, tryTakeMVar, putMVar)
-import Control.Exception (handle, SomeException(..), bracket, bracketOnError)
+import Control.Exception (handle, SomeException(..), bracket)
 import Control.Monad (when, replicateM, forM_)
 import Data.Array (Array, listArray, (!), bounds)
 import Data.ByteString (split)
@@ -243,7 +243,7 @@ newFastLogger typ = case typ of
         let logger str = do
                 ct <- cache
                 updated <- updateTime ref ct
-                forM_ updated $ tryDailyRotate lgrset fspec ref mvar
+                forM_ updated $ tryDailyRotate lgrset fspec mvar
                 pushLogStr lgrset str
         return (logger, rmLoggerSet lgrset)
 
@@ -287,7 +287,7 @@ newTimedFastLogger tgetter typ = case typ of
         let logger f = do
                 ct <- cache
                 updated <- updateTime ref ct
-                forM_ updated $ tryDailyRotate lgrset fspec ref mvar
+                forM_ updated $ tryDailyRotate lgrset fspec mvar
                 t <- tgetter
                 pushLogStr lgrset (f t)
         return (logger, rmLoggerSet lgrset)
@@ -347,13 +347,13 @@ tryRotate lgrset spec ref mvar = bracket lock unlock rotateFiles
     estimate x = fromInteger (x `div` 200)
 
 
-tryDailyRotate :: LoggerSet -> DailyFileLogSpec -> IORef FormattedTime -> MVar () -> FormattedTime -> IO ()
-tryDailyRotate lgrset spec ref mvar oldTime = bracket lock unlock rotateFiles
+tryDailyRotate :: LoggerSet -> DailyFileLogSpec -> MVar () -> FormattedTime -> IO ()
+tryDailyRotate lgrset spec mvar oldTime = bracket lock unlock rotateFiles
   where
     lock           = tryTakeMVar mvar
     unlock Nothing = return ()
     unlock _       = putMVar mvar ()
     rotateFiles Nothing  = return ()
-    rotateFiles (Just l) = do
+    rotateFiles _ = do
         timedRotate spec oldTime
         renewLoggerSet lgrset
