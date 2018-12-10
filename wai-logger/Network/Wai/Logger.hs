@@ -129,7 +129,7 @@ logCheck (LogStdout _)    = return ()
 logCheck (LogStderr _)    = return ()
 logCheck (LogFileNoRotate fp _)      = check fp
 logCheck (LogFile spec _)            = check (log_file spec)
-logCheck (LogFileDailyRotate spec _) = check (daily_log_file spec)
+logCheck (LogFileTimedRotate spec _) = check (timed_log_file spec)
 logCheck (LogCallback _ _) = return ()
 
 ----------------------------------------------------------------
