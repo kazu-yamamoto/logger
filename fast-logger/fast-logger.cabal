@@ -17,6 +17,7 @@ Library
   Exposed-Modules:      System.Log.FastLogger
                         System.Log.FastLogger.File
                         System.Log.FastLogger.Date
+                        System.Log.FastLogger.Types
   Other-Modules:        System.Log.FastLogger.IO
                         System.Log.FastLogger.FileIO
                         System.Log.FastLogger.IORef

@@ -13,9 +13,7 @@ import Data.ByteString (ByteString)
 import Data.ByteString.Char8 (unpack)
 import System.Directory (doesFileExist, doesDirectoryExist, getPermissions, writable, renameFile)
 import System.FilePath (takeDirectory, dropFileName, takeFileName, (</>))
-
-type TimeFormat = ByteString -- redeclaration to allow for LANGUAGE Safe
-type FormattedTime = ByteString -- redeclaration to allow for LANGUAGE Safe
+import System.Log.FastLogger.Types (TimeFormat, FormattedTime)
 
 -- | The spec for logging files
 data FileLogSpec = FileLogSpec {
