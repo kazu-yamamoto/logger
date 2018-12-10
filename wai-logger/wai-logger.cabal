@@ -9,7 +9,7 @@ Description:            A logging system for WAI
 Category:               Web, Yesod
 Cabal-Version:          >= 1.10
 Build-Type:             Custom
-tested-with:            GHC ==7.8.4 || ==7.10.3 || ==8.0.2 || ==8.2.2 || ==8.4.1
+tested-with:            GHC ==7.8.4 || ==7.10.3 || ==8.0.2 || ==8.2.2 || ==8.4.4 || ==8.6.3
 
 custom-setup
   setup-depends:

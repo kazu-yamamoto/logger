@@ -11,7 +11,7 @@ Category:               System
 Cabal-Version:          >= 1.8
 Build-Type:             Simple
 extra-source-files:     README.md ChangeLog.md
-tested-with:            GHC ==7.8.4 || ==7.10.3 || ==8.0.2 || ==8.2.2 || ==8.4.1
+tested-with:            GHC ==7.8.4 || ==7.10.3 || ==8.0.2 || ==8.2.2 || ==8.4.4 || ==8.6.3
 Library
   GHC-Options:          -Wall
   Exposed-Modules:      System.Log.FastLogger
