@@ -49,11 +49,10 @@ module System.Log.FastLogger (
 import Control.Applicative ((<$>))
 #endif
 import Control.Debounce (mkDebounce, defaultDebounceSettings, debounceAction)
-import Control.Concurrent (getNumCapabilities, myThreadId, threadCapability, takeMVar, MVar, newMVar, tryTakeMVar, putMVar)
+import Control.Concurrent (getNumCapabilities, myThreadId, threadCapability, takeMVar, MVar, newMVar, tryTakeMVar, putMVar, forkIO)
 import Control.Exception (handle, SomeException(..), bracket)
 import Control.Monad (when, replicateM)
 import Data.Array (Array, listArray, (!), bounds)
-import Data.ByteString (split)
 import Data.Foldable (forM_)
 import Data.Maybe (isJust)
 import System.EasyFile (getFileSize)
@@ -205,10 +204,11 @@ data LogType
                                   --   'BufSize' is a buffer size
                                   --   for each capability.
                                   --   File rotation is done on-demand.
-    | LogFileDailyRotate DailyFileLogSpec BufSize -- ^ Logging to a file.
+    | LogFileTimedRotate TimedFileLogSpec BufSize -- ^ Logging to a file.
                                   --   'BufSize' is a buffer size
                                   --   for each capability.
-                                  --   Rotation happens daily.
+                                  --   Rotation happens based on check specified
+                                  --   in TimedFileLogSpec.
     | LogCallback (LogStr -> IO ()) (IO ()) -- ^ Logging with a log and flush action.
                                                -- run flush after log each message.
 
@@ -221,7 +221,7 @@ newFastLogger typ = case typ of
     LogStderr bsize                -> newStderrLoggerSet bsize >>= stdLoggerInit
     LogFileNoRotate fp bsize       -> newFileLoggerSet bsize fp >>= fileLoggerInit
     LogFile fspec bsize            -> rotateLoggerInit fspec bsize
-    LogFileDailyRotate fspec bsize -> dailyRotateLoggerInit fspec bsize
+    LogFileTimedRotate fspec bsize -> timedRotateLoggerInit fspec bsize
     LogCallback cb flush           -> return (\str -> cb str >> flush, noOp)
   where
     stdLoggerInit lgrset = return (pushLogStr lgrset, rmLoggerSet lgrset)
@@ -235,16 +235,16 @@ newFastLogger typ = case typ of
                 pushLogStr lgrset str
                 when (cnt <= 0) $ tryRotate lgrset fspec ref mvar
         return (logger, rmLoggerSet lgrset)
-    dailyRotateLoggerInit fspec bsize = do
-        lgrset <- newFileLoggerSet bsize $ daily_log_file fspec
-        cache <- newTimeCache "%Y-%m-%dT%H:%M:%S"
+    timedRotateLoggerInit fspec bsize = do
+        cache <- newTimeCache $ timed_timefmt fspec
         now <- cache
+        lgrset <- newFileLoggerSet bsize $ prefixTime now $ timed_log_file fspec
         ref <- newIORef now
-        mvar <- newMVar ()
+        mvar <- newMVar lgrset
         let logger str = do
                 ct <- cache
-                updated <- updateTime ref ct
-                forM_ updated $ tryDailyRotate lgrset fspec mvar
+                updated <- updateTime (timed_same_timeframe fspec) ref ct
+                when updated $ tryTimedRotate fspec ct mvar
                 pushLogStr lgrset str
         return (logger, rmLoggerSet lgrset)
 
@@ -264,7 +264,7 @@ newTimedFastLogger tgetter typ = case typ of
     LogStderr bsize                -> newStderrLoggerSet bsize >>= stdLoggerInit
     LogFileNoRotate fp bsize       -> newFileLoggerSet bsize fp >>= fileLoggerInit
     LogFile fspec bsize            -> rotateLoggerInit fspec bsize
-    LogFileDailyRotate fspec bsize -> dailyRotateLoggerInit fspec bsize
+    LogFileTimedRotate fspec bsize -> timedRotateLoggerInit fspec bsize
     LogCallback cb flush           -> return (\f -> tgetter >>= cb . f >> flush, noOp)
   where
     stdLoggerInit lgrset = return ( \f -> tgetter >>= pushLogStr lgrset . f, rmLoggerSet lgrset)
@@ -279,16 +279,16 @@ newTimedFastLogger tgetter typ = case typ of
                 pushLogStr lgrset (f t)
                 when (cnt <= 0) $ tryRotate lgrset fspec ref mvar
         return (logger, rmLoggerSet lgrset)
-    dailyRotateLoggerInit fspec bsize = do
-        lgrset <- newFileLoggerSet bsize $ daily_log_file fspec
-        cache <- newTimeCache "%Y-%m-%dT%H:%M:%S"
+    timedRotateLoggerInit fspec bsize = do
+        cache <- newTimeCache $ timed_timefmt fspec
         now <- cache
+        lgrset <- newFileLoggerSet bsize $ prefixTime now $ timed_log_file fspec
         ref <- newIORef now
-        mvar <- newMVar ()
+        mvar <- newMVar lgrset
         let logger f = do
                 ct <- cache
-                updated <- updateTime ref ct
-                forM_ updated $ tryDailyRotate lgrset fspec mvar
+                updated <- updateTime (timed_same_timeframe fspec) ref ct
+                when updated $ tryTimedRotate fspec ct mvar
                 t <- tgetter
                 pushLogStr lgrset (f t)
         return (logger, rmLoggerSet lgrset)
@@ -305,17 +305,9 @@ noOp = return ()
 decrease :: IORef Int -> IO Int
 decrease ref = atomicModifyIORef' ref (\x -> (x - 1, x - 1))
 
--- updateTime returns whether the day has changed and returns the old time if
--- it happend
-updateTime :: IORef FormattedTime -> FormattedTime -> IO (Maybe FormattedTime)
-updateTime ref newTime = atomicModifyIORef' ref go
-  where
-    go oldTime = if newDay == oldDay
-                    then (oldTime, Nothing)
-                    else (newTime, Just oldTime)
-      where
-        newDay = head $ split 84 newTime    -- 84 is 'T' in ASCII, which sperates
-        oldDay = head $ split 84 oldTime    -- day from time in ISO 8601
+-- updateTime returns whether the timeframe has changed
+updateTime :: (FormattedTime -> FormattedTime -> Bool) -> IORef FormattedTime -> FormattedTime -> IO Bool
+updateTime cmp ref newTime = atomicModifyIORef' ref (\x -> (newTime, not $ cmp x newTime))
 
 tryRotate :: LoggerSet -> FileLogSpec -> IORef Int -> MVar () -> IO ()
 tryRotate lgrset spec ref mvar = bracket lock unlock rotateFiles
@@ -348,13 +340,15 @@ tryRotate lgrset spec ref mvar = bracket lock unlock rotateFiles
     estimate x = fromInteger (x `div` 200)
 
 
-tryDailyRotate :: LoggerSet -> DailyFileLogSpec -> MVar () -> FormattedTime -> IO ()
-tryDailyRotate lgrset spec mvar oldTime = bracket lock unlock rotateFiles
+tryTimedRotate :: TimedFileLogSpec -> FormattedTime -> MVar LoggerSet -> IO ()
+tryTimedRotate spec now mvar = bracket lock unlock rotateFiles
   where
     lock           = tryTakeMVar mvar
     unlock Nothing = return ()
-    unlock _       = putMVar mvar ()
+    unlock (Just (LoggerSet current_path a b c)) = do
+        putMVar mvar $ LoggerSet (Just new_file_path) a b c
+        forM_ current_path (forkIO . timed_post_process spec)
     rotateFiles Nothing  = return ()
-    rotateFiles _ = do
-        timedRotate spec oldTime
-        renewLoggerSet lgrset
+    rotateFiles (Just (LoggerSet _ a b c)) = renewLoggerSet $ LoggerSet (Just new_file_path) a b c
+    new_file_path = prefixTime now $ timed_log_file spec
+

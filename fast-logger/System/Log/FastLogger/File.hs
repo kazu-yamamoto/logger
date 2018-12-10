@@ -2,19 +2,19 @@
 
 module System.Log.FastLogger.File
     ( FileLogSpec(..)
-    , DailyFileLogSpec (..)
+    , TimedFileLogSpec (..)
     , check
     , rotate
-    , timedRotate
+    , prefixTime
     ) where
 
-import Control.Concurrent (forkIO)
-import Control.Monad (unless, when, void)
+import Control.Monad (unless, when)
 import Data.ByteString (ByteString)
 import Data.ByteString.Char8 (unpack)
 import System.Directory (doesFileExist, doesDirectoryExist, getPermissions, writable, renameFile)
 import System.FilePath (takeDirectory, dropFileName, takeFileName, (</>))
 
+type TimeFormat = ByteString -- redeclaration to allow for LANGUAGE Safe
 type FormattedTime = ByteString -- redeclaration to allow for LANGUAGE Safe
 
 -- | The spec for logging files
@@ -24,11 +24,18 @@ data FileLogSpec = FileLogSpec {
   , log_backup_number :: Int -- ^ Max number of rotated log files to keep around before overwriting the oldest one.
   }
 
--- | The spec for daily rotation. It supports post processing of log files. Does
+-- | The spec for time based rotation. It supports post processing of log files. Does
 -- not delete any logs.
-data DailyFileLogSpec = DailyFileLogSpec {
-    daily_log_file :: FilePath
-  , daily_post_process :: FilePath -> IO () -- ^ processing function called asynchronously after a file is added to the rotation
+data TimedFileLogSpec = TimedFileLogSpec {
+    timed_log_file :: FilePath              -- ^ base file path
+  , timed_timefmt  :: TimeFormat            -- ^ time format to prepend
+  , timed_same_timeframe  :: FormattedTime -> FormattedTime -> Bool
+                                            -- ^ function that compares two
+                                            --   formatted times as specified by
+                                            --   timed_timefmt and decides if a
+                                            --   new rotation is supposed to
+                                            --   begin
+  , timed_post_process :: FilePath -> IO () -- ^ processing function called asynchronously after a file is added to the rotation
   }
 
 -- | Checking if a log file can be written.
@@ -59,14 +66,6 @@ rotate spec = mapM_ move srcdsts
         exist <- doesFileExist src
         when exist $ renameFile src dst
 
--- | Rotating log files based on time.
-timedRotate :: DailyFileLogSpec -> FormattedTime -> IO ()
-timedRotate spec oldTime = do
-    move (path, new_path)
-    void $ forkIO $ daily_post_process spec new_path
-  where
-    path = daily_log_file spec
-    new_path = dropFileName path </> unpack oldTime ++ "-" ++ takeFileName path
-    move (src,dst) = do
-        exist <- doesFileExist src
-        when exist $ renameFile src dst
+-- | Prefix file name with formatted time
+prefixTime :: FormattedTime -> FilePath -> FilePath
+prefixTime time path = dropFileName path </> unpack time ++ "-" ++ takeFileName path
