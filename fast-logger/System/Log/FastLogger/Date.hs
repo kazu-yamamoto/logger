@@ -4,18 +4,15 @@
 -- |
 -- Formatting time is slow.
 -- This package provides mechanisms to cache formatted date.
-module System.Log.FastLogger.Date (
-  -- * Types
-    TimeFormat
-  , FormattedTime
-  -- * Date cacher
-  , newTimeCache
+module System.Log.FastLogger.Date
+  ( -- * Date cacher
+    newTimeCache
   , simpleTimeFormat
   , simpleTimeFormat'
   ) where
 
 import Control.AutoUpdate (mkAutoUpdate, defaultUpdateSettings, updateAction)
-import Data.ByteString (ByteString)
+import System.Log.FastLogger.Types (TimeFormat, FormattedTime)
 #if WINDOWS
 import qualified Data.ByteString.Char8 as BS
 import Data.Time (UTCTime, formatTime, getCurrentTime, utcToLocalZonedTime)
@@ -28,12 +25,6 @@ import System.Locale (defaultTimeLocale)
 import Data.UnixTime (formatUnixTime, fromEpochTime)
 import System.Posix (EpochTime, epochTime)
 #endif
-
-----------------------------------------------------------------
-
--- | Type aliaes for date format and formatted date.
-type FormattedTime = ByteString
-type TimeFormat = ByteString
 
 ----------------------------------------------------------------
 

@@ -43,6 +43,8 @@ module System.Log.FastLogger (
   , module System.Log.FastLogger.Date
   -- * File rotation
   , module System.Log.FastLogger.File
+  -- * Types
+  , module System.Log.FastLogger.Types
   ) where
 
 #if __GLASGOW_HASKELL__ < 709
@@ -63,6 +65,7 @@ import System.Log.FastLogger.IORef
 import System.Log.FastLogger.LogStr
 import System.Log.FastLogger.Logger
 import System.Log.FastLogger.Date
+import System.Log.FastLogger.Types
 
 ----------------------------------------------------------------
 
