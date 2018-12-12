@@ -9,7 +9,6 @@ module System.Log.FastLogger.File
     ) where
 
 import Control.Monad (unless, when)
-import Data.ByteString (ByteString)
 import Data.ByteString.Char8 (unpack)
 import System.Directory (doesFileExist, doesDirectoryExist, getPermissions, writable, renameFile)
 import System.FilePath (takeDirectory, dropFileName, takeFileName, (</>))
