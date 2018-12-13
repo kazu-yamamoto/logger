@@ -51,7 +51,7 @@ module System.Log.FastLogger (
 import Control.Applicative ((<$>))
 #endif
 import Control.Debounce (mkDebounce, defaultDebounceSettings, debounceAction)
-import Control.Concurrent (getNumCapabilities, myThreadId, threadCapability, takeMVar, MVar, newMVar, tryTakeMVar, putMVar, forkIO)
+import Control.Concurrent (getNumCapabilities, myThreadId, threadCapability, takeMVar, MVar, newMVar, tryTakeMVar, putMVar)
 import Control.Exception (handle, SomeException(..), bracket)
 import Control.Monad (when, replicateM)
 import Data.Array (Array, listArray, (!), bounds)
@@ -350,7 +350,7 @@ tryTimedRotate spec now mvar = bracket lock unlock rotateFiles
     unlock Nothing = return ()
     unlock (Just (LoggerSet current_path a b c)) = do
         putMVar mvar $ LoggerSet (Just new_file_path) a b c
-        forM_ current_path (forkIO . timed_post_process spec)
+        forM_ current_path (timed_post_process spec)
     rotateFiles Nothing  = return ()
     rotateFiles (Just (LoggerSet _ a b c)) = renewLoggerSet $ LoggerSet (Just new_file_path) a b c
     new_file_path = prefixTime now $ timed_log_file spec
