@@ -211,7 +211,7 @@ data LogType
                                   --   'BufSize' is a buffer size
                                   --   for each capability.
                                   --   Rotation happens based on check specified
-                                  --   in TimedFileLogSpec.
+                                  --   in 'TimedFileLogSpec'.
     | LogCallback (LogStr -> IO ()) (IO ()) -- ^ Logging with a log and flush action.
                                                -- run flush after log each message.
 

@@ -22,7 +22,18 @@ data FileLogSpec = FileLogSpec {
   }
 
 -- | The spec for time based rotation. It supports post processing of log files. Does
--- not delete any logs.
+-- not delete any logs. Example:
+--
+-- @
+-- timeRotate fname = LogFileTimedRotate
+--                (TimedFileLogSpec fname timeFormat sametime compressFile)
+--                defaultBufSize
+--    where
+--        timeFormat = "%FT%H%M%S"
+--        sametime = (==) `on` C8.takeWhile (/='T')
+--        compressFile fp = void . forkIO $
+--            callProcess "tar" [ "--remove-files", "-caf", fp <> ".gz", fp ]
+-- @
 data TimedFileLogSpec = TimedFileLogSpec {
     timed_log_file :: FilePath              -- ^ base file path
   , timed_timefmt  :: TimeFormat            -- ^ time format to prepend
