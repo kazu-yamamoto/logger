@@ -9,11 +9,10 @@ Description:            A logging system for WAI
 Category:               Web, Yesod
 Cabal-Version:          >= 1.10
 Build-Type:             Custom
-tested-with:            GHC ==7.8.4 || ==7.10.3 || ==8.0.2 || ==8.2.2 || ==8.4.4 || ==8.6.3
+Tested-With:            GHC ==7.8.4 || ==7.10.3 || ==8.0.2 || ==8.2.2 || ==8.4.4 || ==8.6.3
 
-custom-setup
-  setup-depends:
-    base, Cabal, cabal-doctest >=1.0.6 && <1.1
+Custom-Setup
+  Setup-Depends:        base, Cabal, cabal-doctest >=1.0.6 && <1.1
 
 Library
   Default-Language:     Haskell2010
@@ -25,18 +24,10 @@ Library
   Build-Depends:        base >= 4 && < 5
                       , byteorder
                       , bytestring
-                      , case-insensitive
                       , fast-logger >= 2.4.5
                       , http-types
                       , network
                       , wai >= 2.0.0
-  if os(windows)
-      Cpp-Options:      -DWINDOWS
-      Build-Depends:    time
-                      , old-locale
-  else
-      Build-Depends:    unix
-                      , unix-time >= 0.2.2
 
 Test-Suite doctests
   Type:                 exitcode-stdio-1.0

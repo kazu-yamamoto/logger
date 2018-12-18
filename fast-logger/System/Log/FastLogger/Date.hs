@@ -13,38 +13,18 @@ module System.Log.FastLogger.Date
 
 import Control.AutoUpdate (mkAutoUpdate, defaultUpdateSettings, updateAction)
 import System.Log.FastLogger.Types (TimeFormat, FormattedTime)
-#if WINDOWS
-import qualified Data.ByteString.Char8 as BS
-import Data.Time (UTCTime, formatTime, getCurrentTime, utcToLocalZonedTime)
-# if MIN_VERSION_time(1,5,0)
-import Data.Time (defaultTimeLocale)
-# else
-import System.Locale (defaultTimeLocale)
-# endif
-#else
 import Data.UnixTime (formatUnixTime, fromEpochTime)
-import System.Posix (EpochTime, epochTime)
-#endif
+import System.PosixCompat.Types (EpochTime)
+import System.PosixCompat.Time (epochTime)
 
 ----------------------------------------------------------------
 
-#if WINDOWS
--- | Get date using UTC.
-getTime :: IO UTCTime
-getTime = getCurrentTime
--- | Format UTC date.
-formatDate :: TimeFormat -> UTCTime -> IO FormattedTime
-formatDate fmt ut = do
-  zt <- utcToLocalZonedTime ut
-  return $ BS.pack $ formatTime defaultTimeLocale (BS.unpack fmt) zt
-#else
 -- | Get date using UnixTime.
 getTime :: IO EpochTime
 getTime = epochTime
 -- | Format unix EpochTime date.
 formatDate :: TimeFormat -> EpochTime -> IO FormattedTime
 formatDate fmt = formatUnixTime fmt . fromEpochTime
-#endif
 
 ----------------------------------------------------------------
 

@@ -2,3 +2,5 @@ resolver: lts-10.10
 packages:
 - wai-logger/
 - fast-logger/
+extra-deps:
+- unix-time-0.4.3
