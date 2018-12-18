@@ -1,5 +1,5 @@
 Name:                   fast-logger
-Version:                2.4.11
+Version:                2.4.12
 Author:                 Kazu Yamamoto <kazu@iij.ad.jp>
 Maintainer:             Kazu Yamamoto <kazu@iij.ad.jp>
 License:                BSD3
@@ -17,6 +17,7 @@ Library
   Exposed-Modules:      System.Log.FastLogger
                         System.Log.FastLogger.File
                         System.Log.FastLogger.Date
+                        System.Log.FastLogger.Types
   Other-Modules:        System.Log.FastLogger.IO
                         System.Log.FastLogger.FileIO
                         System.Log.FastLogger.IORef
@@ -34,7 +35,7 @@ Library
       Build-Depends:    bytestring-builder
   if os(windows)
       Cpp-Options:      -DWINDOWS
-      Build-Depends:    time
+      Build-Depends:  time
                       , Win32
                       , old-locale
   else
