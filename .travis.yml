@@ -53,7 +53,8 @@ before_install:
   - unset CC
   - ROOTDIR=$(pwd)
   - mkdir -p $HOME/.local/bin
-  - "PATH=/opt/ghc/bin:/opt/ghc-ppa-tools/bin:$HOME/local/bin:$PATH"
+  - "PATH=/opt/${HC}/bin:/opt/ghc/bin:/opt/ghc-ppa-tools/bin:$HOME/local/bin:$PATH"
+  - echo $PATH
   - HCNUMVER=$(( $(${HC} --numeric-version|sed -E 's/([0-9]+)\.([0-9]+)\.([0-9]+).*/\1 * 10000 + \2 * 100 + \3/') ))
   - echo $HCNUMVER
 
@@ -69,21 +70,20 @@ install:
   - "sed -i.bak 's/^jobs:/-- jobs:/' ${HOME}/.cabal/config"
   - rm -fv cabal.project cabal.project.local
   - grep -Ev -- '^\s*--' ${HOME}/.cabal/config | grep -Ev '^\s*$'
-  - "printf 'packages: \"wai-logger\" \"date-cache\" \"fast-logger\"\\n' > cabal.project"
+  - "printf 'packages: \"wai-logger\" \"fast-logger\"\\n' > cabal.project"
   - cat cabal.project
   - if [ -f "wai-logger/configure.ac" ]; then
       (cd "wai-logger" && autoreconf -i);
-    fi
-  - if [ -f "date-cache/configure.ac" ]; then
-      (cd "date-cache" && autoreconf -i);
     fi
   - if [ -f "fast-logger/configure.ac" ]; then
       (cd "fast-logger" && autoreconf -i);
     fi
   - rm -f cabal.project.freeze
+  - cabal install hspec-discover
+  - cabal install cabal-doctest
   - cabal new-build -w ${HC} ${TEST} ${BENCH} --project-file="cabal.project" --dep -j2 all
   - cabal new-build -w ${HC} --disable-tests --disable-benchmarks --project-file="cabal.project" --dep -j2 all
-  - rm -rf .ghc.environment.* "wai-logger"/dist "date-cache"/dist "fast-logger"/dist
+  - rm -rf .ghc.environment.* "wai-logger"/dist "fast-logger"/dist
   - DISTDIR=$(mktemp -d /tmp/dist-test.XXXX)
 
 # Here starts the actual work to be performed for the package under test;
@@ -91,16 +91,14 @@ install:
 script:
   # test that source-distributions can be generated
   - (cd "wai-logger" && cabal sdist)
-  - (cd "date-cache" && cabal sdist)
   - (cd "fast-logger" && cabal sdist)
-  - mv "wai-logger"/dist/wai-logger-*.tar.gz "date-cache"/dist/date-cache-*.tar.gz "fast-logger"/dist/fast-logger-*.tar.gz ${DISTDIR}/
+  - mv "wai-logger"/dist/wai-logger-*.tar.gz "fast-logger"/dist/fast-logger-*.tar.gz ${DISTDIR}/
   - cd ${DISTDIR} || false
   - find . -maxdepth 1 -name '*.tar.gz' -exec tar -xvf '{}' \;
-  - "printf 'packages: wai-logger-*/*.cabal date-cache-*/*.cabal fast-logger-*/*.cabal\\n' > cabal.project"
+  - "printf 'packages: wai-logger-*/*.cabal fast-logger-*/*.cabal\\n' > cabal.project"
   - cat cabal.project
   # this builds all libraries and executables (without tests/benchmarks)
   - cabal new-build -w ${HC} --disable-tests --disable-benchmarks all
-  - cabal install hspec-discover
 
   # Build with installed constraints for packages in global-db
   - if $INSTALLED; then echo cabal new-build -w ${HC} --disable-tests --disable-benchmarks $(${HCPKG} list --global --simple-output --names-only | sed 's/\([a-zA-Z0-9-]\{1,\}\) */--constraint="\1 installed" /g') all | sh; else echo "Not building with installed constraints"; fi
