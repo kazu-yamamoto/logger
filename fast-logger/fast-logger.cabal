@@ -1,5 +1,5 @@
 Name:                   fast-logger
-Version:                2.4.12
+Version:                2.4.13
 Author:                 Kazu Yamamoto <kazu@iij.ad.jp>
 Maintainer:             Kazu Yamamoto <kazu@iij.ad.jp>
 License:                BSD3
@@ -32,7 +32,7 @@ Library
                       , directory
                       , filepath
                       , text
-                      , unix-time >= 0.4.3
+                      , unix-time >= 0.4.4
                       , unix-compat
   if impl(ghc < 7.8)
       Build-Depends:    bytestring-builder

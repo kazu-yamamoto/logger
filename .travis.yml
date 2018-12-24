@@ -53,11 +53,7 @@ before_install:
   - unset CC
   - ROOTDIR=$(pwd)
   - mkdir -p $HOME/.local/bin
-# For GHC 7.10.3
-# "The program 'hsc2hs' is required but it could not be found "
-# See https://github.com/haskell-CI/haskell-ci/issues/66
-  - HCVER=`echo $HC | sed 's/ghc-//'`
-  - "PATH=/opt/ghc/${HCVER}/bin:/opt/ghc/bin:/opt/ghc-ppa-tools/bin:$HOME/local/bin:$PATH"
+  - "PATH=/opt/ghc/bin:/opt/ghc-ppa-tools/bin:$HOME/local/bin:$PATH"
   - echo $PATH
   - HCNUMVER=$(( $(${HC} --numeric-version|sed -E 's/([0-9]+)\.([0-9]+)\.([0-9]+).*/\1 * 10000 + \2 * 100 + \3/') ))
   - echo $HCNUMVER

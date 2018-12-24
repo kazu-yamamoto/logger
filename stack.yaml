@@ -3,4 +3,4 @@ packages:
 - wai-logger/
 - fast-logger/
 extra-deps:
-- unix-time-0.4.3
+- unix-time-0.4.4
