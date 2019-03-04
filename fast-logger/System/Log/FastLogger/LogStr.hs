@@ -75,7 +75,7 @@ instance ToLogStr LogStr where
 instance ToLogStr S8.ByteString where
     toLogStr bs = LogStr (BS.length bs) (toBuilder bs)
 instance ToLogStr BL.ByteString where
-    toLogStr = toLogStr . S8.concat . BL.toChunks
+    toLogStr b = LogStr (fromIntegral (BL.length b)) (B.lazyByteString b)
 instance ToLogStr Builder where
     toLogStr x = let b = B.toLazyByteString x in LogStr (fromIntegral (BL.length b)) (B.lazyByteString b)
 instance ToLogStr String where
