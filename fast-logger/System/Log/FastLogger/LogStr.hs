@@ -18,6 +18,7 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as BL
+import Data.Int (Int8,Int16,Int32,Int64)
 #if __GLASGOW_HASKELL__ < 709
 import Data.Monoid (Monoid, mempty, mappend)
 #endif
@@ -32,6 +33,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TL
+import Data.Word (Word8,Word16,Word32,Word64)
 
 ----------------------------------------------------------------
 
@@ -84,6 +86,26 @@ instance ToLogStr T.Text where
     toLogStr = toLogStr . T.encodeUtf8
 instance ToLogStr TL.Text where
     toLogStr = toLogStr . TL.encodeUtf8
+instance ToLogStr Int where
+  toLogStr = toLogStr . B.intDec
+instance ToLogStr Int8 where
+  toLogStr = toLogStr . B.int8Dec
+instance ToLogStr Int16 where
+  toLogStr = toLogStr . B.int16Dec
+instance ToLogStr Int32 where
+  toLogStr = toLogStr . B.int32Dec
+instance ToLogStr Int64 where
+  toLogStr = toLogStr . B.int64Dec
+instance ToLogStr Word where
+  toLogStr = toLogStr . B.wordDec
+instance ToLogStr Word8 where
+  toLogStr = toLogStr . B.word8Dec
+instance ToLogStr Word16 where
+  toLogStr = toLogStr . B.word16Dec
+instance ToLogStr Word32 where
+  toLogStr = toLogStr . B.word32Dec
+instance ToLogStr Word64 where
+  toLogStr = toLogStr . B.word64Dec
 
 instance Show LogStr where
   show = show . T.decodeUtf8 . fromLogStr
