@@ -1,3 +1,7 @@
+## 2.4.14
+
+* Add `ToLogStr` instances for the following types: signed integers, unsigned integers, floating-point numbers. These instances all use decimal encodings. [#177](https://github.com/kazu-yamamoto/logger/pull/177)
+
 ## 2.4.11
 
 * Give an explicit definition for (<>) in LogStr's Semigroup instance. [#155](https://github.com/kazu-yamamoto/logger/pull/155)

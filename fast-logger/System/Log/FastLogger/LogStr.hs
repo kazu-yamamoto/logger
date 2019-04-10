@@ -28,6 +28,8 @@ import Data.Monoid ((<>))
 import qualified Data.Semigroup as Semi (Semigroup(..))
 #endif
 import Data.String (IsString(..))
+import Data.Int (Int8,Int16,Int32,Int64)
+import Data.Word (Word8,Word16,Word32,Word64)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.Lazy as TL
@@ -67,6 +69,9 @@ instance Monoid LogStr where
 instance IsString LogStr where
     fromString = toLogStr . TL.pack
 
+-- | Types that can be converted to a 'LogStr'. Instances for
+-- types from the @text@ library use a UTF-8 encoding. Instances
+-- for numerical types use a decimal encoding.
 class ToLogStr msg where
     toLogStr :: msg -> LogStr
 
@@ -84,6 +89,48 @@ instance ToLogStr T.Text where
     toLogStr = toLogStr . T.encodeUtf8
 instance ToLogStr TL.Text where
     toLogStr = toLogStr . TL.encodeUtf8
+
+-- | @since 2.4.14
+instance ToLogStr Int where
+    toLogStr = toLogStr . B.intDec
+-- | @since 2.4.14
+instance ToLogStr Int8 where
+    toLogStr = toLogStr . B.int8Dec
+-- | @since 2.4.14
+instance ToLogStr Int16 where
+    toLogStr = toLogStr . B.int16Dec
+-- | @since 2.4.14
+instance ToLogStr Int32 where
+    toLogStr = toLogStr . B.int32Dec
+-- | @since 2.4.14
+instance ToLogStr Int64 where
+    toLogStr = toLogStr . B.int64Dec
+
+-- | @since 2.4.14
+instance ToLogStr Word where
+    toLogStr = toLogStr . B.wordDec
+-- | @since 2.4.14
+instance ToLogStr Word8 where
+    toLogStr = toLogStr . B.word8Dec
+-- | @since 2.4.14
+instance ToLogStr Word16 where
+    toLogStr = toLogStr . B.word16Dec
+-- | @since 2.4.14
+instance ToLogStr Word32 where
+    toLogStr = toLogStr . B.word32Dec
+-- | @since 2.4.14
+instance ToLogStr Word64 where
+    toLogStr = toLogStr . B.word64Dec
+
+-- | @since 2.4.14
+instance ToLogStr Integer where
+    toLogStr = toLogStr . B.integerDec
+-- | @since 2.4.14
+instance ToLogStr Float where
+    toLogStr = toLogStr . B.floatDec
+-- | @since 2.4.14
+instance ToLogStr Double where
+    toLogStr = toLogStr . B.doubleDec
 
 instance Show LogStr where
   show = show . T.decodeUtf8 . fromLogStr
