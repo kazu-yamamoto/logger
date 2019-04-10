@@ -29,7 +29,7 @@ import qualified Data.Semigroup as Semi (Semigroup(..))
 #endif
 import Data.String (IsString(..))
 import Data.Int (Int8,Int16,Int32,Int64)
-import Data.Word (Word8,Word16,Word32,Word64)
+import Data.Word (Word,Word8,Word16,Word32,Word64)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.Lazy as TL
