@@ -44,6 +44,7 @@ Test-Suite spec
 
     Ghc-Options:     -Wall -threaded
     Other-Modules:   FastLoggerSpec
+    Build-Tools:     hspec-discover >= 2.6
     Build-Depends:   base >= 4 && < 5
                    , bytestring
                    , directory
