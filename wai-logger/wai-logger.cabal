@@ -28,6 +28,8 @@ Library
                       , http-types
                       , network
                       , wai >= 2.0.0
+ if impl(ghc >= 8)
+      Default-Extensions:  Strict StrictData
 
 Test-Suite doctests
   Type:                 exitcode-stdio-1.0
@@ -38,6 +40,8 @@ Test-Suite doctests
   Build-Depends:        base
                       , wai-logger
                       , doctest >= 0.10.1
+  if impl(ghc >= 8)
+      Default-Extensions:  Strict StrictData
 
 Source-Repository head
   Type:                 git
