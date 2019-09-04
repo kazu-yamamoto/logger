@@ -5,11 +5,11 @@ module System.Log.FastLogger.IO where
 
 import Data.ByteString.Builder.Extra (Next(..))
 import qualified Data.ByteString.Builder.Extra as BBE
-import Data.ByteString.Internal (ByteString(..))
-import Data.Word (Word8)
 import Foreign.ForeignPtr (withForeignPtr)
 import Foreign.Marshal.Alloc (mallocBytes, free)
 import Foreign.Ptr (Ptr, plusPtr)
+
+import System.Log.FastLogger.Imports
 import System.Log.FastLogger.LogStr
 
 type Buffer = Ptr Word8

@@ -1,11 +1,12 @@
 module System.Log.FastLogger.FileIO where
 
-import Data.Word (Word8)
 import Foreign.Ptr (Ptr)
 import GHC.IO.Device (close)
 import GHC.IO.FD (openFile, stderr, stdout,  writeRawBufferPtr)
 import qualified GHC.IO.FD as POSIX (FD(..))
 import GHC.IO.IOMode (IOMode(..))
+
+import System.Log.FastLogger.Imports
 
 type FD = POSIX.FD
 

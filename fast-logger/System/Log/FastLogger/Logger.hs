@@ -1,4 +1,5 @@
-{-# LANGUAGE BangPatterns, CPP #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Safe #-}
 
 module System.Log.FastLogger.Logger (
@@ -8,14 +9,15 @@ module System.Log.FastLogger.Logger (
   , flushLog
   ) where
 
+
 import Control.Concurrent (MVar, newMVar, withMVar)
-import Control.Monad (when)
 import Foreign.Marshal.Alloc (allocaBytes)
 import Foreign.Ptr (plusPtr)
+
 import System.Log.FastLogger.FileIO
 import System.Log.FastLogger.IO
+import System.Log.FastLogger.Imports
 import System.Log.FastLogger.LogStr
-import System.Log.FastLogger.IORef
 
 ----------------------------------------------------------------
 
@@ -24,11 +26,9 @@ data Logger = Logger (MVar Buffer) !BufSize (IORef LogStr)
 ----------------------------------------------------------------
 
 newLogger :: BufSize -> IO Logger
-newLogger size = do
-    buf <- getBuffer size
-    mbuf <- newMVar buf
-    lref <- newIORef mempty
-    return $ Logger mbuf size lref
+newLogger size = Logger <$> (getBuffer size >>= newMVar)
+                        <*> pure size
+                        <*> newIORef mempty
 
 ----------------------------------------------------------------
 

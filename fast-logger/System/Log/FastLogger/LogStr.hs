@@ -12,35 +12,23 @@ module System.Log.FastLogger.LogStr (
   , (<>)
   ) where
 
+import qualified Data.ByteString as BS
 import Data.ByteString.Builder (Builder)
 import qualified Data.ByteString.Builder as B
-import Data.ByteString (ByteString)
-import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as BL
-#if __GLASGOW_HASKELL__ < 709
-import Data.Monoid (Monoid, mempty, mappend)
-#endif
-#if MIN_VERSION_base(4,5,0)
-import Data.Monoid ((<>))
-#endif
 #if MIN_VERSION_base(4,9,0)
 import qualified Data.Semigroup as Semi (Semigroup(..))
 #endif
 import Data.String (IsString(..))
-import Data.Int (Int8,Int16,Int32,Int64)
-import Data.Word (Word,Word8,Word16,Word32,Word64)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TL
 
-----------------------------------------------------------------
+import System.Log.FastLogger.Imports
 
-#if !MIN_VERSION_base(4,5,0)
-(<>) :: Monoid m => m -> m -> m
-(<>) = mappend
-#endif
+----------------------------------------------------------------
 
 toBuilder :: ByteString -> Builder
 toBuilder = B.byteString

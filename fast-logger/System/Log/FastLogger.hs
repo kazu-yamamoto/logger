@@ -1,3 +1,6 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE OverloadedStrings #-}
+
 -- | This module provides a fast logging system which
 --   scales on multicore environments (i.e. +RTS -N\<x\>).
 --
@@ -5,9 +8,6 @@
 --   when program is run on more than one core thus users
 --   should rely more on message timestamps than on their order in the
 --   log.
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE OverloadedStrings #-}
-
 module System.Log.FastLogger (
   -- * Creating a logger set
     LoggerSet
@@ -47,24 +47,19 @@ module System.Log.FastLogger (
   , module System.Log.FastLogger.Types
   ) where
 
-#if __GLASGOW_HASKELL__ < 709
-import Control.Applicative ((<$>))
-#endif
 import Control.Debounce (mkDebounce, defaultDebounceSettings, debounceAction)
 import Control.Concurrent (getNumCapabilities, myThreadId, threadCapability, takeMVar, MVar, newMVar, tryTakeMVar, putMVar)
 import Control.Exception (handle, SomeException(..), bracket)
-import Control.Monad (when, replicateM)
 import Data.Array (Array, listArray, (!), bounds)
-import Data.Foldable (forM_)
-import Data.Maybe (isJust)
 import System.EasyFile (getFileSize)
+
+import System.Log.FastLogger.Date
 import System.Log.FastLogger.File
-import System.Log.FastLogger.IO
 import System.Log.FastLogger.FileIO
-import System.Log.FastLogger.IORef
+import System.Log.FastLogger.IO
+import System.Log.FastLogger.Imports
 import System.Log.FastLogger.LogStr
 import System.Log.FastLogger.Logger
-import System.Log.FastLogger.Date
 import System.Log.FastLogger.Types
 
 ----------------------------------------------------------------
@@ -350,7 +345,9 @@ tryTimedRotate spec now mvar = bracket lock unlock rotateFiles
     unlock Nothing = return ()
     unlock (Just (LoggerSet current_path a b c)) = do
         putMVar mvar $ LoggerSet (Just new_file_path) a b c
-        forM_ current_path (timed_post_process spec)
+        case current_path of
+          Nothing   -> return ()
+          Just path -> timed_post_process spec path
     rotateFiles Nothing  = return ()
     rotateFiles (Just (LoggerSet _ a b c)) = renewLoggerSet $ LoggerSet (Just new_file_path) a b c
     new_file_path = prefixTime now $ timed_log_file spec

@@ -8,10 +8,11 @@ module System.Log.FastLogger.File
     , prefixTime
     ) where
 
-import Control.Monad (unless, when)
 import Data.ByteString.Char8 (unpack)
 import System.Directory (doesFileExist, doesDirectoryExist, getPermissions, writable, renameFile)
 import System.FilePath (takeDirectory, dropFileName, takeFileName, (</>))
+
+import System.Log.FastLogger.Imports
 import System.Log.FastLogger.Types (TimeFormat, FormattedTime)
 
 -- | The spec for logging files

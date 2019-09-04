@@ -4,10 +4,10 @@ module System.Log.FastLogger.Types (
   , FormattedTime
   ) where
 
-import Data.ByteString (ByteString)
+import System.Log.FastLogger.Imports
 
 ----------------------------------------------------------------
-  
+
 -- | Type aliaes for date format and formatted date.
 type FormattedTime = ByteString
 type TimeFormat = ByteString

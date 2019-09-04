@@ -20,9 +20,9 @@ Library
                         System.Log.FastLogger.File
                         System.Log.FastLogger.Date
                         System.Log.FastLogger.Types
-  Other-Modules:        System.Log.FastLogger.IO
+  Other-Modules:        System.Log.FastLogger.Imports
+                        System.Log.FastLogger.IO
                         System.Log.FastLogger.FileIO
-                        System.Log.FastLogger.IORef
                         System.Log.FastLogger.LogStr
                         System.Log.FastLogger.Logger
   Build-Depends:        base >= 4.5 && < 5
