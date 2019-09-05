@@ -21,19 +21,18 @@ import System.Log.FastLogger.LogStr
 
 ----------------------------------------------------------------
 
-data Logger = Logger (MVar Buffer) !BufSize (IORef LogStr)
+data Logger = Logger !BufSize (MVar Buffer) (IORef LogStr)
 
 ----------------------------------------------------------------
 
 newLogger :: BufSize -> IO Logger
-newLogger size = Logger <$> (getBuffer size >>= newMVar)
-                        <*> pure size
-                        <*> newIORef mempty
+newLogger size = Logger size <$> (getBuffer size >>= newMVar)
+                             <*> newIORef mempty
 
 ----------------------------------------------------------------
 
 pushLog :: FD -> Logger -> LogStr -> IO ()
-pushLog fd logger@(Logger mbuf size ref) nlogmsg@(LogStr nlen nbuilder)
+pushLog fd logger@(Logger size mbuf ref) nlogmsg@(LogStr nlen nbuilder)
   | nlen > size = do
       flushLog fd logger
 
@@ -56,7 +55,7 @@ pushLog fd logger@(Logger mbuf size ref) nlogmsg@(LogStr nlen nbuilder)
 ----------------------------------------------------------------
 
 flushLog :: FD -> Logger -> IO ()
-flushLog fd (Logger mbuf size lref) = do
+flushLog fd (Logger size mbuf lref) = do
     logmsg <- atomicModifyIORef' lref (\old -> (mempty, old))
     -- If a special buffer is prepared for flusher, this MVar could
     -- be removed. But such a code does not contribute logging speed

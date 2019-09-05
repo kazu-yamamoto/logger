@@ -165,7 +165,7 @@ rmLoggerSet (LoggerSet mfile fref arr _) = do
   where
     flushIt fd i = flushLog fd (arr ! i)
     freeIt i = do
-        let (Logger mbuf _ _) = arr ! i
+        let (Logger _ mbuf _) = arr ! i
         takeMVar mbuf >>= freeBuffer
 
 ----------------------------------------------------------------
