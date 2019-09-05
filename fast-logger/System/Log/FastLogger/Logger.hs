@@ -35,7 +35,6 @@ pushLog :: FD -> Logger -> LogStr -> IO ()
 pushLog fd logger@(Logger size mbuf ref) nlogmsg@(LogStr nlen nbuilder)
   | nlen > size = do
       flushLog fd logger
-
       -- Make sure we have a large enough buffer to hold the entire
       -- contents, thereby allowing for a single write system call and
       -- avoiding interleaving. This does not address the possibility
