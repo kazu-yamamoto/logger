@@ -106,7 +106,7 @@ newFDLoggerSet size mfile fd = do
 --   If the buffer becomes full, the log messages in the buffer
 --   are written to its corresponding file, stdout, or stderr.
 pushLogStr :: LoggerSet -> LogStr -> IO ()
-pushLogStr (LoggerSet _ fref arr flush) logmsg = do
+pushLogStr (LoggerSet _ fdref arr flush) logmsg = do
     (i, _) <- myThreadId >>= threadCapability
     -- The number of capability could be dynamically changed.
     -- So, let's check the upper boundary of the array.
@@ -115,8 +115,7 @@ pushLogStr (LoggerSet _ fref arr flush) logmsg = do
         j | i < lim   = i
           | otherwise = i `mod` lim
     let logger = arr ! j
-    fd <- readIORef fref
-    pushLog fd logger logmsg
+    pushLog fdref logger logmsg
     flush
 
 -- | Same as 'pushLogStr' but also appends a newline.
@@ -136,12 +135,11 @@ flushLogStr :: LoggerSet -> IO ()
 flushLogStr (LoggerSet _ fref arr _) = flushLogStrRaw fref arr
 
 flushLogStrRaw :: IORef FD -> Array Int Logger -> IO ()
-flushLogStrRaw fref arr = do
+flushLogStrRaw fdref arr = do
     let (l,u) = bounds arr
-    fd <- readIORef fref
-    mapM_ (flushIt fd) [l .. u]
+    mapM_ flushIt [l .. u]
   where
-    flushIt fd i = flushLog fd (arr ! i)
+    flushIt i = flushLog fdref (arr ! i)
 
 -- | Renewing the internal file information in 'LoggerSet'.
 --   This does nothing for stdout and stderr.
@@ -155,15 +153,15 @@ renewLoggerSet (LoggerSet (Just file) fref _ _) = do
 -- | Flushing the buffers, closing the internal file information
 --   and freeing the buffers.
 rmLoggerSet :: LoggerSet -> IO ()
-rmLoggerSet (LoggerSet mfile fref arr _) = do
+rmLoggerSet (LoggerSet mfile fdref arr _) = do
     let (l,u) = bounds arr
-    fd <- readIORef fref
     let nums = [l .. u]
-    mapM_ (flushIt fd) nums
+    mapM_ flushIt nums
     mapM_ freeIt nums
+    fd <- readIORef fdref
     when (isJust mfile) $ closeFD fd
   where
-    flushIt fd i = flushLog fd (arr ! i)
+    flushIt i = flushLog fdref (arr ! i)
     freeIt i = do
         let (Logger _ mbuf _) = arr ! i
         takeMVar mbuf >>= freeBuffer
