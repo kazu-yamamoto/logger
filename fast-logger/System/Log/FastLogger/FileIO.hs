@@ -14,7 +14,7 @@ closeFD :: FD -> IO ()
 closeFD = close
 
 openFileFD :: FilePath -> IO FD
-openFileFD f = fst `fmap` openFile f AppendMode False
+openFileFD f = fst <$> openFile f AppendMode False
 
 getStderrFD :: IO FD
 getStderrFD = return stderr
@@ -23,4 +23,4 @@ getStdoutFD :: IO FD
 getStdoutFD = return stdout
 
 writeRawBufferPtr2FD :: FD -> Ptr Word8 -> Int -> IO Int
-writeRawBufferPtr2FD fd bf len = fromIntegral `fmap` writeRawBufferPtr "write" fd bf 0 (fromIntegral len)
+writeRawBufferPtr2FD fd bf len = fromIntegral <$> writeRawBufferPtr "write" fd bf 0 (fromIntegral len)
