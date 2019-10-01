@@ -1,5 +1,6 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP               #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE GADTs             #-}
 
 -- | This module provides a fast logging system which
 --   scales on multicore environments (i.e. +RTS -N\<x\>).
@@ -34,7 +35,7 @@ module System.Log.FastLogger (
   -- * FastLogger
   , FastLogger
   , TimedFastLogger
-  , LogType(..)
+  , LogType'(..), LogType
   , newFastLogger
   , withFastLogger
   , newTimedFastLogger
@@ -183,34 +184,39 @@ type FastLogger = LogStr -> IO ()
 -- @
 type TimedFastLogger = (FormattedTime -> LogStr) -> IO ()
 
+type LogType = LogType' LogStr
+
 -- | Logger Type.
-data LogType
-    = LogNone                     -- ^ No logging.
-    | LogStdout BufSize           -- ^ Logging to stdout.
+data LogType' a where
+    LogNone :: LogType' LogStr    -- ^ No logging.
+    LogStdout :: BufSize -> LogType' LogStr
+                                  -- ^ Logging to stdout.
                                   --   'BufSize' is a buffer size
                                   --   for each capability.
-    | LogStderr BufSize           -- ^ Logging to stderr.
+    LogStderr :: BufSize -> LogType' LogStr
+                                  -- ^ Logging to stderr.
                                   --   'BufSize' is a buffer size
                                   --   for each capability.
-    | LogFileNoRotate FilePath BufSize
+    LogFileNoRotate :: FilePath -> BufSize -> LogType' LogStr
                                   -- ^ Logging to a file.
                                   --   'BufSize' is a buffer size
                                   --   for each capability.
-    | LogFile FileLogSpec BufSize -- ^ Logging to a file.
+    LogFile :: FileLogSpec -> BufSize -> LogType' LogStr
+                                  -- ^ Logging to a file.
                                   --   'BufSize' is a buffer size
                                   --   for each capability.
                                   --   File rotation is done on-demand.
-    | LogFileTimedRotate TimedFileLogSpec BufSize -- ^ Logging to a file.
+    LogFileTimedRotate :: TimedFileLogSpec -> BufSize -> LogType' LogStr -- ^ Logging to a file.
                                   --   'BufSize' is a buffer size
                                   --   for each capability.
                                   --   Rotation happens based on check specified
                                   --   in 'TimedFileLogSpec'.
-    | LogCallback (LogStr -> IO ()) (IO ()) -- ^ Logging with a log and flush action.
-                                               -- run flush after log each message.
+    LogCallback :: (v -> IO ()) -> IO () -> LogType' v  -- ^ Logging with a log and flush action.
+                                                          -- run flush after log each message.
 
 -- | Initialize a 'FastLogger' without attaching timestamp
 -- a tuple of logger and clean up action are returned.
-newFastLogger :: LogType -> IO (FastLogger, IO ())
+newFastLogger :: LogType' v -> IO (v -> IO (), IO ())
 newFastLogger typ = case typ of
     LogNone                        -> return (const noOp, noOp)
     LogStdout bsize                -> newStdoutLoggerSet bsize >>= stdLoggerInit
