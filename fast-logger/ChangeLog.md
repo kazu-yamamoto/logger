@@ -1,3 +1,21 @@
+## 3.0.0
+
+* Allowing the callback logger to be generic. [#182](https://github.com/kazu-yamamoto/logger/pull/180) This is a BREAKING CHANGE. Users should do:
+  1. Importing `LogType'` and related constructors because `LogType` is now a type alias.
+  2. Using `{-# LANGUAGE GADTs #-}`, even if you aren't using anything new, any time you try and `case` over values of type `LogType'`.
+
+## 2.4.17
+
+* Obtaining a fresh fd from IORef just before writing. [#180](https://github.com/kazu-yamamoto/logger/pull/180)
+
+## 2.4.16
+
+* Using strict language extensions.
+
+## 2.4.15
+
+* Rescuing GHC 7.8.
+	
 ## 2.4.14
 
 * Add `ToLogStr` instances for the following types: signed integers, unsigned integers, floating-point numbers. These instances all use decimal encodings. [#177](https://github.com/kazu-yamamoto/logger/pull/177)
