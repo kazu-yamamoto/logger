@@ -1,4 +1,5 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP   #-}
+{-# LANGUAGE GADTs #-}
 
 -- | Apache style logger for WAI applications.
 --
@@ -44,7 +45,7 @@ module Network.Wai.Logger (
   , initLogger
   -- * Types
   , IPAddrSource(..)
-  , LogType(..)
+  , LogType'(..), LogType
   , FileLogSpec(..)
   -- * Utilities
   , showSockAddr
