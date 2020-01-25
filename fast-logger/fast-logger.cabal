@@ -20,6 +20,7 @@ Library
                         System.Log.FastLogger.File
                         System.Log.FastLogger.Date
                         System.Log.FastLogger.Types
+                        System.Log.FastLogger.Internal
   Other-Modules:        System.Log.FastLogger.Imports
                         System.Log.FastLogger.IO
                         System.Log.FastLogger.FileIO
