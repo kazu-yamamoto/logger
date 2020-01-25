@@ -20,11 +20,11 @@ Library
                         System.Log.FastLogger.File
                         System.Log.FastLogger.Date
                         System.Log.FastLogger.Types
-  Other-Modules:        System.Log.FastLogger.Imports
-                        System.Log.FastLogger.IO
-                        System.Log.FastLogger.FileIO
-                        System.Log.FastLogger.LogStr
-                        System.Log.FastLogger.Logger
+                        System.Log.FastLogger.Internal.Imports
+                        System.Log.FastLogger.Internal.IO
+                        System.Log.FastLogger.Internal.FileIO
+                        System.Log.FastLogger.Internal.LogStr
+                        System.Log.FastLogger.Internal.Logger
   Build-Depends:        base >= 4.7 && < 5
                       , array
                       , auto-update >= 0.1.2

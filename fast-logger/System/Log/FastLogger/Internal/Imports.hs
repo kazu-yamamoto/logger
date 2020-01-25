@@ -1,6 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 
-module System.Log.FastLogger.Imports (
+module System.Log.FastLogger.Internal.Imports (
     ByteString(..)
   , module Control.Applicative
   , module Control.Monad

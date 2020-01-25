@@ -4,7 +4,7 @@ module System.Log.FastLogger.Types (
   , FormattedTime
   ) where
 
-import System.Log.FastLogger.Imports
+import System.Log.FastLogger.Internal.Imports
 
 ----------------------------------------------------------------
 
