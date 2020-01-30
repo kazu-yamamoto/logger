@@ -2,7 +2,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE Safe #-}
 
-module System.Log.FastLogger.Internal.Logger (
+module System.Log.FastLogger.Logger (
     Logger(..)
   , newLogger
   , pushLog
@@ -14,10 +14,10 @@ import Control.Concurrent (MVar, newMVar, withMVar)
 import Foreign.Marshal.Alloc (allocaBytes)
 import Foreign.Ptr (plusPtr)
 
-import System.Log.FastLogger.Internal.FileIO
-import System.Log.FastLogger.Internal.IO
-import System.Log.FastLogger.Internal.Imports
-import System.Log.FastLogger.Internal.LogStr
+import System.Log.FastLogger.FileIO
+import System.Log.FastLogger.IO
+import System.Log.FastLogger.Imports
+import System.Log.FastLogger.LogStr
 
 ----------------------------------------------------------------
 

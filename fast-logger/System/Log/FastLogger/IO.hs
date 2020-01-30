@@ -1,7 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE Trustworthy #-}
 
-module System.Log.FastLogger.Internal.IO where
+module System.Log.FastLogger.IO where
 
 import Data.ByteString.Builder.Extra (Next(..))
 import qualified Data.ByteString.Builder.Extra as BBE
@@ -9,8 +9,8 @@ import Foreign.ForeignPtr (withForeignPtr)
 import Foreign.Marshal.Alloc (mallocBytes, free)
 import Foreign.Ptr (Ptr, plusPtr)
 
-import System.Log.FastLogger.Internal.Imports
-import System.Log.FastLogger.Internal.LogStr
+import System.Log.FastLogger.Imports
+import System.Log.FastLogger.LogStr
 
 type Buffer = Ptr Word8
 

@@ -56,11 +56,11 @@ import System.EasyFile (getFileSize)
 
 import System.Log.FastLogger.Date
 import System.Log.FastLogger.File
-import System.Log.FastLogger.Internal.FileIO
-import System.Log.FastLogger.Internal.IO
-import System.Log.FastLogger.Internal.Imports
-import System.Log.FastLogger.Internal.LogStr
-import System.Log.FastLogger.Internal.Logger
+import System.Log.FastLogger.FileIO
+import System.Log.FastLogger.IO
+import System.Log.FastLogger.Imports
+import System.Log.FastLogger.LogStr
+import System.Log.FastLogger.Logger
 import System.Log.FastLogger.Types
 
 ----------------------------------------------------------------

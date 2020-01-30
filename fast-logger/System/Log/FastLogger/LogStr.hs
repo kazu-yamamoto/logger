@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE Safe #-}
 
-module System.Log.FastLogger.Internal.LogStr (
+module System.Log.FastLogger.LogStr (
     Builder
   , LogStr(..)
   , logStrLength
@@ -26,7 +26,7 @@ import qualified Data.Text.Encoding as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TL
 
-import System.Log.FastLogger.Internal.Imports
+import System.Log.FastLogger.Imports
 
 ----------------------------------------------------------------
 
