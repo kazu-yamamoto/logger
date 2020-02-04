@@ -5,3 +5,4 @@ cabal.sandbox.config
 tarballs/
 dist-newstyle/
 .ghc.environment.*
+stack.yaml.lock
