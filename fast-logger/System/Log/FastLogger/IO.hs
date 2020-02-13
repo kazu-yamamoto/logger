@@ -1,5 +1,11 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+
+#if __GLASGOW_HASKELL__ <= 708
 {-# LANGUAGE Trustworthy #-}
+#else
+{-# LANGUAGE Safe #-}
+#endif
 
 module System.Log.FastLogger.IO where
 
