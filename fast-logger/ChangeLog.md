@@ -1,3 +1,8 @@
+## 3.0.1
+
+* Creating the `Internal` module.
+  [#185](https://github.com/kazu-yamamoto/logger/pull/185)
+
 ## 3.0.0
 
 * Allowing the callback logger to be generic. [#182](https://github.com/kazu-yamamoto/logger/pull/180) This is a BREAKING CHANGE. Users should do:
@@ -15,7 +20,7 @@
 ## 2.4.15
 
 * Rescuing GHC 7.8.
-	
+
 ## 2.4.14
 
 * Add `ToLogStr` instances for the following types: signed integers, unsigned integers, floating-point numbers. These instances all use decimal encodings. [#177](https://github.com/kazu-yamamoto/logger/pull/177)
