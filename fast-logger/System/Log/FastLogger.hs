@@ -176,12 +176,10 @@ type FastLogger = LogStr -> IO ()
 --
 -- Usually, one would write a wrapper on top of 'TimedFastLogger', for example:
 --
--- @
--- {-# LANGUAGE OverloadedStrings #-}
---
--- log :: TimedFastLogger -> LogStr -> IO ()
--- log logger msg = logger (\time -> toLogStr (show time) <> " " <> msg <> "\n")
--- @
+-- > {-# LANGUAGE OverloadedStrings #-}
+-- >
+-- > log :: TimedFastLogger -> LogStr -> IO ()
+-- > log logger msg = logger (\time -> toLogStr (show time) <> " " <> msg <> "\n")
 type TimedFastLogger = (FormattedTime -> LogStr) -> IO ()
 
 type LogType = LogType' LogStr
