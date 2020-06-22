@@ -10,36 +10,38 @@
 --   should rely more on message timestamps than on their order in the
 --   log.
 module System.Log.FastLogger (
-  -- * Creating a logger set
-    LoggerSet
-  , newFileLoggerSet
-  , newStdoutLoggerSet
-  , newStderrLoggerSet
-  , newLoggerSet
-  -- * Buffer size
-  , BufSize
-  , defaultBufSize
-  -- * Renewing and removing a logger set
-  , renewLoggerSet
-  , rmLoggerSet
+  -- * FastLogger
+    FastLogger
+  , LogType
+  , LogType'(..)
+  , newFastLogger
+  , withFastLogger
+  -- * Timed FastLogger
+  , TimedFastLogger
+  , newTimedFastLogger
+  , withTimedFastLogger
   -- * Log messages
   , LogStr
   , ToLogStr(..)
   , fromLogStr
   , logStrLength
+  -- * Buffer size
+  , BufSize
+  , defaultBufSize
+  -- * Creating a logger set
+  , LoggerSet
+  , newFileLoggerSet
+  , newStdoutLoggerSet
+  , newStderrLoggerSet
+  , newLoggerSet
+  -- * Renewing and removing a logger set
+  , renewLoggerSet
+  , rmLoggerSet
   -- * Writing a log message
   , pushLogStr
   , pushLogStrLn
   -- * Flushing buffered log messages
   , flushLogStr
-  -- * FastLogger
-  , FastLogger
-  , TimedFastLogger
-  , LogType'(..), LogType
-  , newFastLogger
-  , withFastLogger
-  , newTimedFastLogger
-  , withTimedFastLogger
   -- * Date cache
   , module System.Log.FastLogger.Date
   -- * File rotation
@@ -214,6 +216,9 @@ data LogType' a where
 
 -- | Initialize a 'FastLogger' without attaching timestamp
 -- a tuple of logger and clean up action are returned.
+-- This type signature should be read as:
+--
+-- > newFastLogger :: LogType -> IO (FastLogger, IO ())
 newFastLogger :: LogType' v -> IO (v -> IO (), IO ())
 newFastLogger typ = case typ of
     LogNone                        -> return (const noOp, noOp)
