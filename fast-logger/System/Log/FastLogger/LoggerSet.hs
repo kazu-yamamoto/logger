@@ -2,7 +2,7 @@
 
 module System.Log.FastLogger.LoggerSet (
   -- * Creating a logger set
-    LoggerSet(..)
+    LoggerSet
   , newFileLoggerSet
   , newStdoutLoggerSet
   , newStderrLoggerSet
@@ -15,6 +15,8 @@ module System.Log.FastLogger.LoggerSet (
   , pushLogStrLn
   -- * Flushing buffered log messages
   , flushLogStr
+  -- * Misc
+  , replaceLoggerSet
   ) where
 
 import Control.Debounce (mkDebounce, defaultDebounceSettings, debounceAction)
@@ -130,3 +132,9 @@ rmLoggerSet (LoggerSet mfile fdref arr _) = do
     freeIt i = do
         let (Logger _ mbuf _) = arr ! i
         takeMVar mbuf >>= freeBuffer
+
+-- | Replacing the file path in 'LoggerSet' and returning a new
+--   'LoggerSet' and the old file path.
+replaceLoggerSet :: LoggerSet -> FilePath -> (LoggerSet, Maybe FilePath)
+replaceLoggerSet (LoggerSet current_path a b c) new_file_path =
+    (LoggerSet (Just new_file_path) a b c, current_path)

@@ -29,20 +29,7 @@ module System.Log.FastLogger (
   , BufSize
   , defaultBufSize
   -- * LoggerSet
-  -- ** Creating a logger set
-  , LoggerSet
-  , newFileLoggerSet
-  , newStdoutLoggerSet
-  , newStderrLoggerSet
-  , newLoggerSet
-  -- ** Renewing and removing a logger set
-  , renewLoggerSet
-  , rmLoggerSet
-  -- ** Writing a log message
-  , pushLogStr
-  , pushLogStrLn
-  -- ** Flushing buffered log messages
-  , flushLogStr
+  , module System.Log.FastLogger.LoggerSet
   -- * Date cache
   , module System.Log.FastLogger.Date
   -- * File rotation
@@ -238,18 +225,19 @@ tryRotate lgrset spec ref mvar = bracket lock unlock rotateFiles
     -- 200 is an ad-hoc value for the length of log line.
     estimate x = fromInteger (x `div` 200)
 
-
 tryTimedRotate :: TimedFileLogSpec -> FormattedTime -> MVar LoggerSet -> IO ()
 tryTimedRotate spec now mvar = bracket lock unlock rotateFiles
   where
     lock           = tryTakeMVar mvar
     unlock Nothing = return ()
-    unlock (Just (LoggerSet current_path a b c)) = do
-        putMVar mvar $ LoggerSet (Just new_file_path) a b c
+    unlock (Just lgrset) = do
+        let (newlgrset, current_path) = replaceLoggerSet lgrset new_file_path
+        putMVar mvar newlgrset
         case current_path of
           Nothing   -> return ()
           Just path -> timed_post_process spec path
     rotateFiles Nothing  = return ()
-    rotateFiles (Just (LoggerSet _ a b c)) = renewLoggerSet $ LoggerSet (Just new_file_path) a b c
+    rotateFiles (Just lgrset) = do
+        let (newlgrset, _) = replaceLoggerSet lgrset new_file_path
+        renewLoggerSet newlgrset
     new_file_path = prefixTime now $ timed_log_file spec
-
