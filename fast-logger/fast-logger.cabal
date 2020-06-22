@@ -17,10 +17,11 @@ Library
   Default-Language:     Haskell2010
   GHC-Options:          -Wall
   Exposed-Modules:      System.Log.FastLogger
-                        System.Log.FastLogger.File
                         System.Log.FastLogger.Date
-                        System.Log.FastLogger.Types
+                        System.Log.FastLogger.File
                         System.Log.FastLogger.Internal
+                        System.Log.FastLogger.LoggerSet
+                        System.Log.FastLogger.Types
   Other-Modules:        System.Log.FastLogger.Imports
                         System.Log.FastLogger.IO
                         System.Log.FastLogger.FileIO
