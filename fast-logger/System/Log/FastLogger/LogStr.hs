@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE Safe #-}
@@ -43,6 +44,11 @@ fromBuilder = BS.concat . BL.toChunks . B.toLazyByteString
 ----------------------------------------------------------------
 
 -- | Log message builder. Use ('<>') to append two LogStr in O(1).
+--
+-- In contrast to a normal 'Builder', it knows its length in Bytes.
+--
+-- It is guaranteed that when you evaluate a 'LogStr' to WHNF ('seq'),
+-- the length will be evaluated; consequently,
 data LogStr = LogStr !Int Builder
 
 #if MIN_VERSION_base(4,9,0)
@@ -60,7 +66,13 @@ instance IsString LogStr where
 -- | Types that can be converted to a 'LogStr'. Instances for
 -- types from the @text@ library use a UTF-8 encoding. Instances
 -- for numerical types use a decimal encoding.
+--
+-- As described in 'LogStr', a 'LogStr' knows its length.
+-- That means that you cannot e.g. 'toLogStr' an infinite 'Builder'.
+-- A 'Builder' that produces lots of output will not be logged in
+-- a streaming fashion; it will be evaluated into memory!
 class ToLogStr msg where
+    -- | Converts the given argument into a 'LogStr'.
     toLogStr :: msg -> LogStr
 
 instance ToLogStr LogStr where
@@ -70,7 +82,10 @@ instance ToLogStr S8.ByteString where
 instance ToLogStr BL.ByteString where
     toLogStr b = LogStr (fromIntegral (BL.length b)) (B.lazyByteString b)
 instance ToLogStr Builder where
-    toLogStr x = let b = B.toLazyByteString x in LogStr (fromIntegral (BL.length b)) (B.lazyByteString b)
+    -- Bang to avoid floating it in and computing it twice; it's not necessary
+    -- because we have `Strict` enabled for the project, but it's better to be
+    -- explicit here given that this instance is used by most others.
+    toLogStr x = let !b = B.toLazyByteString x in LogStr (fromIntegral (BL.length b)) (B.lazyByteString b)
 instance ToLogStr String where
     toLogStr = toLogStr . TL.pack
 instance ToLogStr T.Text where
