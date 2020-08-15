@@ -31,6 +31,10 @@ newLogger size = Logger size <$> (getBuffer size >>= newMVar)
 
 ----------------------------------------------------------------
 
+-- | In the below, it is important that `nlen` of the `LogStr` is evaluated
+-- before taking the `mbuf` lock, to avoid holding the log unnecessarily long
+-- to do a pure computation that could be done outside. See the docs of
+-- `LoggingT` of `monad-logger` for an example.
 pushLog :: IORef FD -> Logger -> LogStr -> IO ()
 pushLog fdref logger@(Logger size mbuf ref) nlogmsg@(LogStr nlen nbuilder)
   | nlen > size = do
