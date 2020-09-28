@@ -5,7 +5,7 @@ Maintainer:             Kazu Yamamoto <kazu@iij.ad.jp>
 License:                BSD3
 License-File:           LICENSE
 Synopsis:               A fast logging system
-Description:            A fast logging system
+Description:            A fast logging system for Haskell
 Homepage:               https://github.com/kazu-yamamoto/logger
 Category:               System
 Cabal-Version:          >= 1.10
