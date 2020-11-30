@@ -1,5 +1,5 @@
 Name:                   fast-logger
-Version:                3.0.2
+Version:                3.0.3
 Author:                 Kazu Yamamoto <kazu@iij.ad.jp>
 Maintainer:             Kazu Yamamoto <kazu@iij.ad.jp>
 License:                BSD3
@@ -31,7 +31,7 @@ Library
                       , array
                       , auto-update >= 0.1.2
                       , easy-file >= 0.2
-                      , bytestring
+                      , bytestring >= 0.10.4
                       , directory
                       , filepath
                       , text
