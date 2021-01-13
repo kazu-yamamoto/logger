@@ -17,6 +17,7 @@ import Data.ByteString.Builder (Builder)
 import qualified Data.ByteString.Builder as B
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Short as SBS
 #if MIN_VERSION_base(4,9,0)
 import qualified Data.Semigroup as Semi (Semigroup(..))
 #endif
@@ -78,6 +79,9 @@ instance ToLogStr BL.ByteString where
 instance ToLogStr Builder where
     {-# INLINE toLogStr #-}
     toLogStr x = let b = B.toLazyByteString x in LogStr (fromIntegral (BL.length b)) (B.lazyByteString b)
+instance ToLogStr SBS.ShortByteString where
+    {-# INLINE toLogStr #-}
+    toLogStr b = LogStr (SBS.length b) (B.shortByteString b)
 instance ToLogStr String where
     {-# INLINE toLogStr #-}
     toLogStr = toLogStr . TL.pack

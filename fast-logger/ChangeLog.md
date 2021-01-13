@@ -1,3 +1,9 @@
+## 3.0.3
+
+* Add `ToLogStr` instance for `ShortByteString`. Add lower bound on
+  `bytestring` dependency to ensure that `bytestring` exports
+  `Data.ByteString.Short`.
+
 ## 3.0.1
 
 * Creating the `Internal` module.
