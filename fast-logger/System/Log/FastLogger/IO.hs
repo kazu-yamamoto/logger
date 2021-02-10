@@ -11,7 +11,7 @@ module System.Log.FastLogger.IO where
 
 import Data.ByteString.Builder.Extra (Next(..))
 import qualified Data.ByteString.Builder.Extra as BBE
-import Foreign.ForeignPtr (withForeignPtr)
+import Foreign.ForeignPtr (ForeignPtr, withForeignPtr)
 import Foreign.Marshal.Alloc (mallocBytes, free)
 import Foreign.Ptr (Ptr, plusPtr)
 
@@ -44,5 +44,15 @@ toBufIOWith buf !size io builder = loop $ BBE.runBuilder builder
              More minSize writer'
                | size < minSize -> error "toBufIOWith: More: minSize"
                | otherwise      -> loop writer'
-             Chunk (PS fptr off siz) writer' ->
+             Chunk bs writer' -> flip withBS bs $ \fptr off siz ->
                withForeignPtr fptr $ \ptr -> io (ptr `plusPtr` off) siz >> loop writer'
+
+----------------------------------------------------------------
+-- Compatibility helpers for bytestring
+
+withBS :: (ForeignPtr Word8 -> Int -> Int -> a) -> ByteString -> a
+#if MIN_VERSION_bytestring(0,11,0)
+withBS f (BS fptr len) = f fptr 0 len
+#else
+withBS f (PS fptr off len) = f fptr off len
+#endif
