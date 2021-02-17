@@ -27,7 +27,7 @@ Library
                         System.Log.FastLogger.FileIO
                         System.Log.FastLogger.LogStr
                         System.Log.FastLogger.Logger
-  Build-Depends:        base >= 4.7 && < 5
+  Build-Depends:        base >= 4.9 && < 5
                       , array
                       , auto-update >= 0.1.2
                       , easy-file >= 0.2
@@ -52,7 +52,7 @@ Test-Suite spec
   Other-Modules:    FastLoggerSpec
   Build-Tools:      hspec-discover >= 2.6
   Build-Depends:    base >= 4 && < 5
-                  , bytestring
+                  , bytestring >= 0.10.4
                   , directory
                   , fast-logger
                   , hspec
