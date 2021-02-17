@@ -1,8 +1,13 @@
 ## 3.0.3
 
+* Dropping support of GHC 7.x.
 * Add `ToLogStr` instance for `ShortByteString`. Add lower bound on
   `bytestring` dependency to ensure that `bytestring` exports
   `Data.ByteString.Short`.
+
+## 3.0.2
+
+* Fixing documentation.
 
 ## 3.0.1
 
