@@ -1,0 +1,192 @@
+name: Binaries
+
+defaults:
+  run:
+    shell: bash
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        ghc: ["8.10.4", "8.8.4", "8.6.5"]
+        os: [ubuntu-latest]
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Select optimal cabal version
+        run: |
+          case "$OS" in
+            Windows_NT)   echo "CABAL_VERSION=3.4.0.0-rc5"  >> $GITHUB_ENV;;
+            *)            echo "CABAL_VERSION=3.4.0.0"      >> $GITHUB_ENV;;
+          esac
+
+      - uses: haskell/actions/setup@v1
+        id: setup-haskell
+        with:
+          ghc-version: ${{ matrix.ghc }}
+          cabal-version: ${{ env.CABAL_VERSION }}
+
+      - name: Set some window specific things
+        if: matrix.os == 'windows-latest'
+        run: echo 'EXE_EXT=.exe' >> $GITHUB_ENV
+
+      - name: Configure project
+        run: cabal configure --enable-tests --enable-benchmarks --write-ghc-environment-files=ghc8.4.4+
+
+      - name: Restore cabal cache
+        uses: haskell-works/cabal-cache-action@v1
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          BINARY_CACHE_REGION: ${{ secrets.BINARY_CACHE_REGION }}
+          BINARY_CACHE_THREADS: ${{ secrets.BINARY_CACHE_THREADS }}
+          BINARY_CACHE_URI: ${{ secrets.BINARY_CACHE_URI }}
+        with:
+          args: |
+            sync-from-archive \
+              --threads       "$BINARY_CACHE_THREADS" \
+              --archive-uri   "$BINARY_CACHE_URI" \
+              --region        "$BINARY_CACHE_REGION" \
+              --store-path    "${{ steps.setup-haskell.outputs.cabal-store }}"
+
+      - name: Build
+        # Try building it twice in case of flakey builds on Windows
+        run: |
+          cabal build all --enable-tests --enable-benchmarks --write-ghc-environment-files=ghc8.4.4+ || \
+          cabal build all --enable-tests --enable-benchmarks --write-ghc-environment-files=ghc8.4.4+ -j1
+
+      - name: Test
+        run: |
+          cabal test all --enable-tests --enable-benchmarks --write-ghc-environment-files=ghc8.4.4+
+
+      - name: Save cabal cache
+        uses: haskell-works/cabal-cache-action@v1
+        if: ${{ always() }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          BINARY_CACHE_REGION: ${{ secrets.BINARY_CACHE_REGION }}
+          BINARY_CACHE_THREADS: ${{ secrets.BINARY_CACHE_THREADS }}
+          BINARY_CACHE_URI: ${{ secrets.BINARY_CACHE_URI }}
+        with:
+          args: |
+            sync-to-archive \
+              --threads       "$BINARY_CACHE_THREADS" \
+              --archive-uri   "$BINARY_CACHE_URI" \
+              --region        "$BINARY_CACHE_REGION" \
+              --store-path    "${{ steps.setup-haskell.outputs.cabal-store }}"
+
+  check:
+    needs: build
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Check if cabal project is sane
+        run: |
+          PROJECT_DIR=$PWD
+          mkdir -p $PROJECT_DIR/build/sdist
+          for i in $(git ls-files | grep '\.cabal'); do
+            cd $PROJECT_DIR && cd `dirname $i`
+            cabal check
+          done
+
+      - name: Tag new version
+        id: tag
+        if: ${{ github.ref == 'refs/heads/main' }}
+        env:
+          server: http://hackage.haskell.org
+          username: ${{ secrets.HACKAGE_USER }}
+          password: ${{ secrets.HACKAGE_PASS }}
+        run: |
+          package_version="$(cat *.cabal | grep '^version:' | cut -d : -f 2 | xargs)"
+
+          echo "Package version is v$package_version"
+
+          git fetch --unshallow origin
+
+          if git tag "v$package_version"; then
+            echo "Tagging with new version "v$package_version""
+
+            if git push origin "v$package_version"; then
+              echo "Tagged with new version "v$package_version""
+
+              echo "::set-output name=tag::v$package_version"
+            fi
+          fi
+
+  release:
+    needs: [build, check]
+    runs-on: ubuntu-latest
+    if: ${{ needs.check.outputs.tag != '' }}
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Create source distribution
+        run: |
+          PROJECT_DIR=$PWD
+          mkdir -p $PROJECT_DIR/build/sdist
+          for i in $(git ls-files | grep '\.cabal'); do
+            cd $PROJECT_DIR && cd `dirname $i`
+            cabal v2-sdist -o $PROJECT_DIR/build/sdist
+          done;
+
+      - name: Publish to hackage
+        env:
+          server: http://hackage.haskell.org
+          username: ${{ secrets.HACKAGE_USER }}
+          password: ${{ secrets.HACKAGE_PASS }}
+          candidate: false
+        run: |
+          package_version="$(cat *.cabal | grep '^version:' | cut -d : -f 2 | xargs)"
+
+          for PACKAGE_TARBALL in $(find ./build/sdist/ -name "*.tar.gz"); do
+            PACKAGE_NAME=$(basename ${PACKAGE_TARBALL%.*.*})
+
+            if ${{ env.candidate }}; then
+              TARGET_URL="${{ env.server }}/packages/candidates";
+              DOCS_URL="${{ env.server }}/package/$PACKAGE_NAME/candidate/docs"
+            else
+              TARGET_URL="${{ env.server }}/packages/upload";
+              DOCS_URL="${{ env.server }}/package/$PACKAGE_NAME/docs"
+            fi
+
+            HACKAGE_STATUS=$(curl --silent --head -w %{http_code} -XGET --anyauth --user "${{ env.username }}:${{ env.password }}" ${{ env.server }}/package/$PACKAGE_NAME -o /dev/null)
+
+            if [ "$HACKAGE_STATUS" = "404" ]; then
+              echo "Uploading $PACKAGE_NAME to $TARGET_URL"
+
+              curl -X POST -f --user "${{ env.username }}:${{ env.password }}" $TARGET_URL -F "package=@$PACKAGE_TARBALL"
+              echo "Uploaded $PACKAGE_NAME"
+            else
+              echo "Package $PACKAGE_NAME" already exists on Hackage.
+            fi
+          done
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          body: Undocumented
+          draft: true
+          prerelease: false
