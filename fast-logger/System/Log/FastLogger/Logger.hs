@@ -83,5 +83,5 @@ write fdref buf len' = loop buf (fromIntegral len')
   where
     loop bf !len = do
         written <- writeRawBufferPtr2FD fdref bf len
-        when (written < len) $
+        when (0 <= written && written < len) $
             loop (bf `plusPtr` fromIntegral written) (len - written)

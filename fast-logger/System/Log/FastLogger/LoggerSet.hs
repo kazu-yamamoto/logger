@@ -123,12 +123,14 @@ renewLoggerSet (LoggerSet (Just file) fref _ _) = do
 --   and freeing the buffers.
 rmLoggerSet :: LoggerSet -> IO ()
 rmLoggerSet (LoggerSet mfile fdref arr _) = do
-    let (l,u) = bounds arr
-    let nums = [l .. u]
-    mapM_ flushIt nums
-    mapM_ freeIt nums
     fd <- readIORef fdref
-    when (isJust mfile) $ closeFD fd
+    when (isFDValid fd) $ do
+        let (l,u) = bounds arr
+        let nums = [l .. u]
+        mapM_ flushIt nums
+        mapM_ freeIt nums
+        when (isJust mfile) $ closeFD fd
+        writeIORef fdref invalidFD
   where
     flushIt i = flushLog fdref (arr ! i)
     freeIt i = do

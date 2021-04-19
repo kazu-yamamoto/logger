@@ -25,4 +25,13 @@ getStdoutFD = return stdout
 writeRawBufferPtr2FD :: IORef FD -> Ptr Word8 -> Int -> IO Int
 writeRawBufferPtr2FD fdref bf len = do
     fd <- readIORef fdref
-    fromIntegral <$> writeRawBufferPtr "write" fd bf 0 (fromIntegral len)
+    if isFDValid fd then
+        fromIntegral <$> writeRawBufferPtr "write" fd bf 0 (fromIntegral len)
+      else
+        return (-1)
+
+invalidFD :: POSIX.FD
+invalidFD = stdout { POSIX.fdFD = -1 }
+
+isFDValid :: POSIX.FD -> Bool
+isFDValid fd = POSIX.fdFD fd /= -1
