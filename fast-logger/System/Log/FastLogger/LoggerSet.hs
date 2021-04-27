@@ -38,29 +38,31 @@ import System.Log.FastLogger.Logger
 data LoggerSet = LoggerSet (Maybe FilePath) (IORef FD) (Array Int Logger) (IO ())
 
 -- | Creating a new 'LoggerSet' using a file.
-newFileLoggerSet :: BufSize -> FilePath -> IO LoggerSet
-newFileLoggerSet size file = openFileFD file >>= newFDLoggerSet size (Just file)
+newFileLoggerSet :: BufSize -> Maybe Int -> FilePath -> IO LoggerSet
+newFileLoggerSet size mn file = openFileFD file >>= newFDLoggerSet size mn (Just file)
 
 -- | Creating a new 'LoggerSet' using stdout.
 newStdoutLoggerSet :: BufSize -> IO LoggerSet
-newStdoutLoggerSet size = getStdoutFD >>= newFDLoggerSet size Nothing
+newStdoutLoggerSet size = getStdoutFD >>= newFDLoggerSet size Nothing Nothing
 
 -- | Creating a new 'LoggerSet' using stderr.
 newStderrLoggerSet :: BufSize -> IO LoggerSet
-newStderrLoggerSet size = getStderrFD >>= newFDLoggerSet size Nothing
+newStderrLoggerSet size = getStderrFD >>= newFDLoggerSet size Nothing Nothing
 
 {-# DEPRECATED newLoggerSet "Use newFileLoggerSet etc instead" #-}
 -- | Creating a new 'LoggerSet'.
 --   If 'Nothing' is specified to the second argument,
 --   stdout is used.
 --   Please note that the minimum 'BufSize' is 1.
-newLoggerSet :: BufSize -> Maybe FilePath -> IO LoggerSet
-newLoggerSet size = maybe (newStdoutLoggerSet size) (newFileLoggerSet size)
+newLoggerSet :: BufSize -> Maybe Int -> Maybe FilePath -> IO LoggerSet
+newLoggerSet size mn = maybe (newStdoutLoggerSet size) (newFileLoggerSet size mn)
 
 -- | Creating a new 'LoggerSet' using a FD.
-newFDLoggerSet :: BufSize -> Maybe FilePath -> FD -> IO LoggerSet
-newFDLoggerSet size mfile fd = do
-    n <- getNumCapabilities
+newFDLoggerSet :: BufSize -> Maybe Int -> Maybe FilePath -> FD -> IO LoggerSet
+newFDLoggerSet size mn mfile fd = do
+    n <- case mn of
+      Just n' -> return n'
+      Nothing -> getNumCapabilities
     loggers <- replicateM n $ newLogger (max 1 size)
     let arr = listArray (0,n-1) loggers
     fref <- newIORef fd
