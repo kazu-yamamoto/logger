@@ -1,3 +1,8 @@
+## 3.0.4
+
+* New API: `newFastLogger1` which use only one capability.
+* Making `FD` safer with `invalidFD`.
+
 ## 3.0.3
 
 * Dropping support of GHC 7.x.
