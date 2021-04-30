@@ -1,3 +1,7 @@
+## 3.0.5
+
+* recovering backward compatibility for newFileLoggerSet.
+
 ## 3.0.4
 
 * New API: `newFastLogger1` which use only one capability.
