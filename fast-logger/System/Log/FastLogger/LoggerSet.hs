@@ -4,6 +4,7 @@ module System.Log.FastLogger.LoggerSet (
   -- * Creating a logger set
     LoggerSet
   , newFileLoggerSet
+  , newFileLoggerSetN
   , newStdoutLoggerSet
   , newStderrLoggerSet
   , newLoggerSet
@@ -38,8 +39,12 @@ import System.Log.FastLogger.Logger
 data LoggerSet = LoggerSet (Maybe FilePath) (IORef FD) (Array Int Logger) (IO ())
 
 -- | Creating a new 'LoggerSet' using a file.
-newFileLoggerSet :: BufSize -> Maybe Int -> FilePath -> IO LoggerSet
-newFileLoggerSet size mn file = openFileFD file >>= newFDLoggerSet size mn (Just file)
+newFileLoggerSet :: BufSize -> FilePath -> IO LoggerSet
+newFileLoggerSet size file = openFileFD file >>= newFDLoggerSet size Nothing (Just file)
+
+-- | Creating a new 'LoggerSet' using a file.
+newFileLoggerSetN :: BufSize -> Maybe Int -> FilePath -> IO LoggerSet
+newFileLoggerSetN size mn file = openFileFD file >>= newFDLoggerSet size mn (Just file)
 
 -- | Creating a new 'LoggerSet' using stdout.
 newStdoutLoggerSet :: BufSize -> IO LoggerSet
@@ -55,7 +60,7 @@ newStderrLoggerSet size = getStderrFD >>= newFDLoggerSet size Nothing Nothing
 --   stdout is used.
 --   Please note that the minimum 'BufSize' is 1.
 newLoggerSet :: BufSize -> Maybe Int -> Maybe FilePath -> IO LoggerSet
-newLoggerSet size mn = maybe (newStdoutLoggerSet size) (newFileLoggerSet size mn)
+newLoggerSet size mn = maybe (newStdoutLoggerSet size) (newFileLoggerSetN size mn)
 
 -- | Creating a new 'LoggerSet' using a FD.
 newFDLoggerSet :: BufSize -> Maybe Int -> Maybe FilePath -> FD -> IO LoggerSet

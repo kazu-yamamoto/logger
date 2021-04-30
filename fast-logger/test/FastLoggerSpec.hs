@@ -40,9 +40,9 @@ spec = do
 
 nullLogger :: IO LoggerSet
 #ifdef mingw32_HOST_OS
-nullLogger = newFileLoggerSet 4096 Nothing "nul"
+nullLogger = newFileLoggerSet 4096 "nul"
 #else
-nullLogger = newFileLoggerSet 4096 Nothing "/dev/null"
+nullLogger = newFileLoggerSet 4096 "/dev/null"
 #endif
 
 safeForLarge :: [Int] -> IO ()
@@ -51,7 +51,7 @@ safeForLarge ns = mapM_ safeForLarge' ns
 safeForLarge' :: Int -> IO ()
 safeForLarge' n = flip finally (cleanup tmpfile) $ do
     cleanup tmpfile
-    lgrset <- newFileLoggerSet defaultBufSize Nothing tmpfile
+    lgrset <- newFileLoggerSet defaultBufSize tmpfile
     let xs = toLogStr $ BS.pack $ take (abs n) (cycle ['a'..'z'])
         lf = "x"
     pushLogStr lgrset $ xs <> lf
@@ -73,7 +73,7 @@ logAllMsgs = logAll "LICENSE" `finally` cleanup tmpfile
     tmpfile = "test/temp"
     logAll file = do
         cleanup tmpfile
-        lgrset <- newFileLoggerSet 512 Nothing tmpfile
+        lgrset <- newFileLoggerSet 512 tmpfile
         src <- BS.readFile file
         let bs = (<> "\n") . toLogStr <$> BS.lines src
         mapM_ (pushLogStr lgrset) bs

@@ -112,7 +112,7 @@ newFastLoggerCore mn typ = case typ of
     LogNone                        -> return (const noOp, noOp)
     LogStdout bsize                -> newStdoutLoggerSet bsize >>= stdLoggerInit
     LogStderr bsize                -> newStderrLoggerSet bsize >>= stdLoggerInit
-    LogFileNoRotate fp bsize       -> newFileLoggerSet bsize mn fp >>= fileLoggerInit
+    LogFileNoRotate fp bsize       -> newFileLoggerSetN bsize mn fp >>= fileLoggerInit
     LogFile fspec bsize            -> rotateLoggerInit fspec bsize
     LogFileTimedRotate fspec bsize -> timedRotateLoggerInit fspec bsize
     LogCallback cb flush           -> return (\str -> cb str >> flush, noOp)
@@ -120,7 +120,7 @@ newFastLoggerCore mn typ = case typ of
     stdLoggerInit lgrset = return (pushLogStr lgrset, rmLoggerSet lgrset)
     fileLoggerInit lgrset = return (pushLogStr lgrset, rmLoggerSet lgrset)
     rotateLoggerInit fspec bsize = do
-        lgrset <- newFileLoggerSet bsize mn $ log_file fspec
+        lgrset <- newFileLoggerSetN bsize mn $ log_file fspec
         ref <- newIORef (0 :: Int)
         mvar <- newMVar ()
         let logger str = do
@@ -131,7 +131,7 @@ newFastLoggerCore mn typ = case typ of
     timedRotateLoggerInit fspec bsize = do
         cache <- newTimeCache $ timed_timefmt fspec
         now <- cache
-        lgrset <- newFileLoggerSet bsize mn $ prefixTime now $ timed_log_file fspec
+        lgrset <- newFileLoggerSetN bsize mn $ prefixTime now $ timed_log_file fspec
         ref <- newIORef now
         mvar <- newMVar lgrset
         let logger str = do
@@ -155,7 +155,7 @@ newTimedFastLogger tgetter typ = case typ of
     LogNone                        -> return (const noOp, noOp)
     LogStdout bsize                -> newStdoutLoggerSet bsize >>= stdLoggerInit
     LogStderr bsize                -> newStderrLoggerSet bsize >>= stdLoggerInit
-    LogFileNoRotate fp bsize       -> newFileLoggerSet bsize Nothing fp >>= fileLoggerInit
+    LogFileNoRotate fp bsize       -> newFileLoggerSet bsize fp >>= fileLoggerInit
     LogFile fspec bsize            -> rotateLoggerInit fspec bsize
     LogFileTimedRotate fspec bsize -> timedRotateLoggerInit fspec bsize
     LogCallback cb flush           -> return (\f -> tgetter >>= cb . f >> flush, noOp)
@@ -163,7 +163,7 @@ newTimedFastLogger tgetter typ = case typ of
     stdLoggerInit lgrset = return ( \f -> tgetter >>= pushLogStr lgrset . f, rmLoggerSet lgrset)
     fileLoggerInit lgrset = return (\f -> tgetter >>= pushLogStr lgrset . f, rmLoggerSet lgrset)
     rotateLoggerInit fspec bsize = do
-        lgrset <- newFileLoggerSet bsize Nothing $ log_file fspec
+        lgrset <- newFileLoggerSet bsize $ log_file fspec
         ref <- newIORef (0 :: Int)
         mvar <- newMVar ()
         let logger f = do
@@ -175,7 +175,7 @@ newTimedFastLogger tgetter typ = case typ of
     timedRotateLoggerInit fspec bsize = do
         cache <- newTimeCache $ timed_timefmt fspec
         now <- cache
-        lgrset <- newFileLoggerSet bsize Nothing $ prefixTime now $ timed_log_file fspec
+        lgrset <- newFileLoggerSet bsize $ prefixTime now $ timed_log_file fspec
         ref <- newIORef now
         mvar <- newMVar lgrset
         let logger f = do
