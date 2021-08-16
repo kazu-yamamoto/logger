@@ -63,7 +63,7 @@ type FastLogger = LogStr -> IO ()
 -- > {-# LANGUAGE OverloadedStrings #-}
 -- >
 -- > log :: TimedFastLogger -> LogStr -> IO ()
--- > log logger msg = logger (\time -> toLogStr (show time) <> " " <> msg <> "\n")
+-- > log logger msg = logger (\time -> toLogStr $ show time <> " " <> msg <> "\n")
 type TimedFastLogger = (FormattedTime -> LogStr) -> IO ()
 
 type LogType = LogType' LogStr
