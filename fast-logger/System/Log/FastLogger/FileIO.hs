@@ -22,9 +22,8 @@ getStderrFD = return stderr
 getStdoutFD :: IO FD
 getStdoutFD = return stdout
 
-writeRawBufferPtr2FD :: IORef FD -> Ptr Word8 -> Int -> IO Int
-writeRawBufferPtr2FD fdref bf len = do
-    fd <- readIORef fdref
+writeRawBufferPtr2FD :: FD -> Ptr Word8 -> Int -> IO Int
+writeRawBufferPtr2FD fd bf len =
     if isFDValid fd then
         fromIntegral <$> writeRawBufferPtr "write" fd bf 0 (fromIntegral len)
       else
