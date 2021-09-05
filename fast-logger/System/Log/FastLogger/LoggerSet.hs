@@ -21,7 +21,8 @@ module System.Log.FastLogger.LoggerSet (
   ) where
 
 import Control.Debounce (mkDebounce, defaultDebounceSettings, debounceAction)
-import Control.Concurrent (getNumCapabilities, myThreadId, threadCapability, MVar, newMVar, takeMVar, modifyMVar, modifyMVar_)
+import Control.Concurrent (getNumCapabilities, myThreadId, threadCapability, MVar, newMVar, takeMVar)
+import Control.Exception (mask_)
 import Data.Array (Array, listArray, (!), bounds)
 
 import System.Log.FastLogger.FileIO
@@ -36,7 +37,7 @@ import System.Log.FastLogger.Logger
 --   The number of loggers is the capabilities of GHC RTS.
 --   You can specify it with \"+RTS -N\<x\>\".
 --   A buffer is prepared for each capability.
-data LoggerSet = LoggerSet (Maybe FilePath) (MVar FD) (Array Int Logger) (IO ())
+data LoggerSet = LoggerSet (Maybe FilePath) (MVar FD) (IORef (Array Int Logger)) (IO ())
 
 -- | Creating a new 'LoggerSet' using a file.
 newFileLoggerSet :: BufSize -> FilePath -> IO LoggerSet
@@ -70,17 +71,19 @@ newFDLoggerSet size mn mfile fd = do
       Nothing -> getNumCapabilities
     loggers <- replicateM n $ newLogger (max 1 size)
     let arr = listArray (0,n-1) loggers
+    arrref <- newIORef arr
     fdmv <- newMVar fd
     flush <- mkDebounce defaultDebounceSettings
-        { debounceAction = flushLogStrRaw fdmv arr
+        { debounceAction = flushLogStrRaw fdmv arrref
         }
-    return $ LoggerSet mfile fdmv arr flush
+    return $ LoggerSet mfile fdmv arrref flush
 
 -- | Writing a log message to the corresponding buffer.
 --   If the buffer becomes full, the log messages in the buffer
 --   are written to its corresponding file, stdout, or stderr.
 pushLogStr :: LoggerSet -> LogStr -> IO ()
-pushLogStr (LoggerSet _ fdref arr flush) logmsg = do
+pushLogStr (LoggerSet _ fdref arrref flush) logmsg = do
+    arr <- readIORef arrref
     (i, _) <- myThreadId >>= threadCapability
     -- The number of capability could be dynamically changed.
     -- So, let's check the upper boundary of the array.
@@ -106,40 +109,61 @@ pushLogStrLn loggerSet logStr = pushLogStr loggerSet (logStr <> "\n")
 --   function can be used to force flushing outside of the debounced
 --   flush calls.
 flushLogStr :: LoggerSet -> IO ()
-flushLogStr (LoggerSet _ fref arr _) = flushLogStrRaw fref arr
+flushLogStr (LoggerSet _ fref arrref _) = flushLogStrRaw fref arrref
 
-flushLogStrRaw :: MVar FD -> Array Int Logger -> IO ()
-flushLogStrRaw fdref arr = do
+flushLogStrRaw :: MVar FD -> IORef (Array Int Logger) -> IO ()
+flushLogStrRaw fdmv arrref = do
+    arr <- readIORef arrref
     let (l,u) = bounds arr
-    mapM_ flushIt [l .. u]
+    mapM_ (flushIt arr) [l .. u]
   where
-    flushIt i = flushLog fdref (arr ! i)
+    flushIt arr i = flushLog fdmv (arr ! i)
 
 -- | Renewing the internal file information in 'LoggerSet'.
 --   This does nothing for stdout and stderr.
 renewLoggerSet :: LoggerSet -> IO ()
 renewLoggerSet (LoggerSet Nothing     _    _ _) = return ()
-renewLoggerSet (LoggerSet (Just file) fref _ _) = do
+renewLoggerSet (LoggerSet (Just file) fdmv _ _) = do
     newfd <- openFileFD file
-    oldfd <- modifyMVar fref (\fd -> pure (newfd, fd))
+    oldfd <- modifyFd fdmv (\fd -> pure (newfd, fd))
     closeFD oldfd
 
 -- | Flushing the buffers, closing the internal file information
 --   and freeing the buffers.
 rmLoggerSet :: LoggerSet -> IO ()
-rmLoggerSet (LoggerSet mfile fdref arr _) = modifyMVar_ fdref $ \fd ->
-    if isFDValid fd
-        then do
-            let (l,u) = bounds arr
-            let nums = [l .. u]
-            mapM_ flushIt nums
-            mapM_ freeIt nums
-            when (isJust mfile) $ closeFD fd
-            pure invalidFD
-        else pure fd
+rmLoggerSet (LoggerSet mfile fdmv arrref _) =
+    -- Mask during finalization to prevent losing log messages
+    mask_ $ join $ do
+        -- Taking a lock of 'MVar FD' means blocking all threads to write to FD.
+        -- Therefore lock time should be short.
+        modifyFd fdmv $ \fd ->
+            if isFDValid fd
+                then do
+                    -- Replace current 'Logger's with new ones to prevent that
+                    -- another thread consumes messages in current 'Logger's after
+                    -- unlock 'MVar FD'.
+                    newArr <- newSameSizeEmptyLoggers arrref
+                    closingArr <- atomicModifyIORef' arrref $ \curArr -> (newArr, curArr)
+                    pure (invalidFD, finalizeAfterUnlock fd closingArr)
+                else pure (fd, pure ())
   where
-    flushIt i = flushLog fdref (arr ! i)
-    freeIt i = do
+    newSameSizeEmptyLoggers :: IORef (Array Int Logger) -> IO (Array Int Logger)
+    newSameSizeEmptyLoggers arrref' = do
+        tmpArr <- readIORef arrref'
+        let len = length tmpArr
+            Logger bufsize _ _ = tmpArr ! 0
+        loggers <- replicateM len $ newLogger (max 1 bufsize)
+        pure $ listArray (0,len-1) loggers
+    finalizeAfterUnlock :: FD -> Array Int Logger ->  IO ()
+    finalizeAfterUnlock fd arr = do
+        let (l,u) = bounds arr
+        let nums = [l .. u]
+        fdmv' <- newMVar fd -- NOTE: Just to pass it to `flushLog`
+        mapM_ (flushIt fdmv' arr) nums
+        mapM_ (freeIt arr) nums
+        when (isJust mfile) $ closeFD fd
+    flushIt fdmv' arr i = flushLog fdmv' (arr ! i)
+    freeIt arr i = do
         let (Logger _ mbuf _) = arr ! i
         takeMVar mbuf >>= freeBuffer
 

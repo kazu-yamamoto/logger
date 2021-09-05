@@ -7,10 +7,12 @@ module System.Log.FastLogger.Logger (
   , newLogger
   , pushLog
   , flushLog
+  , withFdAndBuffer_
+  , modifyFd
   ) where
 
 
-import Control.Concurrent (MVar, newMVar, withMVar, withMVarMasked)
+import Control.Concurrent (MVar, newMVar, withMVar, withMVarMasked, modifyMVarMasked)
 import Foreign.Marshal.Alloc (allocaBytes)
 import Foreign.Ptr (plusPtr)
 
@@ -39,13 +41,14 @@ pushLog fdmv logger@(Logger size mbuf ref) nlogmsg@(LogStr nlen _nbuilder)
       -- contents, thereby allowing for a single write system call and
       -- avoiding interleaving. This does not address the possibility
       -- of write not writing the entire buffer at once.
-      allocaBytes nlen $ \buf -> withMVar mbuf $ \_ ->
-        writeLogStr fdmv buf nlen nlogmsg
+      allocaBytes nlen $ \buf -> withFdAndBuffer_ fdmv mbuf $ \fd _buf ->
+        writeLogStr fd buf nlen nlogmsg
   | otherwise = do
     mmsg <- atomicModifyIORef' ref checkBuf
     case mmsg of
         Nothing  -> return ()
-        Just msg -> withMVar mbuf $ \buf -> writeLogStr fdmv buf size msg
+        Just msg ->
+            withFdAndBuffer_ fdmv mbuf $ \fd buf -> writeLogStr fd buf size msg
   where
     checkBuf ologmsg@(LogStr olen _)
       | size < olen + nlen = (nlogmsg, Just ologmsg)
@@ -62,19 +65,19 @@ flushLog fdmv (Logger size mbuf lref) = do
     -- there is no grantee that this function is exclusively called
     -- for a buffer. So, we use MVar here.
     -- This is safe and speed penalty can be ignored.
-    withMVar mbuf $ \buf -> writeLogStr fdmv buf size logmsg
+    withFdAndBuffer_ fdmv mbuf $ \fd buf -> writeLogStr fd buf size logmsg
 
 ----------------------------------------------------------------
 
 -- | Writting 'LogStr' using a buffer in blocking mode.
 --   The size of 'LogStr' must be smaller or equal to
 --   the size of buffer.
-writeLogStr :: MVar FD
+writeLogStr :: FD
             -> Buffer
             -> BufSize
             -> LogStr
             -> IO ()
-writeLogStr fdmv buf size (LogStr len builder)
+writeLogStr fd buf size (LogStr len builder)
   | size < len = error $ mconcat
     [ "writeLogStr: Message length is longer than expected size (buf size: "
     , show size
@@ -82,9 +85,7 @@ writeLogStr fdmv buf size (LogStr len builder)
     , show len
     , ")"
     ]
-  | otherwise  =
-    -- NOTE: Guard fd for thread-safe even if async exceptions are thrown to this thread
-    withMVarMasked fdmv $ \fd -> toBufIOWith buf size (write fd) builder
+  | otherwise = toBufIOWith buf size (write fd) builder
 
 write :: FD -> Buffer -> Int -> IO ()
 write fd buf len' = loop buf (fromIntegral len')
@@ -93,3 +94,17 @@ write fd buf len' = loop buf (fromIntegral len')
         written <- writeRawBufferPtr2FD fd bf len
         when (0 <= written && written < len) $
             loop (bf `plusPtr` fromIntegral written) (len - written)
+
+
+-- | Helper function to decide the order 'MVar's to prevent deadlock:
+--   Take 'MVar FD' first, then take 'MVar Buffer'.
+withFdAndBuffer_ :: MVar FD -> MVar Buffer -> (FD -> Buffer -> IO ()) -> IO ()
+withFdAndBuffer_ fdmv bufmv fn =
+    withMVarMasked fdmv $ \fd ->
+    withMVar bufmv $ \buf -> fn fd buf
+
+-- | 'modifyFd' is the same as 'modifyMVarMasked' but it tells developers that it's
+--   safe way to get FD without deadlock.
+modifyFd :: MVar FD -> (FD -> IO (FD, b)) -> IO b
+modifyFd fdmv fn = modifyMVarMasked fdmv fn
+
