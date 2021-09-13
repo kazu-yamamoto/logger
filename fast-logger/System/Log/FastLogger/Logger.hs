@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE Safe #-}
 
@@ -21,7 +20,7 @@ import System.Log.FastLogger.LogStr
 
 ----------------------------------------------------------------
 
-data Logger = Logger !BufSize (MVar Buffer) (IORef LogStr)
+data Logger = Logger BufSize (MVar Buffer) (IORef LogStr)
 
 ----------------------------------------------------------------
 
@@ -81,7 +80,7 @@ writeLogStr fdref buf size (LogStr len builder)
 write :: IORef FD -> Buffer -> Int -> IO ()
 write fdref buf len' = loop buf (fromIntegral len')
   where
-    loop bf !len = do
+    loop bf len = do
         written <- writeRawBufferPtr2FD fdref bf len
         when (0 <= written && written < len) $
             loop (bf `plusPtr` fromIntegral written) (len - written)
