@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE Safe #-}
 
@@ -10,7 +9,7 @@ module System.Log.FastLogger.Logger (
   ) where
 
 
-import Control.Concurrent (MVar, newMVar, withMVar)
+import Control.Concurrent (MVar, withMVar)
 import Foreign.Marshal.Alloc (allocaBytes)
 import Foreign.Ptr (plusPtr)
 
@@ -21,20 +20,19 @@ import System.Log.FastLogger.LogStr
 
 ----------------------------------------------------------------
 
-data Logger = Logger !BufSize (MVar Buffer) (IORef LogStr)
+newtype Logger = Logger (IORef LogStr)
 
 ----------------------------------------------------------------
 
-newLogger :: BufSize -> IO Logger
-newLogger size = Logger size <$> (getBuffer size >>= newMVar)
-                             <*> newIORef mempty
+newLogger :: IO Logger
+newLogger = Logger <$> newIORef mempty
 
 ----------------------------------------------------------------
 
-pushLog :: IORef FD -> Logger -> LogStr -> IO ()
-pushLog fdref logger@(Logger size mbuf ref) nlogmsg@(LogStr nlen nbuilder)
+pushLog :: IORef FD -> BufSize -> MVar Buffer -> Logger -> LogStr -> IO ()
+pushLog fdref size mbuf logger@(Logger ref) nlogmsg@(LogStr nlen nbuilder)
   | nlen > size = do
-      flushLog fdref logger
+      flushLog fdref size mbuf logger
       -- Make sure we have a large enough buffer to hold the entire
       -- contents, thereby allowing for a single write system call and
       -- avoiding interleaving. This does not address the possibility
@@ -53,8 +51,8 @@ pushLog fdref logger@(Logger size mbuf ref) nlogmsg@(LogStr nlen nbuilder)
 
 ----------------------------------------------------------------
 
-flushLog :: IORef FD -> Logger -> IO ()
-flushLog fdref (Logger size mbuf lref) = do
+flushLog :: IORef FD -> BufSize -> MVar Buffer -> Logger -> IO ()
+flushLog fdref size mbuf (Logger lref) = do
     logmsg <- atomicModifyIORef' lref (\old -> (mempty, old))
     -- If a special buffer is prepared for flusher, this MVar could
     -- be removed. But such a code does not contribute logging speed
@@ -81,7 +79,7 @@ writeLogStr fdref buf size (LogStr len builder)
 write :: IORef FD -> Buffer -> Int -> IO ()
 write fdref buf len' = loop buf (fromIntegral len')
   where
-    loop bf !len = do
+    loop bf len = do
         written <- writeRawBufferPtr2FD fdref bf len
         when (0 <= written && written < len) $
             loop (bf `plusPtr` fromIntegral written) (len - written)

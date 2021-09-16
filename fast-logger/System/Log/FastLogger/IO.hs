@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 
 #if __GLASGOW_HASKELL__ <= 708
@@ -34,7 +33,7 @@ freeBuffer :: Buffer -> IO ()
 freeBuffer = free
 
 toBufIOWith :: Buffer -> BufSize -> (Buffer -> Int -> IO ()) -> Builder -> IO ()
-toBufIOWith buf !size io builder = loop $ BBE.runBuilder builder
+toBufIOWith buf size io builder = loop $ BBE.runBuilder builder
   where
     loop writer = do
         (len, next) <- writer buf size
