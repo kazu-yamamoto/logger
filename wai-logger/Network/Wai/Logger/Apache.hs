@@ -41,10 +41,12 @@ data IPAddrSource =
   | FromFallback
 
 -- | Apache style log format.
-apacheLogStr :: IPAddrSource -> FormattedTime -> Request -> Status -> Maybe Integer -> LogStr
-apacheLogStr ipsrc tmstr req status msize =
+apacheLogStr :: ToLogStr user => IPAddrSource -> (Request -> Maybe user) -> FormattedTime -> Request -> Status -> Maybe Integer -> LogStr
+apacheLogStr ipsrc userget tmstr req status msize =
       toLogStr (getSourceIP ipsrc req)
-  <> " - - ["
+  <> " - "
+  <> maybe "-" toLogStr (userget req)
+  <> " ["
   <> toLogStr tmstr
   <> "] \""
   <> toLogStr (requestMethod req)
@@ -75,10 +77,12 @@ apacheLogStr ipsrc tmstr req status msize =
 #endif
 
 -- | HTTP/2 Push log format in the Apache style.
-serverpushLogStr :: IPAddrSource -> FormattedTime -> Request -> ByteString -> Integer -> LogStr
-serverpushLogStr ipsrc tmstr req path size =
+serverpushLogStr :: ToLogStr user => IPAddrSource -> (Request -> Maybe user) -> FormattedTime -> Request -> ByteString -> Integer -> LogStr
+serverpushLogStr ipsrc userget tmstr req path size =
       toLogStr (getSourceIP ipsrc req)
-  <> " - - ["
+  <> " - "
+  <> maybe "-" toLogStr (userget req)
+  <> " ["
   <> toLogStr tmstr
   <> "] \"PUSH "
   <> toLogStr path
