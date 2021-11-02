@@ -42,6 +42,7 @@ module Network.Wai.Logger (
   , serverpushLogger
   , logRotator
   , logRemover
+  , initLoggerUser
   , initLogger
   -- * Types
   , IPAddrSource(..)
@@ -81,13 +82,11 @@ withStdoutLogger app = bracket setup teardown $ \(aplogger, _) ->
   where
     setup = do
         tgetter <- newTimeCache simpleTimeFormat
-        apf <- initLogger FromFallback (LogStdout 4096) nouser tgetter
+        apf <- initLogger FromFallback (LogStdout 4096) tgetter
         let aplogger = apacheLogger apf
             remover = logRemover apf
         return (aplogger, remover)
     teardown (_, remover) = void remover
-    nouser :: Maybe (Request -> Maybe ByteString)
-    nouser = Nothing
 
 ----------------------------------------------------------------
 
@@ -114,9 +113,9 @@ data ApacheLoggerActions = ApacheLoggerActions {
 ----------------------------------------------------------------
 
 -- | Creating 'ApacheLogger' according to 'LogType'.
-initLogger :: ToLogStr user => IPAddrSource -> LogType -> Maybe (Request -> Maybe user) -> IO FormattedTime
-           -> IO ApacheLoggerActions
-initLogger ipsrc typ ugetter tgetter = do
+initLoggerUser :: ToLogStr user => Maybe (Request -> Maybe user) -> IPAddrSource -> LogType -> IO FormattedTime
+               -> IO ApacheLoggerActions
+initLoggerUser ugetter ipsrc typ tgetter = do
     (fl, cleanUp) <- newFastLogger typ
     return $ ApacheLoggerActions {
         apacheLogger     = apache fl ipsrc ugetter tgetter
@@ -124,6 +123,13 @@ initLogger ipsrc typ ugetter tgetter = do
       , logRotator       = return ()
       , logRemover       = cleanUp
       }
+
+initLogger :: IPAddrSource -> LogType -> IO FormattedTime
+           -> IO ApacheLoggerActions
+initLogger = initLoggerUser nouser
+  where
+    nouser :: Maybe (Request -> Maybe ByteString)
+    nouser = Nothing
 
 --- | Checking if a log file can be written if 'LogType' is 'LogFileNoRotate' or 'LogFile'.
 logCheck :: LogType -> IO ()
