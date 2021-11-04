@@ -42,6 +42,7 @@ module Network.Wai.Logger (
   , serverpushLogger
   , logRotator
   , logRemover
+  , initLoggerUser
   , initLogger
   -- * Types
   , IPAddrSource(..)
@@ -112,16 +113,23 @@ data ApacheLoggerActions = ApacheLoggerActions {
 ----------------------------------------------------------------
 
 -- | Creating 'ApacheLogger' according to 'LogType'.
-initLogger :: IPAddrSource -> LogType -> IO FormattedTime
-           -> IO ApacheLoggerActions
-initLogger ipsrc typ tgetter = do
+initLoggerUser :: ToLogStr user => Maybe (Request -> Maybe user) -> IPAddrSource -> LogType -> IO FormattedTime
+               -> IO ApacheLoggerActions
+initLoggerUser ugetter ipsrc typ tgetter = do
     (fl, cleanUp) <- newFastLogger typ
     return $ ApacheLoggerActions {
-        apacheLogger     = apache fl ipsrc tgetter
-      , serverpushLogger = serverpush fl ipsrc tgetter
+        apacheLogger     = apache fl ipsrc ugetter tgetter
+      , serverpushLogger = serverpush fl ipsrc ugetter tgetter
       , logRotator       = return ()
       , logRemover       = cleanUp
       }
+
+initLogger :: IPAddrSource -> LogType -> IO FormattedTime
+           -> IO ApacheLoggerActions
+initLogger = initLoggerUser nouser
+  where
+    nouser :: Maybe (Request -> Maybe ByteString)
+    nouser = Nothing
 
 --- | Checking if a log file can be written if 'LogType' is 'LogFileNoRotate' or 'LogFile'.
 logCheck :: LogType -> IO ()
@@ -135,15 +143,15 @@ logCheck (LogCallback _ _) = return ()
 
 ----------------------------------------------------------------
 
-apache :: (LogStr -> IO ()) -> IPAddrSource -> IO FormattedTime -> ApacheLogger
-apache cb ipsrc dateget req st mlen = do
+apache :: ToLogStr user => (LogStr -> IO ()) -> IPAddrSource -> Maybe (Request -> Maybe user) -> IO FormattedTime -> ApacheLogger
+apache cb ipsrc userget dateget req st mlen = do
     zdata <- dateget
-    cb (apacheLogStr ipsrc zdata req st mlen)
+    cb (apacheLogStr ipsrc (justGetUser userget) zdata req st mlen)
 
-serverpush :: (LogStr -> IO ()) -> IPAddrSource -> IO FormattedTime -> ServerPushLogger
-serverpush cb ipsrc dateget req path size = do
+serverpush :: ToLogStr user => (LogStr -> IO ()) -> IPAddrSource -> Maybe (Request -> Maybe user) -> IO FormattedTime -> ServerPushLogger
+serverpush cb ipsrc userget dateget req path size = do
     zdata <- dateget
-    cb (serverpushLogStr ipsrc zdata req path size)
+    cb (serverpushLogStr ipsrc (justGetUser userget) zdata req path size)
 
 ---------------------------------------------------------------
 
@@ -167,3 +175,7 @@ clockDateCacher :: IO (DateCacheGetter, DateCacheUpdater)
 clockDateCacher = do
     tgetter <- newTimeCache simpleTimeFormat
     return (tgetter, return ())
+
+justGetUser :: Maybe (Request -> Maybe user) -> (Request -> Maybe user)
+justGetUser (Just getter) = getter
+justGetUser Nothing       = \_ -> Nothing
