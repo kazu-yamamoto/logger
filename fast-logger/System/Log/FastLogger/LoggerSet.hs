@@ -8,6 +8,7 @@ module System.Log.FastLogger.LoggerSet (
   , newStdoutLoggerSet
   , newStderrLoggerSet
   , newLoggerSet
+  , newFDLoggerSet
   -- * Renewing and removing a logger set
   , renewLoggerSet
   , rmLoggerSet
