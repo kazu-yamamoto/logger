@@ -6,7 +6,9 @@ module System.Log.FastLogger.LoggerSet (
   , newFileLoggerSet
   , newFileLoggerSetN
   , newStdoutLoggerSet
+  , newStdoutLoggerSetN
   , newStderrLoggerSet
+  , newStderrLoggerSetN
   , newLoggerSet
   , newFDLoggerSet
   -- * Renewing and removing a logger set
@@ -43,10 +45,16 @@ data LoggerSet = LoggerSet (Maybe FilePath) (IORef FD)
                            (IO ())
 
 -- | Creating a new 'LoggerSet' using a file.
+--
+-- Uses `numCapabilties` many buffers, which will result in log
+-- output that is not ordered by time (see `newFileLoggerSetN`).
 newFileLoggerSet :: BufSize -> FilePath -> IO LoggerSet
 newFileLoggerSet size file = openFileFD file >>= newFDLoggerSet size Nothing (Just file)
 
--- | Creating a new 'LoggerSet' using a file.
+-- | Creating a new 'LoggerSet' using a file, using only the given number of capabilites.
+--
+-- Giving @mn = Just 1@ scales less well on multi-core machines,
+-- but provides time-ordered output.
 newFileLoggerSetN :: BufSize -> Maybe Int -> FilePath -> IO LoggerSet
 newFileLoggerSetN size mn file = openFileFD file >>= newFDLoggerSet size mn (Just file)
 
@@ -54,9 +62,19 @@ newFileLoggerSetN size mn file = openFileFD file >>= newFDLoggerSet size mn (Jus
 newStdoutLoggerSet :: BufSize -> IO LoggerSet
 newStdoutLoggerSet size = getStdoutFD >>= newFDLoggerSet size Nothing Nothing
 
+-- | Creating a new 'LoggerSet' using stdout, with the given number of buffers
+-- (see `newFileLoggerSetN`).
+newStdoutLoggerSetN :: BufSize -> Maybe Int -> IO LoggerSet
+newStdoutLoggerSetN size mn = getStdoutFD >>= newFDLoggerSet size mn Nothing
+
 -- | Creating a new 'LoggerSet' using stderr.
 newStderrLoggerSet :: BufSize -> IO LoggerSet
 newStderrLoggerSet size = getStderrFD >>= newFDLoggerSet size Nothing Nothing
+
+-- | Creating a new 'LoggerSet' using stderr, with the given number of buffers
+-- (see `newFileLoggerSetN`).
+newStderrLoggerSetN :: BufSize -> Maybe Int -> IO LoggerSet
+newStderrLoggerSetN size mn = getStderrFD >>= newFDLoggerSet size mn Nothing
 
 {-# DEPRECATED newLoggerSet "Use newFileLoggerSet etc instead" #-}
 -- | Creating a new 'LoggerSet'.
