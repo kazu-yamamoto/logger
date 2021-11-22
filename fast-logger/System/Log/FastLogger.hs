@@ -117,8 +117,8 @@ newFastLogger1 typ = newFastLoggerCore (Just 1) typ
 newFastLoggerCore :: Maybe Int -> LogType' v -> IO (v -> IO (), IO ())
 newFastLoggerCore mn typ = case typ of
     LogNone                        -> return (const noOp, noOp)
-    LogStdout bsize                -> newStdoutLoggerSet bsize >>= stdLoggerInit
-    LogStderr bsize                -> newStderrLoggerSet bsize >>= stdLoggerInit
+    LogStdout bsize                -> newStdoutLoggerSetN bsize mn >>= stdLoggerInit
+    LogStderr bsize                -> newStderrLoggerSetN bsize mn >>= stdLoggerInit
     LogFileNoRotate fp bsize       -> newFileLoggerSetN bsize mn fp >>= fileLoggerInit
     LogFile fspec bsize            -> rotateLoggerInit fspec bsize
     LogFileTimedRotate fspec bsize -> timedRotateLoggerInit fspec bsize
