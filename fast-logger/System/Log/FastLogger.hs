@@ -101,9 +101,16 @@ data LogType' a where
 -- This type signature should be read as:
 --
 -- > newFastLogger :: LogType -> IO (FastLogger, IO ())
+--
+-- This logger uses `numCapabilities` many buffers, and thus
+-- does not provide time-ordered output.
+-- For time-ordered output, use `newFastLogger1`.
 newFastLogger :: LogType' v -> IO (v -> IO (), IO ())
 newFastLogger typ = newFastLoggerCore Nothing typ
 
+-- | Like `newFastLogger`, but creating a logger that uses only 1
+-- capability. This scales less well on multi-core machines,
+-- but provides time-ordered output.
 newFastLogger1 :: LogType' v -> IO (v -> IO (), IO ())
 newFastLogger1 typ = newFastLoggerCore (Just 1) typ
 
