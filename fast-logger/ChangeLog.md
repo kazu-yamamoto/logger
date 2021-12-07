@@ -1,3 +1,8 @@
+## 3.1.0
+
+* Having a single Buffer in LoggerSet for locking [#197](https://github.com/kazu-yamamoto/logger/pull/197.
+  This would have performance penalty. So, the major version bumps up. If you see performance regression, please register an issue on github.
+
 ## 3.0.5
 
 * recovering backward compatibility for newFileLoggerSet.
