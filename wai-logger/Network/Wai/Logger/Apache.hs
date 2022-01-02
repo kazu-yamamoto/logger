@@ -127,7 +127,7 @@ getSourceFromSocket = BS.pack . showSockAddr . remoteHost
 -- >>> getSourceFromHeader defaultRequest { requestHeaders = [] }
 -- ""
 getSourceFromHeader :: Request -> ByteString
-getSourceFromHeader = fromMaybe "" . getSource
+getSourceFromHeader = fromMaybe "-" . getSource
 
 -- |
 -- >>> getSourceFromFallback defaultRequest { requestHeaders = [ ("X-Real-IP", "127.0.0.1") ] }
