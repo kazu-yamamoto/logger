@@ -1,7 +1,7 @@
 ## 3.1.1
 
 * More time-ordered logging functions
-  [#199](https://github.com/kazu-yamamoto/logger/pull/199
+  [#199](https://github.com/kazu-yamamoto/logger/pull/199)
 
 ## 3.1.0
 
