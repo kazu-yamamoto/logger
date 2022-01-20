@@ -101,17 +101,24 @@ data LogType' a where
 -- This type signature should be read as:
 --
 -- > newFastLogger :: LogType -> IO (FastLogger, IO ())
+--
+-- This logger uses `numCapabilities` many buffers, and thus
+-- does not provide time-ordered output.
+-- For time-ordered output, use `newFastLogger1`.
 newFastLogger :: LogType' v -> IO (v -> IO (), IO ())
 newFastLogger typ = newFastLoggerCore Nothing typ
 
+-- | Like `newFastLogger`, but creating a logger that uses only 1
+-- capability. This scales less well on multi-core machines,
+-- but provides time-ordered output.
 newFastLogger1 :: LogType' v -> IO (v -> IO (), IO ())
 newFastLogger1 typ = newFastLoggerCore (Just 1) typ
 
 newFastLoggerCore :: Maybe Int -> LogType' v -> IO (v -> IO (), IO ())
 newFastLoggerCore mn typ = case typ of
     LogNone                        -> return (const noOp, noOp)
-    LogStdout bsize                -> newStdoutLoggerSet bsize >>= stdLoggerInit
-    LogStderr bsize                -> newStderrLoggerSet bsize >>= stdLoggerInit
+    LogStdout bsize                -> newStdoutLoggerSetN bsize mn >>= stdLoggerInit
+    LogStderr bsize                -> newStderrLoggerSetN bsize mn >>= stdLoggerInit
     LogFileNoRotate fp bsize       -> newFileLoggerSetN bsize mn fp >>= fileLoggerInit
     LogFile fspec bsize            -> rotateLoggerInit fspec bsize
     LogFileTimedRotate fspec bsize -> timedRotateLoggerInit fspec bsize
