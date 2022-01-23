@@ -46,4 +46,4 @@ showSockAddr (SockAddrInet _ addr4)                       = showIPv4 addr4 (byte
 showSockAddr (SockAddrInet6 _ _ (0,0,0x0000ffff,addr4) _) = showIPv4 addr4 False
 showSockAddr (SockAddrInet6 _ _ (0,0,0,1) _)              = "::1"
 showSockAddr (SockAddrInet6 _ _ addr6 _)                  = showIPv6 addr6
-showSockAddr _                                            = "unknownSocket"
+showSockAddr (SockAddrUnix _)                             = "-"
