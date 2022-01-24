@@ -123,9 +123,9 @@ getSourceFromSocket = BS.pack . showSockAddr . remoteHost
 -- >>> getSourceFromHeader defaultRequest { requestHeaders = [ ("X-Forwarded-For", "127.0.0.1") ] }
 -- "127.0.0.1"
 -- >>> getSourceFromHeader defaultRequest { requestHeaders = [ ("Something", "127.0.0.1") ] }
--- ""
+-- "-"
 -- >>> getSourceFromHeader defaultRequest { requestHeaders = [] }
--- ""
+-- "-"
 getSourceFromHeader :: Request -> ByteString
 getSourceFromHeader = fromMaybe "-" . getSource
 
