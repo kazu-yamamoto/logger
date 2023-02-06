@@ -1,4 +1,7 @@
+{-# LANGUAGE CPP #-}
+#if !MIN_VERSION_directory(1,3,8)
 {-# LANGUAGE Safe #-}
+#endif
 
 module System.Log.FastLogger.File
     ( FileLogSpec(..)
