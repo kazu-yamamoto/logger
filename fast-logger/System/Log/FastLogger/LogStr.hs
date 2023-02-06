@@ -50,12 +50,14 @@ data LogStr = LogStr !Int Builder
 instance Semi.Semigroup LogStr where
     {-# INLINE (<>) #-}
     LogStr s1 b1 <> LogStr s2 b2 = LogStr (s1 + s2) (b1 <> b2)
-#endif
-
+instance Monoid LogStr where
+    mempty = LogStr 0 (toBuilder BS.empty)
+#else
 instance Monoid LogStr where
     mempty = LogStr 0 (toBuilder BS.empty)
     {-# INLINE mappend #-}
     LogStr s1 b1 `mappend` LogStr s2 b2 = LogStr (s1 + s2) (b1 <> b2)
+#endif
 
 instance IsString LogStr where
     {-# INLINE fromString #-}
