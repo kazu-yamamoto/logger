@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE Safe #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module System.Log.FastLogger.Logger (
     Logger(..)
@@ -20,7 +21,9 @@ import System.Log.FastLogger.LogStr
 
 ----------------------------------------------------------------
 
-newtype Logger = Logger (IORef LogStr)
+newtype Logger = Logger {
+    lgrRef :: IORef LogStr
+  }
 
 ----------------------------------------------------------------
 
@@ -30,7 +33,7 @@ newLogger = Logger <$> newIORef mempty
 ----------------------------------------------------------------
 
 pushLog :: IORef FD -> BufSize -> MVar Buffer -> Logger -> LogStr -> IO ()
-pushLog fdref size mbuf logger@(Logger ref) nlogmsg@(LogStr nlen nbuilder)
+pushLog fdref size mbuf logger@Logger{..} nlogmsg@(LogStr nlen nbuilder)
   | nlen > size = do
       flushLog fdref size mbuf logger
       -- Make sure we have a large enough buffer to hold the entire
@@ -40,7 +43,7 @@ pushLog fdref size mbuf logger@(Logger ref) nlogmsg@(LogStr nlen nbuilder)
       allocaBytes nlen $ \buf -> withMVar mbuf $ \_ ->
         toBufIOWith buf nlen (write fdref) nbuilder
   | otherwise = do
-    action <- atomicModifyIORef' ref checkBuf
+    action <- atomicModifyIORef' lgrRef checkBuf
     action
   where
     push msg = withMVar mbuf $ \buf -> writeLogStr fdref buf size msg
@@ -51,8 +54,8 @@ pushLog fdref size mbuf logger@(Logger ref) nlogmsg@(LogStr nlen nbuilder)
 ----------------------------------------------------------------
 
 flushLog :: IORef FD -> BufSize -> MVar Buffer -> Logger -> IO ()
-flushLog fdref size mbuf (Logger lref) = do
-    logmsg <- atomicModifyIORef' lref (\old -> (mempty, old))
+flushLog fdref size mbuf Logger{..} = do
+    logmsg <- atomicModifyIORef' lgrRef (\old -> (mempty, old))
     -- If a special buffer is prepared for flusher, this MVar could
     -- be removed. But such a code does not contribute logging speed
     -- according to experiment. And even with the special buffer,
