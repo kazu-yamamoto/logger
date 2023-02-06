@@ -40,14 +40,13 @@ pushLog fdref size mbuf logger@(Logger ref) nlogmsg@(LogStr nlen nbuilder)
       allocaBytes nlen $ \buf -> withMVar mbuf $ \_ ->
         toBufIOWith buf nlen (write fdref) nbuilder
   | otherwise = do
-    mmsg <- atomicModifyIORef' ref checkBuf
-    case mmsg of
-        Nothing  -> return ()
-        Just msg -> withMVar mbuf $ \buf -> writeLogStr fdref buf size msg
+    action <- atomicModifyIORef' ref checkBuf
+    action
   where
+    push msg = withMVar mbuf $ \buf -> writeLogStr fdref buf size msg
     checkBuf ologmsg@(LogStr olen _)
-      | size < olen + nlen = (nlogmsg, Just ologmsg)
-      | otherwise          = (ologmsg <> nlogmsg, Nothing)
+      | size < olen + nlen = (nlogmsg,            push ologmsg)
+      | otherwise          = (ologmsg <> nlogmsg, return ())
 
 ----------------------------------------------------------------
 
