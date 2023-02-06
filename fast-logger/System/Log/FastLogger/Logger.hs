@@ -55,14 +55,16 @@ pushLog fdref size mbuf logger@Logger{..} nlogmsg@(LogStr nlen nbuilder)
 
 flushLog :: IORef FD -> BufSize -> MVar Buffer -> Logger -> IO ()
 flushLog fdref size mbuf Logger{..} = do
-    logmsg <- atomicModifyIORef' lgrRef (\old -> (mempty, old))
+    action <- atomicModifyIORef' lgrRef (\old -> (mempty, push old))
+    action
+  where
     -- If a special buffer is prepared for flusher, this MVar could
     -- be removed. But such a code does not contribute logging speed
     -- according to experiment. And even with the special buffer,
     -- there is no grantee that this function is exclusively called
     -- for a buffer. So, we use MVar here.
     -- This is safe and speed penalty can be ignored.
-    withMVar mbuf $ \buf -> writeLogStr fdref buf size logmsg
+    push msg = withMVar mbuf $ \buf -> writeLogStr fdref buf size msg
 
 ----------------------------------------------------------------
 
