@@ -1,3 +1,10 @@
+## 3.1.2
+
+* Require unix-compat >= 0.2
+  [#206](https://github.com/kazu-yamamoto/logger/pull/206)
+* Remove Safe if directory >= 1.3.8
+  [#199](https://github.com/kazu-yamamoto/logger/pull/199)
+
 ## 3.1.1
 
 * More time-ordered logging functions
