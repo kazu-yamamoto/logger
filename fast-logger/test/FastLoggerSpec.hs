@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings, BangPatterns, CPP #-}
 
-module FastLoggerSpec where
+module FastLoggerSpec (spec) where
 
 #if __GLASGOW_HASKELL__ < 709
 import Control.Applicative ((<$>))
@@ -8,7 +8,9 @@ import Control.Applicative ((<$>))
 import Control.Exception (finally)
 import Control.Monad (when)
 import qualified Data.ByteString.Char8 as BS
+#if !MIN_VERSION_base(4,11,0)
 import Data.Monoid ((<>))
+#endif
 import Data.String (IsString(fromString))
 import System.Directory (doesFileExist, removeFile)
 import System.Log.FastLogger
@@ -22,12 +24,14 @@ spec = do
       let logstr :: LogStr
           logstr = fromString str
       in show logstr == show str
+
   describe "instance Eq LogStr" $ do
     prop "it should be consistent with instance IsString" $ \str1 str2 ->
       let logstr1, logstr2 :: LogStr
           logstr1 = fromString str1
           logstr2 = fromString str2
       in (logstr1 == logstr2) == (str1 == str2)
+
   describe "pushLogMsg" $ do
     it "is safe for a large message" $ safeForLarge [
         100
@@ -37,13 +41,6 @@ spec = do
       , 1000000
       ]
     it "logs all messages" logAllMsgs
-
-nullLogger :: IO LoggerSet
-#ifdef mingw32_HOST_OS
-nullLogger = newFileLoggerSet 4096 "nul"
-#else
-nullLogger = newFileLoggerSet 4096 "/dev/null"
-#endif
 
 safeForLarge :: [Int] -> IO ()
 safeForLarge ns = mapM_ safeForLarge' ns
