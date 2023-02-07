@@ -23,10 +23,12 @@ Library
                         System.Log.FastLogger.LoggerSet
                         System.Log.FastLogger.Types
   Other-Modules:        System.Log.FastLogger.Imports
-                        System.Log.FastLogger.IO
                         System.Log.FastLogger.FileIO
+                        System.Log.FastLogger.IO
                         System.Log.FastLogger.LogStr
-                        System.Log.FastLogger.Logger
+                        System.Log.FastLogger.MultiLogger
+                        System.Log.FastLogger.SingleLogger
+                        System.Log.FastLogger.Write
   Build-Depends:        base >= 4.9 && < 5
                       , array
                       , auto-update >= 0.1.2
@@ -34,6 +36,7 @@ Library
                       , bytestring >= 0.10.4
                       , directory
                       , filepath
+                      , stm
                       , text
                       , unix-time >= 0.4.4
                       , unix-compat >= 0.2
