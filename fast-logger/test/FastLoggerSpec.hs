@@ -6,16 +6,20 @@ module FastLoggerSpec (spec) where
 import Control.Applicative ((<$>))
 #endif
 import Control.Exception (finally)
-import Control.Monad (when)
+import Control.Concurrent
+import Control.Concurrent.Async
+import Control.Monad
 import qualified Data.ByteString.Char8 as BS
+import Data.List (sort)
 #if !MIN_VERSION_base(4,11,0)
 import Data.Monoid ((<>))
 #endif
 import Data.String (IsString(fromString))
-import System.Directory (doesFileExist, removeFile)
+import System.Directory
 import System.Log.FastLogger
 import Test.Hspec
 import Test.Hspec.QuickCheck (prop)
+import Text.Printf
 
 spec :: Spec
 spec = do
@@ -41,6 +45,29 @@ spec = do
       , 1000000
       ]
     it "logs all messages" logAllMsgs
+
+  describe "fastlogger 1" $ do
+    it "maintains the ordering of log messages" $ do
+        let tmpfile = "/tmp/fastlogger-test.txt"
+        cleanup tmpfile
+        (pushlog, teardown) <- newFastLogger1 $ LogFileNoRotate tmpfile 128
+        numCapabilities <- getNumCapabilities
+        let concurrency = numCapabilities * 200 :: Int
+            logEntriesCount = 100 :: Int
+        forConcurrently_ [0 .. concurrency - 1] $ \t ->
+          forM_ [0 .. logEntriesCount - 1] $ \i -> do
+            let tag = "thread id: " <> show t <> " " :: String
+                cnt = printf "%02d" i :: String
+                logmsg = toLogStr tag <> "log line nr: " <> toLogStr cnt <> "\n"
+            pushlog logmsg
+        teardown
+        xs <- BS.lines <$> BS.readFile tmpfile
+        forM_ [0 .. concurrency - 1] $ \t -> do
+            let tag = BS.pack ("thread id: " <> show t <> " ")
+                msgs = filter (tag `BS.isPrefixOf`) xs
+            sort msgs `shouldBe` msgs
+        cleanup tmpfile
+
 
 safeForLarge :: [Int] -> IO ()
 safeForLarge ns = mapM_ safeForLarge' ns

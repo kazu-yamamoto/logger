@@ -48,10 +48,11 @@ Test-Suite spec
   Default-Language: Haskell2010
   Type:             exitcode-stdio-1.0
 
-  Ghc-Options:      -Wall -threaded
+  Ghc-Options:      -Wall -threaded -rtsopts -with-rtsopts=-N
   Other-Modules:    FastLoggerSpec
   Build-Tools:      hspec-discover >= 2.6
   Build-Depends:    base >= 4 && < 5
+                  , async
                   , bytestring >= 0.10.4
                   , directory
                   , fast-logger
