@@ -109,8 +109,9 @@ newFastLogger :: LogType' v -> IO (v -> IO (), IO ())
 newFastLogger typ = newFastLoggerCore Nothing typ
 
 -- | Like `newFastLogger`, but creating a logger that uses only 1
--- capability. This scales less well on multi-core machines,
--- but provides time-ordered output.
+-- internal builder. This scales less on multi-core machines and
+-- consumes more memory because of an internal queue but provides
+-- time-ordered output.
 newFastLogger1 :: LogType' v -> IO (v -> IO (), IO ())
 newFastLogger1 typ = newFastLoggerCore (Just 1) typ
 

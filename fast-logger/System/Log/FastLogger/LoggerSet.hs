@@ -104,7 +104,7 @@ newFDLoggerSet size mn mfile fd = do
     let bufsiz = max 1 size
     mbuf <- getBuffer bufsiz >>= newMVar
     let buffd = BufFD fdref bufsiz mbuf
-    logger <- if n == 1 then
+    logger <- if n == 1 && mn == Just 1 then
                   SL <$> S.newSingleLogger buffd
                 else do
                   ML <$> M.newMultiLogger n
