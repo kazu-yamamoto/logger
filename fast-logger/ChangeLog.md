@@ -1,3 +1,8 @@
+## 3.2.0
+
+* newFastLogger1 ensures the ordering of logs
+  [#207](https://github.com/kazu-yamamoto/logger/pull/207)
+
 ## 3.1.2
 
 * Require unix-compat >= 0.2
