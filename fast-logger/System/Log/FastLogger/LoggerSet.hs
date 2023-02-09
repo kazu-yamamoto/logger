@@ -24,7 +24,7 @@ module System.Log.FastLogger.LoggerSet (
   , replaceLoggerSet
   ) where
 
-import Control.Concurrent (getNumCapabilities, takeMVar, newMVar)
+import Control.Concurrent (getNumCapabilities)
 import Control.Debounce (mkDebounce, defaultDebounceSettings, debounceAction)
 
 import System.Log.FastLogger.FileIO
@@ -49,7 +49,7 @@ data Logger = SL SingleLogger | ML MultiLogger
 --   A buffer is prepared for each capability.
 data LoggerSet = LoggerSet {
     lgrsetFilePath :: Maybe FilePath
-  , lgrsetBufFD    :: BufFD
+  , lgrsetFdRef    :: IORef FD
   , lgrsetLogger   :: Logger
   , lgrsetDebounce :: IO ()
   }
@@ -102,18 +102,16 @@ newFDLoggerSet size mn mfile fd = do
       Nothing -> getNumCapabilities
     fdref <- newIORef fd
     let bufsiz = max 1 size
-    mbuf <- getBuffer bufsiz >>= newMVar
-    let buffd = BufFD fdref bufsiz mbuf
     logger <- if n == 1 && mn == Just 1 then
-                  SL <$> S.newSingleLogger buffd
+                  SL <$> S.newSingleLogger bufsiz fdref
                 else do
-                  ML <$> M.newMultiLogger n
+                  ML <$> M.newMultiLogger n bufsiz fdref
     flush <- mkDebounce defaultDebounceSettings
-        { debounceAction = flushLogStrRaw logger buffd
+        { debounceAction = flushLogStrRaw logger
         }
     return $ LoggerSet {
         lgrsetFilePath = mfile
-      , lgrsetBufFD    = buffd
+      , lgrsetFdRef    = fdref
       , lgrsetLogger   = logger
       , lgrsetDebounce = flush
       }
@@ -124,10 +122,10 @@ newFDLoggerSet size mn mfile fd = do
 pushLogStr :: LoggerSet -> LogStr -> IO ()
 pushLogStr LoggerSet{..} logmsg = case lgrsetLogger of
   SL sl -> do
-      pushAllLog sl lgrsetBufFD logmsg
+      pushLog sl logmsg
       lgrsetDebounce
   ML ml -> do
-      pushAllLog ml lgrsetBufFD logmsg
+      pushLog ml logmsg
       lgrsetDebounce
 
 -- | Same as 'pushLogStr' but also appends a newline.
@@ -144,11 +142,11 @@ pushLogStrLn loggerSet logStr = pushLogStr loggerSet (logStr <> "\n")
 --   function can be used to force flushing outside of the debounced
 --   flush calls.
 flushLogStr :: LoggerSet -> IO ()
-flushLogStr LoggerSet{..} = flushLogStrRaw lgrsetLogger lgrsetBufFD
+flushLogStr LoggerSet{..} = flushLogStrRaw lgrsetLogger
 
-flushLogStrRaw :: Logger -> BufFD -> IO ()
-flushLogStrRaw (SL sl) buffd = flushAllLog sl buffd
-flushLogStrRaw (ML ml) buffd = flushAllLog ml buffd
+flushLogStrRaw :: Logger -> IO ()
+flushLogStrRaw (SL sl) = flushAllLog sl
+flushLogStrRaw (ML ml) = flushAllLog ml
 
 -- | Renewing the internal file information in 'LoggerSet'.
 --   This does nothing for stdout and stderr.
@@ -157,22 +155,20 @@ renewLoggerSet LoggerSet{..} = case lgrsetFilePath of
   Nothing -> return ()
   Just file -> do
       newfd <- openFileFD file
-      oldfd <- atomicModifyIORef' (buffdFDRef lgrsetBufFD) (\fd -> (newfd, fd))
+      oldfd <- atomicModifyIORef' lgrsetFdRef (\fd -> (newfd, fd))
       closeFD oldfd
 
 -- | Flushing the buffers, closing the internal file information
 --   and freeing the buffers.
 rmLoggerSet :: LoggerSet -> IO ()
 rmLoggerSet LoggerSet{..} = do
-    let fdref = buffdFDRef lgrsetBufFD
-    fd <- readIORef fdref
+    fd <- readIORef lgrsetFdRef
     when (isFDValid fd) $ do
         case lgrsetLogger of
-          SL sl -> stopLoggers sl lgrsetBufFD
-          ML ml -> stopLoggers ml lgrsetBufFD
-        takeMVar (buffdMVar lgrsetBufFD) >>= freeBuffer
+          SL sl -> stopLoggers sl
+          ML ml -> stopLoggers ml
         when (isJust lgrsetFilePath) $ closeFD fd
-        writeIORef fdref invalidFD
+        writeIORef lgrsetFdRef invalidFD
 
 -- | Replacing the file path in 'LoggerSet' and returning a new
 --   'LoggerSet' and the old file path.
