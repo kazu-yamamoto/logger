@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module System.Log.FastLogger.LoggerSet (
   -- * Creating a logger set
@@ -23,15 +24,22 @@ module System.Log.FastLogger.LoggerSet (
   , replaceLoggerSet
   ) where
 
-import Control.Concurrent (MVar, getNumCapabilities, myThreadId, threadCapability, takeMVar, newMVar)
+import Control.Concurrent (getNumCapabilities)
 import Control.Debounce (mkDebounce, defaultDebounceSettings, debounceAction)
-import Data.Array (Array, listArray, (!), bounds)
 
 import System.Log.FastLogger.FileIO
 import System.Log.FastLogger.IO
 import System.Log.FastLogger.Imports
 import System.Log.FastLogger.LogStr
-import System.Log.FastLogger.Logger
+import System.Log.FastLogger.MultiLogger (MultiLogger)
+import qualified System.Log.FastLogger.MultiLogger as M
+import System.Log.FastLogger.SingleLogger (SingleLogger)
+import qualified System.Log.FastLogger.SingleLogger as S
+import System.Log.FastLogger.Write
+
+----------------------------------------------------------------
+
+data Logger = SL SingleLogger | ML MultiLogger
 
 ----------------------------------------------------------------
 
@@ -39,10 +47,12 @@ import System.Log.FastLogger.Logger
 --   The number of loggers is the capabilities of GHC RTS.
 --   You can specify it with \"+RTS -N\<x\>\".
 --   A buffer is prepared for each capability.
-data LoggerSet = LoggerSet (Maybe FilePath) (IORef FD)
-                           BufSize (MVar Buffer)
-                           (Array Int Logger)
-                           (IO ())
+data LoggerSet = LoggerSet {
+    lgrsetFilePath :: Maybe FilePath
+  , lgrsetFdRef    :: IORef FD
+  , lgrsetLogger   :: Logger
+  , lgrsetDebounce :: IO ()
+  }
 
 -- | Creating a new 'LoggerSet' using a file.
 --
@@ -90,31 +100,33 @@ newFDLoggerSet size mn mfile fd = do
     n <- case mn of
       Just n' -> return n'
       Nothing -> getNumCapabilities
-    loggers <- replicateM n newLogger
-    let arr = listArray (0,n-1) loggers
-    fref <- newIORef fd
+    fdref <- newIORef fd
     let bufsiz = max 1 size
-    mbuf <- getBuffer bufsiz >>= newMVar
+    logger <- if n == 1 && mn == Just 1 then
+                  SL <$> S.newSingleLogger bufsiz fdref
+                else do
+                  ML <$> M.newMultiLogger n bufsiz fdref
     flush <- mkDebounce defaultDebounceSettings
-        { debounceAction = flushLogStrRaw fref bufsiz mbuf arr
+        { debounceAction = flushLogStrRaw logger
         }
-    return $ LoggerSet mfile fref bufsiz mbuf arr flush
+    return $ LoggerSet {
+        lgrsetFilePath = mfile
+      , lgrsetFdRef    = fdref
+      , lgrsetLogger   = logger
+      , lgrsetDebounce = flush
+      }
 
 -- | Writing a log message to the corresponding buffer.
 --   If the buffer becomes full, the log messages in the buffer
 --   are written to its corresponding file, stdout, or stderr.
 pushLogStr :: LoggerSet -> LogStr -> IO ()
-pushLogStr (LoggerSet _ fdref size mbuf arr flush) logmsg = do
-    (i, _) <- myThreadId >>= threadCapability
-    -- The number of capability could be dynamically changed.
-    -- So, let's check the upper boundary of the array.
-    let u = snd $ bounds arr
-        lim = u + 1
-        j | i < lim   = i
-          | otherwise = i `mod` lim
-    let logger = arr ! j
-    pushLog fdref size mbuf logger logmsg
-    flush
+pushLogStr LoggerSet{..} logmsg = case lgrsetLogger of
+  SL sl -> do
+      pushLog sl logmsg
+      lgrsetDebounce
+  ML ml -> do
+      pushLog ml logmsg
+      lgrsetDebounce
 
 -- | Same as 'pushLogStr' but also appends a newline.
 pushLogStrLn :: LoggerSet -> LogStr -> IO ()
@@ -130,41 +142,36 @@ pushLogStrLn loggerSet logStr = pushLogStr loggerSet (logStr <> "\n")
 --   function can be used to force flushing outside of the debounced
 --   flush calls.
 flushLogStr :: LoggerSet -> IO ()
-flushLogStr (LoggerSet _ fref size mbuf arr _) = flushLogStrRaw fref size mbuf arr
+flushLogStr LoggerSet{..} = flushLogStrRaw lgrsetLogger
 
-flushLogStrRaw :: IORef FD -> BufSize -> MVar Buffer -> Array Int Logger -> IO ()
-flushLogStrRaw fdref size mbuf arr = do
-    let (l,u) = bounds arr
-    mapM_ flushIt [l .. u]
-  where
-    flushIt i = flushLog fdref size mbuf (arr ! i)
+flushLogStrRaw :: Logger -> IO ()
+flushLogStrRaw (SL sl) = flushAllLog sl
+flushLogStrRaw (ML ml) = flushAllLog ml
 
 -- | Renewing the internal file information in 'LoggerSet'.
 --   This does nothing for stdout and stderr.
 renewLoggerSet :: LoggerSet -> IO ()
-renewLoggerSet (LoggerSet Nothing     _    _ _ _ _) = return ()
-renewLoggerSet (LoggerSet (Just file) fref _ _ _ _) = do
-    newfd <- openFileFD file
-    oldfd <- atomicModifyIORef' fref (\fd -> (newfd, fd))
-    closeFD oldfd
+renewLoggerSet LoggerSet{..} = case lgrsetFilePath of
+  Nothing -> return ()
+  Just file -> do
+      newfd <- openFileFD file
+      oldfd <- atomicModifyIORef' lgrsetFdRef (\fd -> (newfd, fd))
+      closeFD oldfd
 
 -- | Flushing the buffers, closing the internal file information
 --   and freeing the buffers.
 rmLoggerSet :: LoggerSet -> IO ()
-rmLoggerSet (LoggerSet mfile fdref size mbuf arr _) = do
-    fd <- readIORef fdref
+rmLoggerSet LoggerSet{..} = do
+    fd <- readIORef lgrsetFdRef
     when (isFDValid fd) $ do
-        let (l,u) = bounds arr
-        let nums = [l .. u]
-        mapM_ flushIt nums
-        takeMVar mbuf >>= freeBuffer
-        when (isJust mfile) $ closeFD fd
-        writeIORef fdref invalidFD
-  where
-    flushIt i = flushLog fdref size mbuf(arr ! i)
+        case lgrsetLogger of
+          SL sl -> stopLoggers sl
+          ML ml -> stopLoggers ml
+        when (isJust lgrsetFilePath) $ closeFD fd
+        writeIORef lgrsetFdRef invalidFD
 
 -- | Replacing the file path in 'LoggerSet' and returning a new
 --   'LoggerSet' and the old file path.
 replaceLoggerSet :: LoggerSet -> FilePath -> (LoggerSet, Maybe FilePath)
-replaceLoggerSet (LoggerSet current_path a b c d e) new_file_path =
-    (LoggerSet (Just new_file_path) a b c d e, current_path)
+replaceLoggerSet lgrset@LoggerSet{..} new_file_path =
+    (lgrset { lgrsetFilePath = Just new_file_path }, lgrsetFilePath)
