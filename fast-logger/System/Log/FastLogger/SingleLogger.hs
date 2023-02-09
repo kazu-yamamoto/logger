@@ -1,7 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module System.Log.FastLogger.SingleLogger (
-    SingleLogger(..)
+    SingleLogger
   , newSingleLogger
   ) where
 
@@ -16,6 +16,7 @@ import System.Log.FastLogger.Write
 
 ----------------------------------------------------------------
 
+-- | A non-scale but time-ordered logger.
 data SingleLogger = SingleLogger {
     slgrRef     :: IORef (LogStr
                          ,[LogStr])-- writer queue
@@ -55,6 +56,7 @@ writer bufsize buf fdref tvar ref mvar = loop (0 :: Int)
 
 ----------------------------------------------------------------
 
+-- | Creating `SingleLogger`.
 newSingleLogger :: BufSize -> IORef FD -> IO SingleLogger
 newSingleLogger bufsize fdref = do
     tvar <- newTVarIO 0

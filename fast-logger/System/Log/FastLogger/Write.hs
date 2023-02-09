@@ -19,11 +19,11 @@ import System.Log.FastLogger.LogStr
 -- | Writting 'LogStr' using a buffer in blocking mode.
 --   The size of 'LogStr' must be smaller or equal to
 --   the size of buffer.
-
 writeLogStr :: Buffer -> IORef FD -> LogStr -> IO ()
 writeLogStr buf fdref (LogStr len builder) =
     toBufIOWith buf len (write fdref) builder
 
+-- | Writting 'LogStr' using a temporary buffer.
 writeBigLogStr :: IORef FD -> LogStr -> IO ()
 writeBigLogStr fdref (LogStr len builder) =  allocaBytes len $ \buf ->
     toBufIOWith buf len (write fdref) builder
@@ -38,6 +38,7 @@ write fdref buf len' = loop buf (fromIntegral len')
 
 ----------------------------------------------------------------
 
+-- | A class for internal loggers.
 class Loggers a where
     stopLoggers :: a -> IO ()
     pushLog     :: a -> LogStr -> IO ()

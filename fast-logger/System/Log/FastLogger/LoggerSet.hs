@@ -31,9 +31,9 @@ import System.Log.FastLogger.FileIO
 import System.Log.FastLogger.IO
 import System.Log.FastLogger.Imports
 import System.Log.FastLogger.LogStr
-import System.Log.FastLogger.MultiLogger (MultiLogger(..))
+import System.Log.FastLogger.MultiLogger (MultiLogger)
 import qualified System.Log.FastLogger.MultiLogger as M
-import System.Log.FastLogger.SingleLogger (SingleLogger(..))
+import System.Log.FastLogger.SingleLogger (SingleLogger)
 import qualified System.Log.FastLogger.SingleLogger as S
 import System.Log.FastLogger.Write
 

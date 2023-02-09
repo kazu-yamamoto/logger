@@ -1,7 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module System.Log.FastLogger.MultiLogger (
-    MultiLogger(..)
+    MultiLogger
   , newMultiLogger
   ) where
 
@@ -21,6 +21,7 @@ newtype MLogger = MLogger {
     lgrRef :: IORef LogStr
   }
 
+-- | A scale but non-time-ordered logger.
 data MultiLogger = MultiLogger {
     mlgrArray   :: Array Int MLogger
   , mlgrMBuffer :: MVar Buffer
@@ -38,6 +39,8 @@ instance Loggers MultiLogger where
 newMLogger :: IO MLogger
 newMLogger = MLogger <$> newIORef mempty
 
+-- | Creating `MultiLogger`.
+--   The first argument is the number of the internal builders.
 newMultiLogger :: Int -> BufSize -> IORef FD -> IO MultiLogger
 newMultiLogger n bufsize fdref= do
     mbuf <- getBuffer bufsize >>= newMVar
