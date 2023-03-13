@@ -64,11 +64,12 @@ newSingleLogger bufsize fdref = do
     mvar <- newEmptyMVar
     buf <- getBuffer bufsize
     _ <- forkIO $ writer bufsize buf fdref tvar ref mvar
-    let kill = do
+    let wakeup = atomically $ modifyTVar' tvar (+ 1)
+        kill = do
             let fin = LogStr (-1) mempty
             atomicModifyIORef' ref (\(old,q) -> ((mempty,fin:old:q),()))
+            wakeup
             takeMVar mvar
-        wakeup = atomically $ modifyTVar' tvar (+ 1)
     return $ SingleLogger {
         slgrRef     = ref
       , slgrKill    = kill
