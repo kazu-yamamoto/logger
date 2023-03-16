@@ -1,68 +1,80 @@
-Name:                   fast-logger
-Version:                3.2.1
-Author:                 Kazu Yamamoto <kazu@iij.ad.jp>
-Maintainer:             Kazu Yamamoto <kazu@iij.ad.jp>
-License:                BSD3
-License-File:           LICENSE
-Synopsis:               A fast logging system
-Description:            A fast logging system for Haskell
-Homepage:               https://github.com/kazu-yamamoto/logger
-Category:               System
-Cabal-Version:          >= 1.10
-Build-Type:             Simple
-Extra-Source-Files:     README.md ChangeLog.md
-Tested-With:            GHC ==7.8.4 || ==7.10.3 || ==8.0.2 || ==8.2.2 || ==8.4.4 || ==8.6.3
+cabal-version:      >=1.10
+name:               fast-logger
+version:            3.2.1
+license:            BSD3
+license-file:       LICENSE
+maintainer:         Kazu Yamamoto <kazu@iij.ad.jp>
+author:             Kazu Yamamoto <kazu@iij.ad.jp>
+tested-with:
+    ghc ==7.8.4 || ==7.10.3 || ==8.0.2 || ==8.2.2 || ==8.4.4 || ==8.6.3
 
-Library
-  Default-Language:     Haskell2010
-  GHC-Options:          -Wall
-  Exposed-Modules:      System.Log.FastLogger
-                        System.Log.FastLogger.Date
-                        System.Log.FastLogger.File
-                        System.Log.FastLogger.Internal
-                        System.Log.FastLogger.LoggerSet
-                        System.Log.FastLogger.Types
-  Other-Modules:        System.Log.FastLogger.Imports
-                        System.Log.FastLogger.FileIO
-                        System.Log.FastLogger.IO
-                        System.Log.FastLogger.LogStr
-                        System.Log.FastLogger.MultiLogger
-                        System.Log.FastLogger.SingleLogger
-                        System.Log.FastLogger.Write
-  Build-Depends:        base >= 4.9 && < 5
-                      , array
-                      , auto-update >= 0.1.2
-                      , easy-file >= 0.2
-                      , bytestring >= 0.10.4
-                      , directory
-                      , filepath
-                      , stm
-                      , text
-                      , unix-time >= 0.4.4
-                      , unix-compat >= 0.2
-  if impl(ghc < 7.8)
-      Build-Depends:    bytestring-builder
-  if impl(ghc >= 8)
-      Default-Extensions:  Strict StrictData
+homepage:           https://github.com/kazu-yamamoto/logger
+synopsis:           A fast logging system
+description:        A fast logging system for Haskell
+category:           System
+build-type:         Simple
+extra-source-files:
+    README.md
+    ChangeLog.md
 
-Test-Suite spec
-  Main-Is:          Spec.hs
-  Hs-Source-Dirs:   test
-  Default-Language: Haskell2010
-  Type:             exitcode-stdio-1.0
+source-repository head
+    type:     git
+    location: https://github.com/kazu-yamamoto/logger.git
 
-  Ghc-Options:      -Wall -threaded -rtsopts -with-rtsopts=-N
-  Other-Modules:    FastLoggerSpec
-  Build-Tools:      hspec-discover >= 2.6
-  Build-Depends:    base >= 4 && < 5
-                  , async
-                  , bytestring >= 0.10.4
-                  , directory
-                  , fast-logger
-                  , hspec
-  if impl(ghc >= 8)
-      Default-Extensions:  Strict StrictData
+library
+    exposed-modules:
+        System.Log.FastLogger
+        System.Log.FastLogger.Date
+        System.Log.FastLogger.File
+        System.Log.FastLogger.Internal
+        System.Log.FastLogger.LoggerSet
+        System.Log.FastLogger.Types
 
-Source-Repository head
-  Type:                 git
-  Location:             git://github.com/kazu-yamamoto/logger.git
+    other-modules:
+        System.Log.FastLogger.Imports
+        System.Log.FastLogger.FileIO
+        System.Log.FastLogger.IO
+        System.Log.FastLogger.LogStr
+        System.Log.FastLogger.MultiLogger
+        System.Log.FastLogger.SingleLogger
+        System.Log.FastLogger.Write
+
+    default-language: Haskell2010
+    ghc-options:      -Wall
+    build-depends:
+        base >=4.9 && <5,
+        array,
+        auto-update >=0.1.2,
+        easy-file >=0.2,
+        bytestring >=0.10.4,
+        directory,
+        filepath,
+        stm,
+        text,
+        unix-time >=0.4.4,
+        unix-compat >=0.2
+
+    if impl(ghc <7.8)
+        build-depends: bytestring-builder
+
+    if impl(ghc >=8)
+        default-extensions: Strict StrictData
+
+test-suite spec
+    type:             exitcode-stdio-1.0
+    main-is:          Spec.hs
+    build-tools:      hspec-discover >=2.6
+    hs-source-dirs:   test
+    other-modules:    FastLoggerSpec
+    default-language: Haskell2010
+    ghc-options:      -Wall -threaded -rtsopts -with-rtsopts=-N
+    build-depends:
+        base >=4 && <5,
+        async,
+        bytestring >=0.10.4,
+        directory,
+        fast-logger,
+        hspec
+
+    if impl(ghc >=8)
+        default-extensions: Strict StrictData
