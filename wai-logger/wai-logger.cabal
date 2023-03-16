@@ -8,11 +8,8 @@ Synopsis:               A logging system for WAI
 Description:            A logging system for WAI
 Category:               Web, Yesod
 Cabal-Version:          >= 1.10
-Build-Type:             Custom
+Build-Type:             Simple
 Tested-With:            GHC ==7.8.4 || ==7.10.3 || ==8.0.2 || ==8.2.2 || ==8.4.4 || ==8.6.3
-
-Custom-Setup
-  Setup-Depends:        base, Cabal, cabal-doctest >=1.0.6 && <1.1
 
 Library
   Default-Language:     Haskell2010
@@ -29,18 +26,6 @@ Library
                       , network
                       , wai >= 2.0.0
  if impl(ghc >= 8)
-      Default-Extensions:  Strict StrictData
-
-Test-Suite doctests
-  Type:                 exitcode-stdio-1.0
-  Default-Language:     Haskell2010
-  HS-Source-Dirs:       test
-  Ghc-Options:          -Wall
-  Main-Is:              doctests.hs
-  Build-Depends:        base
-                      , wai-logger
-                      , doctest >= 0.10.1
-  if impl(ghc >= 8)
       Default-Extensions:  Strict StrictData
 
 Source-Repository head
