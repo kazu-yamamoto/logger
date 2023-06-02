@@ -100,6 +100,7 @@ flushAllLog SingleLogger{..} = do
     slgrWakeup
 
 stopLoggers :: SingleLogger -> IO ()
-stopLoggers SingleLogger{..} = do
+stopLoggers sl@SingleLogger{..} = do
+    System.Log.FastLogger.SingleLogger.flushAllLog sl
     slgrKill
     freeBuffer slgrBuffer
