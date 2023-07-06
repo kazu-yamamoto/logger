@@ -91,7 +91,7 @@ pushLog SingleLogger{..} nlogmsg@(LogStr nlen _)
         when wake slgrWakeup
   where
     checkBuf (ologmsg@(LogStr olen _),q)
-      | slgrBufSize < olen + nlen = ((nlogmsg, nlogmsg:q), True)
+      | slgrBufSize < olen + nlen = ((nlogmsg, ologmsg:q), True)
       | otherwise                 = ((ologmsg <> nlogmsg, q), False)
 
 flushAllLog :: SingleLogger -> IO ()
