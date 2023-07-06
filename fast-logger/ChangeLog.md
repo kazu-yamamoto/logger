@@ -1,3 +1,12 @@
+## 3.2.2
+
+* Corrected handling of messages at the buffer boundary in the SingleLogger
+  [#211](https://github.com/kazu-yamamoto/logger/pull/211)
+
+## 3.2.1
+
+* Fixing a bug where a single logger is not killed
+
 ## 3.2.0
 
 * newFastLogger1 ensures the ordering of logs
