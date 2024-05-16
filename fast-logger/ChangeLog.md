@@ -1,3 +1,8 @@
+## 3.2.3
+
+* Ensuring flush for single logger.
+  [#214](https://github.com/kazu-yamamoto/logger/pull/214)
+
 ## 3.2.2
 
 * Corrected handling of messages at the buffer boundary in the SingleLogger
