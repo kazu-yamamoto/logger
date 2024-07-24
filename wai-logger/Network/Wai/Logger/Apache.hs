@@ -23,6 +23,7 @@ import Data.Monoid ((<>))
 import Data.Monoid (mappend)
 #endif
 import Network.HTTP.Types (Status, statusCode)
+import Network.HTTP.Types.Header (HeaderName)
 import Network.Wai (Request(..))
 import Network.Wai.Logger.IP
 import System.Log.FastLogger
@@ -37,6 +38,8 @@ data IPAddrSource =
     FromSocket
   -- | From X-Real-IP: or X-Forwarded-For: in the HTTP header.
   | FromHeader
+  -- | From a custom HTTP header, useful in proxied environment.
+  | FromHeaderCustom [HeaderName]
   -- | From the peer address if header is not found.
   | FromFallback
 
@@ -107,9 +110,10 @@ serverpushLogStr ipsrc userget tmstr req path size =
 -- getSourceIP = getSourceIP fromString fromByteString
 
 getSourceIP :: IPAddrSource -> Request -> ByteString
-getSourceIP FromSocket   = getSourceFromSocket
-getSourceIP FromHeader   = getSourceFromHeader
+getSourceIP FromSocket = getSourceFromSocket
+getSourceIP FromHeader = getSourceFromHeader
 getSourceIP FromFallback = getSourceFromFallback
+getSourceIP (FromHeaderCustom hs) = fromMaybe "-" . getSourceFromHeaderCustom hs
 
 -- |
 -- >>> getSourceFromSocket defaultRequest
@@ -151,8 +155,14 @@ getSourceFromFallback req = fromMaybe (getSourceFromSocket req) $ getSource req
 -- >>> getSource defaultRequest
 -- Nothing
 getSource :: Request -> Maybe ByteString
-getSource req = addr
+getSource = getSourceFromHeaders ["x-real-ip", "x-forwarded-for"]
+
+getSourceFromHeaders :: [HeaderName] -> Request -> Maybe ByteString
+getSourceFromHeaders headerNames req = addr
   where
-    maddr = find (\x -> fst x `elem` ["x-real-ip", "x-forwarded-for"]) hdrs
+    maddr = find (\(name,_) -> name `elem` headerNames) hdrs
     addr = fmap snd maddr
     hdrs = requestHeaders req
+
+getSourceFromHeaderCustom :: [HeaderName] -> Request -> Maybe ByteString
+getSourceFromHeaderCustom hs = getSourceFromHeaders hs
