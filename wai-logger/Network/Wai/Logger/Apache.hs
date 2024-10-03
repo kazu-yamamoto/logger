@@ -130,6 +130,14 @@ getSourceFromSocket = BS.pack . showSockAddr . remoteHost
 -- "-"
 -- >>> getSourceFromHeader defaultRequest { requestHeaders = [] }
 -- "-"
+--
+-- 'getSourceFromHeader' uses the first instance of either @"X-Real-IP"@ or
+-- @"X-Forwarded-For"@ that it finds in the header list:
+--
+-- >>> getSourceFromHeader defaultRequest { requestHeaders = [ ("X-Real-IP", "1.2.3.4"), ("X-Forwarded-For", "5.6.7.8") ] }
+-- "1.2.3.4"
+-- >>> getSourceFromHeader defaultRequest { requestHeaders = [ ("X-Forwarded-For", "5.6.7.8"), ("X-Real-IP", "1.2.3.4") ] }
+-- "5.6.7.8"
 getSourceFromHeader :: Request -> ByteString
 getSourceFromHeader = fromMaybe "-" . getSource
 
@@ -142,6 +150,14 @@ getSourceFromHeader = fromMaybe "-" . getSource
 -- "0.0.0.0"
 -- >>> getSourceFromFallback defaultRequest { requestHeaders = [] }
 -- "0.0.0.0"
+--
+-- 'getSourceFromFallback' uses the first instance of either @"X-Real-IP"@ or
+-- @"X-Forwarded-For"@ that it finds in the header list:
+--
+-- >>> getSourceFromFallback defaultRequest { requestHeaders = [ ("X-Real-IP", "1.2.3.4"), ("X-Forwarded-For", "5.6.7.8") ] }
+-- "1.2.3.4"
+-- >>> getSourceFromFallback defaultRequest { requestHeaders = [ ("X-Forwarded-For", "5.6.7.8"), ("X-Real-IP", "1.2.3.4") ] }
+-- "5.6.7.8"
 getSourceFromFallback :: Request -> ByteString
 getSourceFromFallback req = fromMaybe (getSourceFromSocket req) $ getSource req
 
@@ -154,6 +170,14 @@ getSourceFromFallback req = fromMaybe (getSourceFromSocket req) $ getSource req
 -- Nothing
 -- >>> getSource defaultRequest
 -- Nothing
+--
+-- 'getSource' uses the first instance of either @"X-Real-IP"@ or
+-- @"X-Forwarded-For"@ that it finds in the header list:
+--
+-- >>> getSource defaultRequest { requestHeaders = [ ("X-Real-IP", "1.2.3.4"), ("X-Forwarded-For", "5.6.7.8") ] }
+-- Just "1.2.3.4"
+-- >>> getSource defaultRequest { requestHeaders = [ ("X-Forwarded-For", "5.6.7.8"), ("X-Real-IP", "1.2.3.4") ] }
+-- Just "5.6.7.8"
 getSource :: Request -> Maybe ByteString
 getSource = getSourceFromHeaders ["x-real-ip", "x-forwarded-for"]
 
