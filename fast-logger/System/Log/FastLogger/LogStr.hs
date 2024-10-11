@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE Safe #-}
+{-# LANGUAGE Trustworthy #-}
 
 module System.Log.FastLogger.LogStr (
     Builder
@@ -24,6 +24,9 @@ import qualified Data.Semigroup as Semi (Semigroup(..))
 import Data.String (IsString(..))
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
+#if MIN_VERSION_text(2,0,0)
+import qualified Data.Text.Foreign as T
+#endif
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TL
 
@@ -89,11 +92,18 @@ instance ToLogStr String where
     toLogStr = toLogStr . TL.pack
 instance ToLogStr T.Text where
     {-# INLINE toLogStr #-}
+#if MIN_VERSION_text(2,0,0)
+    toLogStr t = LogStr (T.lengthWord8 t) (T.encodeUtf8Builder t)
+#else
     toLogStr = toLogStr . T.encodeUtf8
+#endif
 instance ToLogStr TL.Text where
     {-# INLINE toLogStr #-}
+#if MIN_VERSION_text(2,0,0)
+    toLogStr t = LogStr (TL.foldlChunks (\n c -> T.lengthWord8 c + n) 0 t) (TL.encodeUtf8Builder t)
+#else
     toLogStr = toLogStr . TL.encodeUtf8
-
+#endif
 -- | @since 2.4.14
 instance ToLogStr Int where
     {-# INLINE toLogStr #-}
