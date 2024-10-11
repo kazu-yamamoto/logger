@@ -114,8 +114,6 @@ serverpushLogStr ipsrc userget tmstr req path size =
     mua = lookup "user-agent" $ requestHeaders req
 #endif
 
--- getSourceIP = getSourceIP fromString fromByteString
-
 getSourceIP :: IPAddrSource -> Request -> ByteString
 getSourceIP FromSocket = getSourceFromSocket
 getSourceIP FromHeader = getSourceFromHeader
