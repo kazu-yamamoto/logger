@@ -49,6 +49,10 @@ data IPAddrSource =
   | FromHeaderCustom [HeaderName]
   -- | Just like 'FromHeader', but falls back on the peer address if header is not found.
   | FromFallback
+  -- | This gives you the most flexibility to figure out the IP source address
+  -- from the 'Request'.  The returned 'ByteString' is used as the IP source
+  -- address.
+  | FromRequest (Request -> ByteString)
 
 -- | Apache style log format.
 apacheLogStr :: ToLogStr user => IPAddrSource -> (Request -> Maybe user) -> FormattedTime -> Request -> Status -> Maybe Integer -> LogStr
@@ -119,6 +123,7 @@ getSourceIP FromSocket = getSourceFromSocket
 getSourceIP FromHeader = getSourceFromHeader
 getSourceIP FromFallback = getSourceFromFallback
 getSourceIP (FromHeaderCustom hs) = fromMaybe "-" . getSourceFromHeaderCustom hs
+getSourceIP (FromRequest fromReq) = fromReq
 
 -- |
 -- >>> getSourceFromSocket defaultRequest
