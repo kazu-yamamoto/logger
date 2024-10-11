@@ -36,16 +36,23 @@ import System.Log.FastLogger
 data IPAddrSource =
   -- | From the peer address of the HTTP connection.
     FromSocket
-  -- | From X-Real-IP: or X-Forwarded-For: in the HTTP header.
+  -- | From @X-Real-IP@ or @X-Forwarded-For@ in the HTTP header.
   --
-  -- This picks either X-Real-IP or X-Forwarded-For depending on which of these
+  -- This picks either @X-Real-IP@ or @X-Forwarded-For@ depending on which of these
   -- headers comes first in the ordered list of request headers.
   --
-  -- If the X-Forwarded-For header is picked, the value will be parsed and the
+  -- If the @X-Forwarded-For@ header is picked, the value will be assumed to be a
+  -- comma-separated list of IP addresses.  The value will be parsed, and the
   -- left-most IP address will be used (which is mostly likely to be the actual
   -- client IP address).
   | FromHeader
   -- | From a custom HTTP header, useful in proxied environment.
+  --
+  -- The header value will be assumed to be a comma-separated list of IP
+  -- addresses.  The value will be parsed, and the left-most IP address will be
+  -- used (which is mostly likely to be the actual client IP address).
+  --
+  -- Note that this still works as expected for a single IP address.
   | FromHeaderCustom [HeaderName]
   -- | Just like 'FromHeader', but falls back on the peer address if header is not found.
   | FromFallback
@@ -252,5 +259,13 @@ getSourceFromHeaders headerNamesAndPostProc req = getFirst $ foldMap f $ request
 --
 -- >>> getSourceFromHeaderCustom ["x-foobar", "baz"] defaultRequest { requestHeaders = [ ("baz", "1.2.3.4"), ("x-foobar", "5.6.7.8") ] }
 -- Just "1.2.3.4"
+--
+-- 'getSourceFromHeaderCustom' splits the value of the header it finds by @,@
+-- and uses the first item. This makes it easy to use with headers like
+-- @X-Forwarded-For@, which are expected to have a comma-separated list of IP
+-- addresses:
+--
+-- >>> getSourceFromHeaderCustom ["x-foobar"] defaultRequest { requestHeaders = [ ("X-Foobar", "5.6.7.8, 10.11.12.13, 1.2.3.4") ] }
+-- Just "5.6.7.8"
 getSourceFromHeaderCustom :: [HeaderName] -> Request -> Maybe ByteString
-getSourceFromHeaderCustom hs = getSourceFromHeaders (fmap (,id) hs)
+getSourceFromHeaderCustom hs = getSourceFromHeaders (fmap (,firstIpInXFF) hs)
