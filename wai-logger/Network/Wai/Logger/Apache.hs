@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, CPP #-}
+{-# LANGUAGE OverloadedStrings, CPP, TupleSections #-}
 
 module Network.Wai.Logger.Apache (
     IPAddrSource(..)
@@ -18,7 +18,7 @@ import qualified Data.ByteString.Char8 as BS
 import Data.List (find)
 import Data.Maybe (fromMaybe)
 #if MIN_VERSION_base(4,5,0)
-import Data.Monoid ((<>))
+import Data.Monoid ((<>), First (..))
 #else
 import Data.Monoid (mappend)
 #endif
@@ -36,12 +36,30 @@ import System.Log.FastLogger
 data IPAddrSource =
   -- | From the peer address of the HTTP connection.
     FromSocket
-  -- | From X-Real-IP: or X-Forwarded-For: in the HTTP header.
+  -- | From @X-Real-IP@ or @X-Forwarded-For@ in the HTTP header.
+  --
+  -- This picks either @X-Real-IP@ or @X-Forwarded-For@ depending on which of these
+  -- headers comes first in the ordered list of request headers.
+  --
+  -- If the @X-Forwarded-For@ header is picked, the value will be assumed to be a
+  -- comma-separated list of IP addresses.  The value will be parsed, and the
+  -- left-most IP address will be used (which is mostly likely to be the actual
+  -- client IP address).
   | FromHeader
   -- | From a custom HTTP header, useful in proxied environment.
+  --
+  -- The header value will be assumed to be a comma-separated list of IP
+  -- addresses.  The value will be parsed, and the left-most IP address will be
+  -- used (which is mostly likely to be the actual client IP address).
+  --
+  -- Note that this still works as expected for a single IP address.
   | FromHeaderCustom [HeaderName]
-  -- | From the peer address if header is not found.
+  -- | Just like 'FromHeader', but falls back on the peer address if header is not found.
   | FromFallback
+  -- | This gives you the most flexibility to figure out the IP source address
+  -- from the 'Request'.  The returned 'ByteString' is used as the IP source
+  -- address.
+  | FromRequest (Request -> ByteString)
 
 -- | Apache style log format.
 apacheLogStr :: ToLogStr user => IPAddrSource -> (Request -> Maybe user) -> FormattedTime -> Request -> Status -> Maybe Integer -> LogStr
@@ -107,13 +125,12 @@ serverpushLogStr ipsrc userget tmstr req path size =
     mua = lookup "user-agent" $ requestHeaders req
 #endif
 
--- getSourceIP = getSourceIP fromString fromByteString
-
 getSourceIP :: IPAddrSource -> Request -> ByteString
 getSourceIP FromSocket = getSourceFromSocket
 getSourceIP FromHeader = getSourceFromHeader
 getSourceIP FromFallback = getSourceFromFallback
 getSourceIP (FromHeaderCustom hs) = fromMaybe "-" . getSourceFromHeaderCustom hs
+getSourceIP (FromRequest fromReq) = fromReq
 
 -- |
 -- >>> getSourceFromSocket defaultRequest
@@ -130,6 +147,20 @@ getSourceFromSocket = BS.pack . showSockAddr . remoteHost
 -- "-"
 -- >>> getSourceFromHeader defaultRequest { requestHeaders = [] }
 -- "-"
+--
+-- 'getSourceFromHeader' uses the first instance of either @"X-Real-IP"@ or
+-- @"X-Forwarded-For"@ that it finds in the ordered header list:
+--
+-- >>> getSourceFromHeader defaultRequest { requestHeaders = [ ("X-Real-IP", "1.2.3.4"), ("X-Forwarded-For", "5.6.7.8") ] }
+-- "1.2.3.4"
+-- >>> getSourceFromHeader defaultRequest { requestHeaders = [ ("X-Forwarded-For", "5.6.7.8"), ("X-Real-IP", "1.2.3.4") ] }
+-- "5.6.7.8"
+--
+-- 'getSourceFromHeader' handles pulling out the first IP in the
+-- comma-separated IP list in X-Forwarded-For:
+--
+-- >>> getSourceFromHeader defaultRequest { requestHeaders = [ ("X-Forwarded-For", "5.6.7.8, 10.11.12.13, 1.2.3.4") ] }
+-- "5.6.7.8"
 getSourceFromHeader :: Request -> ByteString
 getSourceFromHeader = fromMaybe "-" . getSource
 
@@ -142,6 +173,20 @@ getSourceFromHeader = fromMaybe "-" . getSource
 -- "0.0.0.0"
 -- >>> getSourceFromFallback defaultRequest { requestHeaders = [] }
 -- "0.0.0.0"
+--
+-- 'getSourceFromFallback' uses the first instance of either @"X-Real-IP"@ or
+-- @"X-Forwarded-For"@ that it finds in the ordered header list:
+--
+-- >>> getSourceFromFallback defaultRequest { requestHeaders = [ ("X-Real-IP", "1.2.3.4"), ("X-Forwarded-For", "5.6.7.8") ] }
+-- "1.2.3.4"
+-- >>> getSourceFromFallback defaultRequest { requestHeaders = [ ("X-Forwarded-For", "5.6.7.8"), ("X-Real-IP", "1.2.3.4") ] }
+-- "5.6.7.8"
+--
+-- 'getSourceFromFallback' handles pulling out the first IP in the
+-- comma-separated IP list in X-Forwarded-For:
+--
+-- >>> getSourceFromFallback defaultRequest { requestHeaders = [ ("X-Forwarded-For", "5.6.7.8, 10.11.12.13, 1.2.3.4") ] }
+-- "5.6.7.8"
 getSourceFromFallback :: Request -> ByteString
 getSourceFromFallback req = fromMaybe (getSourceFromSocket req) $ getSource req
 
@@ -154,15 +199,73 @@ getSourceFromFallback req = fromMaybe (getSourceFromSocket req) $ getSource req
 -- Nothing
 -- >>> getSource defaultRequest
 -- Nothing
+--
+-- 'getSource' uses the first instance of either @"X-Real-IP"@ or
+-- @"X-Forwarded-For"@ that it finds in the ordered header list:
+--
+-- >>> getSource defaultRequest { requestHeaders = [ ("X-Real-IP", "1.2.3.4"), ("X-Forwarded-For", "5.6.7.8") ] }
+-- Just "1.2.3.4"
+-- >>> getSource defaultRequest { requestHeaders = [ ("X-Forwarded-For", "5.6.7.8"), ("X-Real-IP", "1.2.3.4") ] }
+-- Just "5.6.7.8"
+--
+-- 'getSource' handles pulling out the first IP in the comma-separated IP list
+-- in X-Forwarded-For:
+--
+-- >>> getSource defaultRequest { requestHeaders = [ ("X-Forwarded-For", "5.6.7.8, 10.11.12.13, 1.2.3.4") ] }
+-- Just "5.6.7.8"
 getSource :: Request -> Maybe ByteString
-getSource = getSourceFromHeaders ["x-real-ip", "x-forwarded-for"]
+getSource = getSourceFromHeaders [("x-real-ip", id), ("x-forwarded-for", firstIpInXFF)]
 
-getSourceFromHeaders :: [HeaderName] -> Request -> Maybe ByteString
-getSourceFromHeaders headerNames req = addr
+-- | Pull out the first IP in a comma-separated list of X-Forwarded-For IPs.
+--
+-- >>> firstIpInXFF "1.2.3.4, 5.6.7.8, 10.11.12.13"
+-- "1.2.3.4"
+--
+-- If there are no commas, just return the whole input ByteString:
+--
+-- >>> firstIpInXFF "5.6.7.8"
+-- "5.6.7.8"
+--
+-- Note that this function doesn't make sure the input is actually an IP address:
+--
+-- >>> firstIpInXFF "hello, world"
+-- "hello"
+firstIpInXFF :: ByteString -> ByteString
+firstIpInXFF = BS.takeWhile (/= ',')
+
+getSourceFromHeaders :: [(HeaderName, ByteString -> ByteString)] -> Request -> Maybe ByteString
+getSourceFromHeaders headerNamesAndPostProc req = getFirst $ foldMap f $ requestHeaders req
   where
-    maddr = find (\(name,_) -> name `elem` headerNames) hdrs
-    addr = fmap snd maddr
-    hdrs = requestHeaders req
+    -- Take a header name and value from the request, and try match it against
+    -- the list of headers and post-processing functions.  If it matches,
+    -- return the ByteString resulting from applying the post-processing function
+    -- to the header value.
+    f :: (HeaderName, ByteString) -> First ByteString
+    f (headerNameFromReq, headerValFromReq) =
+      let maybePostProc = find (\(headerNameFromPostProc, _) -> headerNameFromReq == headerNameFromPostProc) headerNamesAndPostProc
+      in First $ fmap (\(_, postProc) -> postProc headerValFromReq) maybePostProc
 
+-- |
+-- >>> getSourceFromHeaderCustom ["x-foobar"] defaultRequest { requestHeaders = [ ("X-catdog", "1.2.3.4"), ("X-Foobar", "5.6.7.8"), ("Other", "1.1.1.1") ] }
+-- Just "5.6.7.8"
+--
+-- If none of the headers in the passed-in list are in the 'Request', then return 'Nothing':
+--
+-- >>> getSourceFromHeaderCustom ["x-foobar", "baz"] defaultRequest { requestHeaders = [ ("abb", "1.2.3.4"), ("xyz", "5.6.7.8") ] }
+-- Nothing
+--
+-- 'getSourceFromHeaderCustom' uses the first instance of any header in the
+-- passed in list that it finds in the ordered header list from the request:
+--
+-- >>> getSourceFromHeaderCustom ["x-foobar", "baz"] defaultRequest { requestHeaders = [ ("baz", "1.2.3.4"), ("x-foobar", "5.6.7.8") ] }
+-- Just "1.2.3.4"
+--
+-- 'getSourceFromHeaderCustom' splits the value of the header it finds by @,@
+-- and uses the first item. This makes it easy to use with headers like
+-- @X-Forwarded-For@, which are expected to have a comma-separated list of IP
+-- addresses:
+--
+-- >>> getSourceFromHeaderCustom ["x-foobar"] defaultRequest { requestHeaders = [ ("X-Foobar", "5.6.7.8, 10.11.12.13, 1.2.3.4") ] }
+-- Just "5.6.7.8"
 getSourceFromHeaderCustom :: [HeaderName] -> Request -> Maybe ByteString
-getSourceFromHeaderCustom hs = getSourceFromHeaders hs
+getSourceFromHeaderCustom hs = getSourceFromHeaders (fmap (,firstIpInXFF) hs)
