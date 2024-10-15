@@ -1,3 +1,8 @@
+## 3.2.4
+
+* Avoid unnecessary copy for Text values with text-2.0
+  [#219](https://github.com/kazu-yamamoto/logger/pull/219)
+
 ## 3.2.3
 
 * Ensuring flush for single logger.

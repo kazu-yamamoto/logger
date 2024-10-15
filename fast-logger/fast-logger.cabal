@@ -1,6 +1,6 @@
 cabal-version:      >=1.10
 name:               fast-logger
-version:            3.2.3
+version:            3.2.4
 license:            BSD3
 license-file:       LICENSE
 maintainer:         Kazu Yamamoto <kazu@iij.ad.jp>
