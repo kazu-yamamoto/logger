@@ -4,24 +4,25 @@
 -- |
 -- Formatting time is slow.
 -- This package provides mechanisms to cache formatted date.
-module System.Log.FastLogger.Date
-  ( -- * Date cacher
-    newTimeCache
-  , simpleTimeFormat
-  , simpleTimeFormat'
-  ) where
+module System.Log.FastLogger.Date (
+    -- * Date cacher
+    newTimeCache,
+    simpleTimeFormat,
+    simpleTimeFormat',
+) where
 
-import Control.AutoUpdate (mkAutoUpdate, defaultUpdateSettings, updateAction)
-import System.Log.FastLogger.Types (TimeFormat, FormattedTime)
+import Control.AutoUpdate (defaultUpdateSettings, mkAutoUpdate, updateAction)
 import Data.UnixTime (formatUnixTime, fromEpochTime)
-import System.PosixCompat.Types (EpochTime)
+import System.Log.FastLogger.Types (FormattedTime, TimeFormat)
 import System.PosixCompat.Time (epochTime)
+import System.PosixCompat.Types (EpochTime)
 
 ----------------------------------------------------------------
 
 -- | Get date using UnixTime.
 getTime :: IO EpochTime
 getTime = epochTime
+
 -- | Format unix EpochTime date.
 formatDate :: TimeFormat -> EpochTime -> IO FormattedTime
 formatDate fmt = formatUnixTime fmt . fromEpochTime
@@ -33,9 +34,11 @@ formatDate fmt = formatUnixTime fmt . fromEpochTime
 -- auto updating formatted time, this cache update every 1 second.
 -- more detail in "Control.AutoUpdate"
 newTimeCache :: TimeFormat -> IO (IO FormattedTime)
-newTimeCache fmt = mkAutoUpdate defaultUpdateSettings{
-        updateAction = getTime >>= formatDate fmt
-    }
+newTimeCache fmt =
+    mkAutoUpdate
+        defaultUpdateSettings
+            { updateAction = getTime >>= formatDate fmt
+            }
 
 -- | A simple time cache using format @"%d/%b/%Y:%T %z"@
 simpleTimeFormat :: TimeFormat

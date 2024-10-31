@@ -1,10 +1,12 @@
-{-# LANGUAGE OverloadedStrings, CPP, TupleSections #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections #-}
 
 module Network.Wai.Logger.Apache (
-    IPAddrSource(..)
-  , apacheLogStr
-  , serverpushLogStr
-  ) where
+    IPAddrSource (..),
+    apacheLogStr,
+    serverpushLogStr,
+) where
 
 #ifndef MIN_VERSION_base
 #define MIN_VERSION_base(x,y,z) 1
@@ -24,7 +26,7 @@ import Data.Monoid (mappend)
 #endif
 import Network.HTTP.Types (Status, statusCode)
 import Network.HTTP.Types.Header (HeaderName)
-import Network.Wai (Request(..))
+import Network.Wai (Request (..))
 import Network.Wai.Logger.IP
 import System.Log.FastLogger
 
@@ -33,57 +35,65 @@ import System.Log.FastLogger
 -- >>> import Network.Wai (defaultRequest)
 
 -- | Source from which the IP source address of the client is obtained.
-data IPAddrSource =
-  -- | From the peer address of the HTTP connection.
-    FromSocket
-  -- | From @X-Real-IP@ or @X-Forwarded-For@ in the HTTP header.
-  --
-  -- This picks either @X-Real-IP@ or @X-Forwarded-For@ depending on which of these
-  -- headers comes first in the ordered list of request headers.
-  --
-  -- If the @X-Forwarded-For@ header is picked, the value will be assumed to be a
-  -- comma-separated list of IP addresses.  The value will be parsed, and the
-  -- left-most IP address will be used (which is mostly likely to be the actual
-  -- client IP address).
-  | FromHeader
-  -- | From a custom HTTP header, useful in proxied environment.
-  --
-  -- The header value will be assumed to be a comma-separated list of IP
-  -- addresses.  The value will be parsed, and the left-most IP address will be
-  -- used (which is mostly likely to be the actual client IP address).
-  --
-  -- Note that this still works as expected for a single IP address.
-  | FromHeaderCustom [HeaderName]
-  -- | Just like 'FromHeader', but falls back on the peer address if header is not found.
-  | FromFallback
-  -- | This gives you the most flexibility to figure out the IP source address
-  -- from the 'Request'.  The returned 'ByteString' is used as the IP source
-  -- address.
-  | FromRequest (Request -> ByteString)
+data IPAddrSource
+    = -- | From the peer address of the HTTP connection.
+      FromSocket
+    | -- | From @X-Real-IP@ or @X-Forwarded-For@ in the HTTP header.
+      --
+      -- This picks either @X-Real-IP@ or @X-Forwarded-For@ depending on which of these
+      -- headers comes first in the ordered list of request headers.
+      --
+      -- If the @X-Forwarded-For@ header is picked, the value will be assumed to be a
+      -- comma-separated list of IP addresses.  The value will be parsed, and the
+      -- left-most IP address will be used (which is mostly likely to be the actual
+      -- client IP address).
+      FromHeader
+    | -- | From a custom HTTP header, useful in proxied environment.
+      --
+      -- The header value will be assumed to be a comma-separated list of IP
+      -- addresses.  The value will be parsed, and the left-most IP address will be
+      -- used (which is mostly likely to be the actual client IP address).
+      --
+      -- Note that this still works as expected for a single IP address.
+      FromHeaderCustom [HeaderName]
+    | -- | Just like 'FromHeader', but falls back on the peer address if header is not found.
+      FromFallback
+    | -- | This gives you the most flexibility to figure out the IP source address
+      -- from the 'Request'.  The returned 'ByteString' is used as the IP source
+      -- address.
+      FromRequest (Request -> ByteString)
 
 -- | Apache style log format.
-apacheLogStr :: ToLogStr user => IPAddrSource -> (Request -> Maybe user) -> FormattedTime -> Request -> Status -> Maybe Integer -> LogStr
+apacheLogStr
+    :: ToLogStr user
+    => IPAddrSource
+    -> (Request -> Maybe user)
+    -> FormattedTime
+    -> Request
+    -> Status
+    -> Maybe Integer
+    -> LogStr
 apacheLogStr ipsrc userget tmstr req status msize =
-      toLogStr (getSourceIP ipsrc req)
-  <> " - "
-  <> maybe "-" toLogStr (userget req)
-  <> " ["
-  <> toLogStr tmstr
-  <> "] \""
-  <> toLogStr (requestMethod req)
-  <> " "
-  <> toLogStr path
-  <> " "
-  <> toLogStr (show (httpVersion req))
-  <> "\" "
-  <> toLogStr (show (statusCode status))
-  <> " "
-  <> toLogStr (maybe "-" show msize)
-  <> " \""
-  <> toLogStr (fromMaybe "" mr)
-  <> "\" \""
-  <> toLogStr (fromMaybe "" mua)
-  <> "\"\n"
+    toLogStr (getSourceIP ipsrc req)
+        <> " - "
+        <> maybe "-" toLogStr (userget req)
+        <> " ["
+        <> toLogStr tmstr
+        <> "] \""
+        <> toLogStr (requestMethod req)
+        <> " "
+        <> toLogStr path
+        <> " "
+        <> toLogStr (show (httpVersion req))
+        <> "\" "
+        <> toLogStr (show (statusCode status))
+        <> " "
+        <> toLogStr (maybe "-" show msize)
+        <> " \""
+        <> toLogStr (fromMaybe "" mr)
+        <> "\" \""
+        <> toLogStr (fromMaybe "" mua)
+        <> "\"\n"
   where
     path = rawPathInfo req <> rawQueryString req
 #if !MIN_VERSION_base(4,5,0)
@@ -98,24 +108,32 @@ apacheLogStr ipsrc userget tmstr req status msize =
 #endif
 
 -- | HTTP/2 Push log format in the Apache style.
-serverpushLogStr :: ToLogStr user => IPAddrSource -> (Request -> Maybe user) -> FormattedTime -> Request -> ByteString -> Integer -> LogStr
+serverpushLogStr
+    :: ToLogStr user
+    => IPAddrSource
+    -> (Request -> Maybe user)
+    -> FormattedTime
+    -> Request
+    -> ByteString
+    -> Integer
+    -> LogStr
 serverpushLogStr ipsrc userget tmstr req path size =
-      toLogStr (getSourceIP ipsrc req)
-  <> " - "
-  <> maybe "-" toLogStr (userget req)
-  <> " ["
-  <> toLogStr tmstr
-  <> "] \"PUSH "
-  <> toLogStr path
-  <> " HTTP/2\" 200 "
-  <> toLogStr (show size)
-  <> " \""
-  <> toLogStr ref
-  <> "\" \""
-  <> toLogStr (fromMaybe "" mua)
-  <> "\"\n"
+    toLogStr (getSourceIP ipsrc req)
+        <> " - "
+        <> maybe "-" toLogStr (userget req)
+        <> " ["
+        <> toLogStr tmstr
+        <> "] \"PUSH "
+        <> toLogStr path
+        <> " HTTP/2\" 200 "
+        <> toLogStr (show size)
+        <> " \""
+        <> toLogStr ref
+        <> "\" \""
+        <> toLogStr (fromMaybe "" mua)
+        <> "\"\n"
   where
-    ref  = rawPathInfo req
+    ref = rawPathInfo req
 #if !MIN_VERSION_base(4,5,0)
     (<>) = mappend
 #endif
@@ -233,7 +251,8 @@ getSource = getSourceFromHeaders [("x-real-ip", id), ("x-forwarded-for", firstIp
 firstIpInXFF :: ByteString -> ByteString
 firstIpInXFF = BS.takeWhile (/= ',')
 
-getSourceFromHeaders :: [(HeaderName, ByteString -> ByteString)] -> Request -> Maybe ByteString
+getSourceFromHeaders
+    :: [(HeaderName, ByteString -> ByteString)] -> Request -> Maybe ByteString
 getSourceFromHeaders headerNamesAndPostProc req = getFirst $ foldMap f $ requestHeaders req
   where
     -- Take a header name and value from the request, and try match it against
@@ -242,8 +261,11 @@ getSourceFromHeaders headerNamesAndPostProc req = getFirst $ foldMap f $ request
     -- to the header value.
     f :: (HeaderName, ByteString) -> First ByteString
     f (headerNameFromReq, headerValFromReq) =
-      let maybePostProc = find (\(headerNameFromPostProc, _) -> headerNameFromReq == headerNameFromPostProc) headerNamesAndPostProc
-      in First $ fmap (\(_, postProc) -> postProc headerValFromReq) maybePostProc
+        let maybePostProc =
+                find
+                    (\(headerNameFromPostProc, _) -> headerNameFromReq == headerNameFromPostProc)
+                    headerNamesAndPostProc
+         in First $ fmap (\(_, postProc) -> postProc headerValFromReq) maybePostProc
 
 -- |
 -- >>> getSourceFromHeaderCustom ["x-foobar"] defaultRequest { requestHeaders = [ ("X-catdog", "1.2.3.4"), ("X-Foobar", "5.6.7.8"), ("Other", "1.1.1.1") ] }

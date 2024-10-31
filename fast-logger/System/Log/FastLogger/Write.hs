@@ -1,10 +1,10 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module System.Log.FastLogger.Write (
-    writeLogStr
-  , writeBigLogStr
-  , Loggers(..)
-  ) where
+    writeLogStr,
+    writeBigLogStr,
+    Loggers (..),
+) where
 
 import Foreign.Marshal.Alloc (allocaBytes)
 import Foreign.Ptr (plusPtr)
@@ -25,7 +25,7 @@ writeLogStr buf fdref (LogStr len builder) =
 
 -- | Writting 'LogStr' using a temporary buffer.
 writeBigLogStr :: IORef FD -> LogStr -> IO ()
-writeBigLogStr fdref (LogStr len builder) =  allocaBytes len $ \buf ->
+writeBigLogStr fdref (LogStr len builder) = allocaBytes len $ \buf ->
     toBufIOWith buf len (write fdref) builder
 
 write :: IORef FD -> Buffer -> Int -> IO ()
@@ -41,5 +41,5 @@ write fdref buf len' = loop buf (fromIntegral len')
 -- | A class for internal loggers.
 class Loggers a where
     stopLoggers :: a -> IO ()
-    pushLog     :: a -> LogStr -> IO ()
+    pushLog :: a -> LogStr -> IO ()
     flushAllLog :: a -> IO ()

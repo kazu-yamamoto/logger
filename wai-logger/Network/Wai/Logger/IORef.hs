@@ -1,12 +1,12 @@
 {-# LANGUAGE CPP #-}
 
 module Network.Wai.Logger.IORef (
-       IORef
-     , newIORef
-     , readIORef
-     , writeIORef
-     , atomicModifyIORef'
-     ) where
+    IORef,
+    newIORef,
+    readIORef,
+    writeIORef,
+    atomicModifyIORef',
+) where
 
 import Data.IORef
 

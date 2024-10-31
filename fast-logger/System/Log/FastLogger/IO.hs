@@ -8,10 +8,10 @@
 
 module System.Log.FastLogger.IO where
 
-import Data.ByteString.Builder.Extra (Next(..))
+import Data.ByteString.Builder.Extra (Next (..))
 import qualified Data.ByteString.Builder.Extra as BBE
 import Foreign.ForeignPtr (withForeignPtr)
-import Foreign.Marshal.Alloc (mallocBytes, free)
+import Foreign.Marshal.Alloc (free, mallocBytes)
 import Foreign.Ptr (Ptr, plusPtr)
 
 import System.Log.FastLogger.Imports
@@ -39,9 +39,9 @@ toBufIOWith buf size io builder = loop $ BBE.runBuilder builder
         (len, next) <- writer buf size
         io buf len
         case next of
-             Done -> return ()
-             More minSize writer'
-               | size < minSize -> error "toBufIOWith: More: minSize"
-               | otherwise      -> loop writer'
-             Chunk (PS fptr off siz) writer' ->
-               withForeignPtr fptr $ \ptr -> io (ptr `plusPtr` off) siz >> loop writer'
+            Done -> return ()
+            More minSize writer'
+                | size < minSize -> error "toBufIOWith: More: minSize"
+                | otherwise -> loop writer'
+            Chunk (PS fptr off siz) writer' ->
+                withForeignPtr fptr $ \ptr -> io (ptr `plusPtr` off) siz >> loop writer'

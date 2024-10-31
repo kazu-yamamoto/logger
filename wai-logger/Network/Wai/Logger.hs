@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP   #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
 
 -- | Apache style logger for WAI applications.
@@ -30,33 +30,37 @@
 -- >     pong = "PONG"
 -- >     msg = byteString pong
 -- >     len = fromIntegral $ BS.length pong
-
 module Network.Wai.Logger (
-  -- * High level functions
-    ApacheLogger
-  , withStdoutLogger
-  , ServerPushLogger
-  -- * Creating a logger
-  , ApacheLoggerActions
-  , apacheLogger
-  , serverpushLogger
-  , logRotator
-  , logRemover
-  , initLoggerUser
-  , initLogger
-  -- * Types
-  , IPAddrSource(..)
-  , LogType'(..), LogType
-  , FileLogSpec(..)
-  -- * Utilities
-  , showSockAddr
-  , logCheck
-  -- * Backward compability
-  , clockDateCacher
-  , ZonedDate
-  , DateCacheGetter
-  , DateCacheUpdater
-  ) where
+    -- * High level functions
+    ApacheLogger,
+    withStdoutLogger,
+    ServerPushLogger,
+
+    -- * Creating a logger
+    ApacheLoggerActions,
+    apacheLogger,
+    serverpushLogger,
+    logRotator,
+    logRemover,
+    initLoggerUser,
+    initLogger,
+
+    -- * Types
+    IPAddrSource (..),
+    LogType' (..),
+    LogType,
+    FileLogSpec (..),
+
+    -- * Utilities
+    showSockAddr,
+    logCheck,
+
+    -- * Backward compability
+    clockDateCacher,
+    ZonedDate,
+    DateCacheGetter,
+    DateCacheUpdater,
+) where
 
 #if __GLASGOW_HASKELL__ < 709
 import Control.Applicative ((<$>))
@@ -97,35 +101,44 @@ type ApacheLogger = Request -> Status -> Maybe Integer -> IO ()
 type ServerPushLogger = Request -> ByteString -> Integer -> IO ()
 
 -- | Function set of Apache style logger.
-data ApacheLoggerActions = ApacheLoggerActions {
-    -- | The Apache logger.
-    apacheLogger :: ApacheLogger
-    -- | The HTTP/2 server push logger.
-  , serverpushLogger :: ServerPushLogger
-    -- | This is obsoleted. Rotation is done on-demand.
+data ApacheLoggerActions = ApacheLoggerActions
+    { apacheLogger :: ApacheLogger
+    -- ^ The Apache logger.
+    , serverpushLogger :: ServerPushLogger
+    -- ^ The HTTP/2 server push logger.
+    , logRotator :: IO ()
+    -- ^ This is obsoleted. Rotation is done on-demand.
     --   So, this is now an empty action.
-  , logRotator :: IO ()
-    -- | Removing resources relating to Apache logger.
+    , logRemover :: IO ()
+    -- ^ Removing resources relating to Apache logger.
     --   E.g. flushing and deallocating internal buffers.
-  , logRemover :: IO ()
-  }
+    }
 
 ----------------------------------------------------------------
 
 -- | Creating 'ApacheLogger' according to 'LogType'.
-initLoggerUser :: ToLogStr user => Maybe (Request -> Maybe user) -> IPAddrSource -> LogType -> IO FormattedTime
-               -> IO ApacheLoggerActions
+initLoggerUser
+    :: ToLogStr user
+    => Maybe (Request -> Maybe user)
+    -> IPAddrSource
+    -> LogType
+    -> IO FormattedTime
+    -> IO ApacheLoggerActions
 initLoggerUser ugetter ipsrc typ tgetter = do
     (fl, cleanUp) <- newFastLogger typ
-    return $ ApacheLoggerActions {
-        apacheLogger     = apache fl ipsrc ugetter tgetter
-      , serverpushLogger = serverpush fl ipsrc ugetter tgetter
-      , logRotator       = return ()
-      , logRemover       = cleanUp
-      }
+    return $
+        ApacheLoggerActions
+            { apacheLogger = apache fl ipsrc ugetter tgetter
+            , serverpushLogger = serverpush fl ipsrc ugetter tgetter
+            , logRotator = return ()
+            , logRemover = cleanUp
+            }
 
-initLogger :: IPAddrSource -> LogType -> IO FormattedTime
-           -> IO ApacheLoggerActions
+initLogger
+    :: IPAddrSource
+    -> LogType
+    -> IO FormattedTime
+    -> IO ApacheLoggerActions
 initLogger = initLoggerUser nouser
   where
     nouser :: Maybe (Request -> Maybe ByteString)
@@ -133,22 +146,34 @@ initLogger = initLoggerUser nouser
 
 --- | Checking if a log file can be written if 'LogType' is 'LogFileNoRotate' or 'LogFile'.
 logCheck :: LogType -> IO ()
-logCheck LogNone          = return ()
-logCheck (LogStdout _)    = return ()
-logCheck (LogStderr _)    = return ()
-logCheck (LogFileNoRotate fp _)      = check fp
-logCheck (LogFile spec _)            = check (log_file spec)
+logCheck LogNone = return ()
+logCheck (LogStdout _) = return ()
+logCheck (LogStderr _) = return ()
+logCheck (LogFileNoRotate fp _) = check fp
+logCheck (LogFile spec _) = check (log_file spec)
 logCheck (LogFileTimedRotate spec _) = check (timed_log_file spec)
 logCheck (LogCallback _ _) = return ()
 
 ----------------------------------------------------------------
 
-apache :: ToLogStr user => (LogStr -> IO ()) -> IPAddrSource -> Maybe (Request -> Maybe user) -> IO FormattedTime -> ApacheLogger
+apache
+    :: ToLogStr user
+    => (LogStr -> IO ())
+    -> IPAddrSource
+    -> Maybe (Request -> Maybe user)
+    -> IO FormattedTime
+    -> ApacheLogger
 apache cb ipsrc userget dateget req st mlen = do
     zdata <- dateget
     cb (apacheLogStr ipsrc (justGetUser userget) zdata req st mlen)
 
-serverpush :: ToLogStr user => (LogStr -> IO ()) -> IPAddrSource -> Maybe (Request -> Maybe user) -> IO FormattedTime -> ServerPushLogger
+serverpush
+    :: ToLogStr user
+    => (LogStr -> IO ())
+    -> IPAddrSource
+    -> Maybe (Request -> Maybe user)
+    -> IO FormattedTime
+    -> ServerPushLogger
 serverpush cb ipsrc userget dateget req path size = do
     zdata <- dateget
     cb (serverpushLogStr ipsrc (justGetUser userget) zdata req path size)
@@ -178,4 +203,4 @@ clockDateCacher = do
 
 justGetUser :: Maybe (Request -> Maybe user) -> (Request -> Maybe user)
 justGetUser (Just getter) = getter
-justGetUser Nothing       = \_ -> Nothing
+justGetUser Nothing = \_ -> Nothing

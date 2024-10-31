@@ -3,27 +3,35 @@
 {-# LANGUAGE Safe #-}
 #endif
 
-module System.Log.FastLogger.File
-    ( FileLogSpec(..)
-    , TimedFileLogSpec (..)
-    , check
-    , rotate
-    , prefixTime
-    ) where
+module System.Log.FastLogger.File (
+    FileLogSpec (..),
+    TimedFileLogSpec (..),
+    check,
+    rotate,
+    prefixTime,
+) where
 
 import Data.ByteString.Char8 (unpack)
-import System.Directory (doesFileExist, doesDirectoryExist, getPermissions, writable, renameFile)
-import System.FilePath (takeDirectory, dropFileName, takeFileName, (</>))
+import System.Directory (
+    doesDirectoryExist,
+    doesFileExist,
+    getPermissions,
+    renameFile,
+    writable,
+ )
+import System.FilePath (dropFileName, takeDirectory, takeFileName, (</>))
 
 import System.Log.FastLogger.Imports
-import System.Log.FastLogger.Types (TimeFormat, FormattedTime)
+import System.Log.FastLogger.Types (FormattedTime, TimeFormat)
 
 -- | The spec for logging files
-data FileLogSpec = FileLogSpec {
-    log_file :: FilePath
-  , log_file_size :: Integer -- ^ Max log file size (in bytes) before requiring rotation.
-  , log_backup_number :: Int -- ^ Max number of rotated log files to keep around before overwriting the oldest one.
-  }
+data FileLogSpec = FileLogSpec
+    { log_file :: FilePath
+    , log_file_size :: Integer
+    -- ^ Max log file size (in bytes) before requiring rotation.
+    , log_backup_number :: Int
+    -- ^ Max number of rotated log files to keep around before overwriting the oldest one.
+    }
 
 -- | The spec for time based rotation. It supports post processing of log files. Does
 -- not delete any logs. Example:
@@ -38,17 +46,20 @@ data FileLogSpec = FileLogSpec {
 --        compressFile fp = void . forkIO $
 --            callProcess "tar" [ "--remove-files", "-caf", fp <> ".gz", fp ]
 -- @
-data TimedFileLogSpec = TimedFileLogSpec {
-    timed_log_file :: FilePath              -- ^ base file path
-  , timed_timefmt  :: TimeFormat            -- ^ time format to prepend
-  , timed_same_timeframe  :: FormattedTime -> FormattedTime -> Bool
-                                            -- ^ function that compares two
-                                            --   formatted times as specified by
-                                            --   timed_timefmt and decides if a
-                                            --   new rotation is supposed to
-                                            --   begin
-  , timed_post_process :: FilePath -> IO () -- ^ processing function called asynchronously after a file is added to the rotation
-  }
+data TimedFileLogSpec = TimedFileLogSpec
+    { timed_log_file :: FilePath
+    -- ^ base file path
+    , timed_timefmt :: TimeFormat
+    -- ^ time format to prepend
+    , timed_same_timeframe :: FormattedTime -> FormattedTime -> Bool
+    -- ^ function that compares two
+    --   formatted times as specified by
+    --   timed_timefmt and decides if a
+    --   new rotation is supposed to
+    --   begin
+    , timed_post_process :: FilePath -> IO ()
+    -- ^ processing function called asynchronously after a file is added to the rotation
+    }
 
 -- | Checking if a log file can be written.
 check :: FilePath -> IO ()
@@ -70,11 +81,11 @@ rotate spec = mapM_ move srcdsts
   where
     path = log_file spec
     n = log_backup_number spec
-    dsts' = reverse . ("":) . map (('.':). show) $ [0..n-1]
-    dsts = map (path++) dsts'
+    dsts' = reverse . ("" :) . map (('.' :) . show) $ [0 .. n - 1]
+    dsts = map (path ++) dsts'
     srcs = tail dsts
     srcdsts = zip srcs dsts
-    move (src,dst) = do
+    move (src, dst) = do
         exist <- doesFileExist src
         when exist $ renameFile src dst
 

@@ -1,13 +1,19 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module System.Log.FastLogger.MultiLogger (
-    MultiLogger
-  , newMultiLogger
-  ) where
+    MultiLogger,
+    newMultiLogger,
+) where
 
-
-import Control.Concurrent (myThreadId, threadCapability, MVar, newMVar, withMVar, takeMVar)
-import Data.Array (Array, listArray, (!), bounds)
+import Control.Concurrent (
+    MVar,
+    myThreadId,
+    newMVar,
+    takeMVar,
+    threadCapability,
+    withMVar,
+ )
+import Data.Array (Array, bounds, listArray, (!))
 
 import System.Log.FastLogger.FileIO
 import System.Log.FastLogger.IO
@@ -17,21 +23,21 @@ import System.Log.FastLogger.Write
 
 ----------------------------------------------------------------
 
-newtype MLogger = MLogger {
-    lgrRef :: IORef LogStr
-  }
+newtype MLogger = MLogger
+    { lgrRef :: IORef LogStr
+    }
 
 -- | A scale but non-time-ordered logger.
-data MultiLogger = MultiLogger {
-    mlgrArray   :: Array Int MLogger
-  , mlgrMBuffer :: MVar Buffer
-  , mlgrBufSize :: BufSize
-  , mlgrFdRef   :: IORef FD
-  }
+data MultiLogger = MultiLogger
+    { mlgrArray :: Array Int MLogger
+    , mlgrMBuffer :: MVar Buffer
+    , mlgrBufSize :: BufSize
+    , mlgrFdRef :: IORef FD
+    }
 
 instance Loggers MultiLogger where
     stopLoggers = System.Log.FastLogger.MultiLogger.stopLoggers
-    pushLog     = System.Log.FastLogger.MultiLogger.pushLog
+    pushLog = System.Log.FastLogger.MultiLogger.pushLog
     flushAllLog = System.Log.FastLogger.MultiLogger.flushAllLog
 
 ----------------------------------------------------------------
@@ -42,15 +48,16 @@ newMLogger = MLogger <$> newIORef mempty
 -- | Creating `MultiLogger`.
 --   The first argument is the number of the internal builders.
 newMultiLogger :: Int -> BufSize -> IORef FD -> IO MultiLogger
-newMultiLogger n bufsize fdref= do
+newMultiLogger n bufsize fdref = do
     mbuf <- getBuffer bufsize >>= newMVar
-    arr <- listArray (0,n-1) <$> replicateM n newMLogger
-    return $ MultiLogger {
-        mlgrArray   = arr
-      , mlgrMBuffer = mbuf
-      , mlgrBufSize = bufsize
-      , mlgrFdRef   = fdref
-      }
+    arr <- listArray (0, n - 1) <$> replicateM n newMLogger
+    return $
+        MultiLogger
+            { mlgrArray = arr
+            , mlgrMBuffer = mbuf
+            , mlgrBufSize = bufsize
+            , mlgrFdRef = fdref
+            }
 
 ----------------------------------------------------------------
 
@@ -61,33 +68,34 @@ pushLog ml@MultiLogger{..} logmsg = do
     -- So, let's check the upper boundary of the array.
     let u = snd $ bounds mlgrArray
         lim = u + 1
-        j | i < lim   = i
-          | otherwise = i `mod` lim
+        j
+            | i < lim = i
+            | otherwise = i `mod` lim
     let logger = mlgrArray ! j
     pushLog' logger logmsg
   where
     pushLog' logger@MLogger{..} nlogmsg@(LogStr nlen _)
-      | nlen > mlgrBufSize = do
-          flushLog ml logger
-          -- Make sure we have a large enough buffer to hold the entire
-          -- contents, thereby allowing for a single write system call and
-          -- avoiding interleaving. This does not address the possibility
-          -- of write not writing the entire buffer at once.
-          writeBigLogStr' ml nlogmsg
-      | otherwise = do
-        action <- atomicModifyIORef' lgrRef checkBuf
-        action
+        | nlen > mlgrBufSize = do
+            flushLog ml logger
+            -- Make sure we have a large enough buffer to hold the entire
+            -- contents, thereby allowing for a single write system call and
+            -- avoiding interleaving. This does not address the possibility
+            -- of write not writing the entire buffer at once.
+            writeBigLogStr' ml nlogmsg
+        | otherwise = do
+            action <- atomicModifyIORef' lgrRef checkBuf
+            action
       where
         checkBuf ologmsg@(LogStr olen _)
-          | mlgrBufSize < olen + nlen = (nlogmsg, writeLogStr' ml ologmsg)
-          | otherwise                 = (ologmsg <> nlogmsg, return ())
+            | mlgrBufSize < olen + nlen = (nlogmsg, writeLogStr' ml ologmsg)
+            | otherwise = (ologmsg <> nlogmsg, return ())
 
 ----------------------------------------------------------------
 
 flushAllLog :: MultiLogger -> IO ()
 flushAllLog ml@MultiLogger{..} = do
     let flushIt i = flushLog ml (mlgrArray ! i)
-        (l,u) = bounds mlgrArray
+        (l, u) = bounds mlgrArray
         nums = [l .. u]
     mapM_ flushIt nums
 
@@ -106,8 +114,8 @@ flushLog ml MLogger{..} = do
 
 stopLoggers :: MultiLogger -> IO ()
 stopLoggers ml@MultiLogger{..} = do
-  System.Log.FastLogger.MultiLogger.flushAllLog ml
-  takeMVar mlgrMBuffer >>= freeBuffer
+    System.Log.FastLogger.MultiLogger.flushAllLog ml
+    takeMVar mlgrMBuffer >>= freeBuffer
 
 ----------------------------------------------------------------
 

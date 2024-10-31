@@ -2,16 +2,16 @@ module Network.Wai.Logger.Prefork.File where
 
 import Control.Applicative
 import Control.Concurrent
-import Control.Exception (handle, SomeException, catch)
+import Control.Exception (SomeException, catch, handle)
 import Control.Monad
 import Data.IORef
 import Network.Wai.Logger
 import Network.Wai.Logger.Prefork.Types
-import Prelude hiding (catch)
 import System.Date.Cache
 import System.IO
 import System.Log.FastLogger
 import System.Posix
+import Prelude hiding (catch)
 
 ----------------------------------------------------------------
 
@@ -27,8 +27,11 @@ setLogger (LoggerRef ref) = writeIORef ref
 
 type LogFlusher = IO ()
 
-fileLoggerInit :: IPAddrSource -> FileLogSpec -> Signal
-               -> IO (ApacheLogger, LogFlusher)
+fileLoggerInit
+    :: IPAddrSource
+    -> FileLogSpec
+    -> Signal
+    -> IO (ApacheLogger, LogFlusher)
 fileLoggerInit ipsrc spec signal = do
     hdl <- open spec
     dc <- clockDateCacher zonedDateCacheConf
@@ -76,10 +79,11 @@ fileLoggerController spec signal pids = forever $ do
     file = log_file spec
     over = handle handler $ do
         siz <- fromIntegral . fileSize <$> getFileStatus file
-        if siz > log_file_size spec then
-            return True
-          else
-            return False
+        if siz > log_file_size spec
+            then
+                return True
+            else
+                return False
     sendSignal pid = signalProcess signal pid `catch` ignore
     handler :: SomeException -> IO Bool
     handler _ = return False

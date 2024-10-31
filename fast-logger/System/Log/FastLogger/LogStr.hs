@@ -3,14 +3,14 @@
 {-# LANGUAGE Trustworthy #-}
 
 module System.Log.FastLogger.LogStr (
-    Builder
-  , LogStr(..)
-  , logStrLength
-  , fromLogStr
-  , ToLogStr(..)
-  , mempty
-  , (<>)
-  ) where
+    Builder,
+    LogStr (..),
+    logStrLength,
+    fromLogStr,
+    ToLogStr (..),
+    mempty,
+    (<>),
+) where
 
 import qualified Data.ByteString as BS
 import Data.ByteString.Builder (Builder)
@@ -21,7 +21,7 @@ import qualified Data.ByteString.Short as SBS
 #if MIN_VERSION_base(4,9,0)
 import qualified Data.Semigroup as Semi (Semigroup(..))
 #endif
-import Data.String (IsString(..))
+import Data.String (IsString (..))
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 #if MIN_VERSION_text(2,0,0)
@@ -83,7 +83,9 @@ instance ToLogStr BL.ByteString where
     toLogStr b = LogStr (fromIntegral (BL.length b)) (B.lazyByteString b)
 instance ToLogStr Builder where
     {-# INLINE toLogStr #-}
-    toLogStr x = let b = B.toLazyByteString x in LogStr (fromIntegral (BL.length b)) (B.lazyByteString b)
+    toLogStr x =
+        let b = B.toLazyByteString x
+         in LogStr (fromIntegral (BL.length b)) (B.lazyByteString b)
 instance ToLogStr SBS.ShortByteString where
     {-# INLINE toLogStr #-}
     toLogStr b = LogStr (SBS.length b) (B.shortByteString b)
@@ -108,18 +110,22 @@ instance ToLogStr TL.Text where
 instance ToLogStr Int where
     {-# INLINE toLogStr #-}
     toLogStr = toLogStr . B.intDec
+
 -- | @since 2.4.14
 instance ToLogStr Int8 where
     {-# INLINE toLogStr #-}
     toLogStr = toLogStr . B.int8Dec
+
 -- | @since 2.4.14
 instance ToLogStr Int16 where
     {-# INLINE toLogStr #-}
     toLogStr = toLogStr . B.int16Dec
+
 -- | @since 2.4.14
 instance ToLogStr Int32 where
     {-# INLINE toLogStr #-}
     toLogStr = toLogStr . B.int32Dec
+
 -- | @since 2.4.14
 instance ToLogStr Int64 where
     {-# INLINE toLogStr #-}
@@ -129,18 +135,22 @@ instance ToLogStr Int64 where
 instance ToLogStr Word where
     {-# INLINE toLogStr #-}
     toLogStr = toLogStr . B.wordDec
+
 -- | @since 2.4.14
 instance ToLogStr Word8 where
     {-# INLINE toLogStr #-}
     toLogStr = toLogStr . B.word8Dec
+
 -- | @since 2.4.14
 instance ToLogStr Word16 where
     {-# INLINE toLogStr #-}
     toLogStr = toLogStr . B.word16Dec
+
 -- | @since 2.4.14
 instance ToLogStr Word32 where
     {-# INLINE toLogStr #-}
     toLogStr = toLogStr . B.word32Dec
+
 -- | @since 2.4.14
 instance ToLogStr Word64 where
     {-# INLINE toLogStr #-}
@@ -150,20 +160,22 @@ instance ToLogStr Word64 where
 instance ToLogStr Integer where
     {-# INLINE toLogStr #-}
     toLogStr = toLogStr . B.integerDec
+
 -- | @since 2.4.14
 instance ToLogStr Float where
     {-# INLINE toLogStr #-}
     toLogStr = toLogStr . B.floatDec
+
 -- | @since 2.4.14
 instance ToLogStr Double where
     {-# INLINE toLogStr #-}
     toLogStr = toLogStr . B.doubleDec
 
 instance Show LogStr where
-  show = show . T.decodeUtf8 . fromLogStr
+    show = show . T.decodeUtf8 . fromLogStr
 
 instance Eq LogStr where
-  a == b = fromLogStr a == fromLogStr b
+    a == b = fromLogStr a == fromLogStr b
 
 -- | Obtaining the length of 'LogStr'.
 logStrLength :: LogStr -> Int

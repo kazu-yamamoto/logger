@@ -2,30 +2,34 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module System.Log.FastLogger.LoggerSet (
-  -- * Creating a logger set
-    LoggerSet
-  , newFileLoggerSet
-  , newFileLoggerSetN
-  , newStdoutLoggerSet
-  , newStdoutLoggerSetN
-  , newStderrLoggerSet
-  , newStderrLoggerSetN
-  , newLoggerSet
-  , newFDLoggerSet
-  -- * Renewing and removing a logger set
-  , renewLoggerSet
-  , rmLoggerSet
-  -- * Writing a log message
-  , pushLogStr
-  , pushLogStrLn
-  -- * Flushing buffered log messages
-  , flushLogStr
-  -- * Misc
-  , replaceLoggerSet
-  ) where
+    -- * Creating a logger set
+    LoggerSet,
+    newFileLoggerSet,
+    newFileLoggerSetN,
+    newStdoutLoggerSet,
+    newStdoutLoggerSetN,
+    newStderrLoggerSet,
+    newStderrLoggerSetN,
+    newLoggerSet,
+    newFDLoggerSet,
+
+    -- * Renewing and removing a logger set
+    renewLoggerSet,
+    rmLoggerSet,
+
+    -- * Writing a log message
+    pushLogStr,
+    pushLogStrLn,
+
+    -- * Flushing buffered log messages
+    flushLogStr,
+
+    -- * Misc
+    replaceLoggerSet,
+) where
 
 import Control.Concurrent (getNumCapabilities)
-import Control.Debounce (mkDebounce, defaultDebounceSettings, debounceAction)
+import Control.Debounce (debounceAction, defaultDebounceSettings, mkDebounce)
 
 import System.Log.FastLogger.FileIO
 import System.Log.FastLogger.IO
@@ -47,12 +51,12 @@ data Logger = SL SingleLogger | ML MultiLogger
 --   The number of loggers is the capabilities of GHC RTS.
 --   You can specify it with \"+RTS -N\<x\>\".
 --   A buffer is prepared for each capability.
-data LoggerSet = LoggerSet {
-    lgrsetFilePath :: Maybe FilePath
-  , lgrsetFdRef    :: IORef FD
-  , lgrsetLogger   :: Logger
-  , lgrsetDebounce :: IO ()
-  }
+data LoggerSet = LoggerSet
+    { lgrsetFilePath :: Maybe FilePath
+    , lgrsetFdRef :: IORef FD
+    , lgrsetLogger :: Logger
+    , lgrsetDebounce :: IO ()
+    }
 
 -- | Creating a new 'LoggerSet' using a file.
 --
@@ -87,6 +91,7 @@ newStderrLoggerSetN :: BufSize -> Maybe Int -> IO LoggerSet
 newStderrLoggerSetN size mn = getStderrFD >>= newFDLoggerSet size mn Nothing
 
 {-# DEPRECATED newLoggerSet "Use newFileLoggerSet etc instead" #-}
+
 -- | Creating a new 'LoggerSet'.
 --   If 'Nothing' is specified to the second argument,
 --   stdout is used.
@@ -98,35 +103,40 @@ newLoggerSet size mn = maybe (newStdoutLoggerSet size) (newFileLoggerSetN size m
 newFDLoggerSet :: BufSize -> Maybe Int -> Maybe FilePath -> FD -> IO LoggerSet
 newFDLoggerSet size mn mfile fd = do
     n <- case mn of
-      Just n' -> return n'
-      Nothing -> getNumCapabilities
+        Just n' -> return n'
+        Nothing -> getNumCapabilities
     fdref <- newIORef fd
     let bufsiz = max 1 size
-    logger <- if n == 1 && mn == Just 1 then
-                  SL <$> S.newSingleLogger bufsiz fdref
-                else do
-                  ML <$> M.newMultiLogger n bufsiz fdref
-    flush <- mkDebounce defaultDebounceSettings
-        { debounceAction = flushLogStrRaw logger
-        }
-    return $ LoggerSet {
-        lgrsetFilePath = mfile
-      , lgrsetFdRef    = fdref
-      , lgrsetLogger   = logger
-      , lgrsetDebounce = flush
-      }
+    logger <-
+        if n == 1 && mn == Just 1
+            then
+                SL <$> S.newSingleLogger bufsiz fdref
+            else do
+                ML <$> M.newMultiLogger n bufsiz fdref
+    flush <-
+        mkDebounce
+            defaultDebounceSettings
+                { debounceAction = flushLogStrRaw logger
+                }
+    return $
+        LoggerSet
+            { lgrsetFilePath = mfile
+            , lgrsetFdRef = fdref
+            , lgrsetLogger = logger
+            , lgrsetDebounce = flush
+            }
 
 -- | Writing a log message to the corresponding buffer.
 --   If the buffer becomes full, the log messages in the buffer
 --   are written to its corresponding file, stdout, or stderr.
 pushLogStr :: LoggerSet -> LogStr -> IO ()
 pushLogStr LoggerSet{..} logmsg = case lgrsetLogger of
-  SL sl -> do
-      pushLog sl logmsg
-      lgrsetDebounce
-  ML ml -> do
-      pushLog ml logmsg
-      lgrsetDebounce
+    SL sl -> do
+        pushLog sl logmsg
+        lgrsetDebounce
+    ML ml -> do
+        pushLog ml logmsg
+        lgrsetDebounce
 
 -- | Same as 'pushLogStr' but also appends a newline.
 pushLogStrLn :: LoggerSet -> LogStr -> IO ()
@@ -152,11 +162,11 @@ flushLogStrRaw (ML ml) = flushAllLog ml
 --   This does nothing for stdout and stderr.
 renewLoggerSet :: LoggerSet -> IO ()
 renewLoggerSet LoggerSet{..} = case lgrsetFilePath of
-  Nothing -> return ()
-  Just file -> do
-      newfd <- openFileFD file
-      oldfd <- atomicModifyIORef' lgrsetFdRef (\fd -> (newfd, fd))
-      closeFD oldfd
+    Nothing -> return ()
+    Just file -> do
+        newfd <- openFileFD file
+        oldfd <- atomicModifyIORef' lgrsetFdRef (\fd -> (newfd, fd))
+        closeFD oldfd
 
 -- | Flushing the buffers, closing the internal file information
 --   and freeing the buffers.
@@ -165,8 +175,8 @@ rmLoggerSet LoggerSet{..} = do
     fd <- readIORef lgrsetFdRef
     when (isFDValid fd) $ do
         case lgrsetLogger of
-          SL sl -> stopLoggers sl
-          ML ml -> stopLoggers ml
+            SL sl -> stopLoggers sl
+            ML ml -> stopLoggers ml
         when (isJust lgrsetFilePath) $ closeFD fd
         writeIORef lgrsetFdRef invalidFD
 
@@ -174,4 +184,4 @@ rmLoggerSet LoggerSet{..} = do
 --   'LoggerSet' and the old file path.
 replaceLoggerSet :: LoggerSet -> FilePath -> (LoggerSet, Maybe FilePath)
 replaceLoggerSet lgrset@LoggerSet{..} new_file_path =
-    (lgrset { lgrsetFilePath = Just new_file_path }, lgrsetFilePath)
+    (lgrset{lgrsetFilePath = Just new_file_path}, lgrsetFilePath)
