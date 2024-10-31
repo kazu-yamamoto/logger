@@ -44,7 +44,7 @@ library
     build-depends:
         base >=4.9 && <5,
         array,
-        auto-update >=0.1.2,
+        auto-update >=0.2.2,
         easy-file >=0.2,
         bytestring >=0.10.4,
         directory,

@@ -11,7 +11,7 @@ module System.Log.FastLogger.Date (
     simpleTimeFormat',
 ) where
 
-import Control.AutoUpdate (defaultUpdateSettings, mkAutoUpdate, updateAction)
+import Control.AutoUpdate (defaultUpdateSettings, mkAutoUpdate, updateAction, updateThreadName)
 import Data.UnixTime (formatUnixTime, fromEpochTime)
 import System.Log.FastLogger.Types (FormattedTime, TimeFormat)
 import System.PosixCompat.Time (epochTime)
@@ -38,6 +38,7 @@ newTimeCache fmt =
     mkAutoUpdate
         defaultUpdateSettings
             { updateAction = getTime >>= formatDate fmt
+            , updateThreadName = "Date string cacher of FastLogger (AutoUpdate)"
             }
 
 -- | A simple time cache using format @"%d/%b/%Y:%T %z"@

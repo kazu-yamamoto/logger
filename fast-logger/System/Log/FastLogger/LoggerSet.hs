@@ -29,7 +29,7 @@ module System.Log.FastLogger.LoggerSet (
 ) where
 
 import Control.Concurrent (getNumCapabilities)
-import Control.Debounce (debounceAction, defaultDebounceSettings, mkDebounce)
+import Control.Debounce (debounceAction, defaultDebounceSettings, mkDebounce, debounceThreadName)
 
 import System.Log.FastLogger.FileIO
 import System.Log.FastLogger.IO
@@ -117,6 +117,7 @@ newFDLoggerSet size mn mfile fd = do
         mkDebounce
             defaultDebounceSettings
                 { debounceAction = flushLogStrRaw logger
+                , debounceThreadName = "Loggerset of FastLogger (Debounce)"
                 }
     return $
         LoggerSet
