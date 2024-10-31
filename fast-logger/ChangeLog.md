@@ -1,3 +1,7 @@
+## 3.2.5
+
+* Giving names to threads.
+
 ## 3.2.4
 
 * Avoid unnecessary copy for Text values with text-2.0
