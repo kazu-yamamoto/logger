@@ -83,7 +83,7 @@ rotate spec = mapM_ move srcdsts
     n = log_backup_number spec
     dsts' = reverse . ("" :) . map (('.' :) . show) $ [0 .. n - 1]
     dsts = map (path ++) dsts'
-    srcs = tail dsts
+    srcs = drop 1 dsts
     srcdsts = zip srcs dsts
     move (src, dst) = do
         exist <- doesFileExist src

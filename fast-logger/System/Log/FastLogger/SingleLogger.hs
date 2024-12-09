@@ -7,6 +7,7 @@ module System.Log.FastLogger.SingleLogger (
 
 import Control.Concurrent (MVar, forkIO, newEmptyMVar, putMVar, takeMVar)
 import Control.Concurrent.STM
+import GHC.Conc.Sync (labelThread)
 
 import System.Log.FastLogger.FileIO
 import System.Log.FastLogger.IO
@@ -69,7 +70,8 @@ newSingleLogger bufsize fdref = do
     tvar <- newTVarIO 0
     ref <- newIORef (mempty, [])
     buf <- getBuffer bufsize
-    _ <- forkIO $ writer bufsize buf fdref tvar ref
+    tid <- forkIO $ writer bufsize buf fdref tvar ref
+    labelThread tid "FastLogger single logger's writer"
     let wakeup = atomically $ modifyTVar' tvar (+ 1)
         flush cont = do
             mvar <- newEmptyMVar
