@@ -1,3 +1,7 @@
+## 3.2.6
+
+* Labeling the thread of SingleLogger.
+
 ## 3.2.5
 
 * Giving names to threads.
