@@ -47,8 +47,9 @@ module System.Log.FastLogger (
 ) where
 
 import Control.Concurrent (MVar, newMVar, putMVar, tryTakeMVar)
-import Control.Exception (SomeException (..), bracket, handle)
+import Control.Exception (bracket)
 import System.EasyFile (getFileSize)
+import qualified System.IO.Error as E
 
 import System.Log.FastLogger.Date
 import System.Log.FastLogger.File
@@ -80,30 +81,35 @@ type LogType = LogType' LogStr
 data LogType' a where
     LogNone :: LogType' LogStr
         -- ^ No logging.
-    LogStdout :: BufSize
+    LogStdout
+        :: BufSize
         -> LogType' LogStr
         -- ^ Logging to stdout.
         --   'BufSize' is a buffer size
         --   for each capability.
-    LogStderr :: BufSize
+    LogStderr
+        :: BufSize
         -> LogType' LogStr
         -- ^ Logging to stderr.
         --   'BufSize' is a buffer size
         --   for each capability.
-    LogFileNoRotate :: FilePath
+    LogFileNoRotate
+        :: FilePath
         -> BufSize
         -> LogType' LogStr
         -- ^ Logging to a file.
         --   'BufSize' is a buffer size
         --   for each capability.
-    LogFile :: FileLogSpec
+    LogFile
+        :: FileLogSpec
         -> BufSize
         -> LogType' LogStr
         -- ^ Logging to a file.
         --   'BufSize' is a buffer size
         --   for each capability.
         --   File rotation is done on-demand.
-    LogFileTimedRotate :: TimedFileLogSpec
+    LogFileTimedRotate
+        :: TimedFileLogSpec
         -> BufSize
         -> LogType' LogStr
         -- ^ Logging to a file.
@@ -111,7 +117,8 @@ data LogType' a where
         --   for each capability.
         --   Rotation happens based on check specified
         --   in 'TimedFileLogSpec'.
-    LogCallback :: (v -> IO ())
+    LogCallback
+        :: (v -> IO ())
         -> IO ()
         -> LogType' v
         -- ^ Logging with a log and flush action.
@@ -261,11 +268,11 @@ tryRotate lgrset spec ref mvar = bracket lock unlock rotateFiles
                     writeIORef ref $ estimate (limit - siz)
     file = log_file spec
     limit = log_file_size spec
+    -- The log file is locked by GHC.
+    -- We need to get its file size by the way not using locks.
     getSize =
-        handle (\(SomeException _) -> return Nothing) $
-            -- The log file is locked by GHC.
-            -- We need to get its file size by the way not using locks.
-            Just . fromIntegral <$> getFileSize file
+        (Just . fromIntegral <$> getFileSize file) `E.catchIOError` \_ -> return Nothing
+
     -- 200 is an ad-hoc value for the length of log line.
     estimate x = fromInteger (x `div` 200)
 
