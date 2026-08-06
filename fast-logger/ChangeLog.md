@@ -1,3 +1,7 @@
+## 3.2.7
+
+* Don't eat up an asynchronous exception.
+
 ## 3.2.6
 
 * Labeling the thread of SingleLogger.
