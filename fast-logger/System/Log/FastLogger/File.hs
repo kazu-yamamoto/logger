@@ -76,6 +76,14 @@ check file = do
     dir = takeDirectory file
 
 -- | Rotating log files.
+--
+-- The log file is renamed while it is still open, which every platform
+-- allows except Windows, and Windows allows it only of a file opened
+-- sharing deletion.  The descriptor 'GHC.IO.FD' opens is not, so under the
+-- POSIX subsystem there -- @+RTS --io-manager=posix@, which is still the
+-- default -- this is refused and the file does not rotate.  Under the
+-- native one the file is a 'System.IO.Handle', which is shared for
+-- deletion, and it does.
 rotate :: FileLogSpec -> IO ()
 rotate spec = mapM_ move srcdsts
   where
