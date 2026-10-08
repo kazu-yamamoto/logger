@@ -108,6 +108,15 @@ data LogType' a where
         --   'BufSize' is a buffer size
         --   for each capability.
         --   File rotation is done on-demand.
+        --
+        --   On Windows this needs the native I\/O manager
+        --   (@+RTS --io-manager=native@).  Rotation renames the
+        --   log file while it is still open, which the
+        --   descriptor the POSIX subsystem opens there is not
+        --   shared for; the rename is refused and the file
+        --   stops rotating.  Nothing is lost -- the log keeps
+        --   being written to the one file, past the size asked
+        --   for.
     LogFileTimedRotate
         :: TimedFileLogSpec
         -> BufSize
