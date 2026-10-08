@@ -65,6 +65,22 @@ jobs:
       shell: bash
       run: cabal update
 
+    # Before the cache is written, so that what doctest is built from is in
+    # it.  Installed from the one job that runs it, for the same reason the
+    # run is limited to one.
+    - name: Install doctest
+      id: doctest-dep
+      if: ${{ runner.os == 'Linux' && matrix.ghc == '9.12' }}
+      shell: bash
+      run: |
+        if cabal install --offline --overwrite-policy=always doctest
+        then
+          echo "installed=false" >> "$GITHUB_OUTPUT"
+        else
+          cabal install doctest --overwrite-policy=always
+          echo "installed=true" >> "$GITHUB_OUTPUT"
+        fi
+
     - name: Install dependencies
       id: inst-dep
       shell: bash
@@ -80,7 +96,7 @@ jobs:
     # Only when something was actually built.  Writing the cache back
     # unchanged on every run is minutes of upload for nothing.
     - name: Save Cache
-      if: ${{ steps.inst-dep.outputs.installed == 'true' }}
+      if: ${{ steps.inst-dep.outputs.installed == 'true' || steps.doctest-dep.outputs.installed == 'true' }}
       uses: actions/cache/save@v4
       with:
         path: ${{ steps.setup.outputs.cabal-store }}
@@ -96,7 +112,6 @@ jobs:
       if: ${{ runner.os == 'Linux' && matrix.ghc == '9.12' }}
       shell: bash
       run: |
-        cabal install doctest --overwrite-policy=always
         for package in $(sed 's/packages://g' cabal.project)
         do
           cabal repl --build-depends=QuickCheck --with-repl=doctest $package
