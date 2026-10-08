@@ -1,3 +1,8 @@
+## 3.2.8
+
+* Take another road under the Windows native I/O manager
+  [#222](https://github.com/kazu-yamamoto/logger/pull/222)
+
 ## 3.2.7
 
 * Don't eat up an asynchronous exception.
