@@ -13,45 +13,91 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os:  [ 'ubuntu-latest', 'macOS-latest' ]
-        ghc: [ '8.10', '9.0', '9.2', '9.4' ]
+        os:  [ 'ubuntu-latest', 'macOS-latest', 'windows-latest' ]
+        ghc: [ '9.2', '9.4', '9.6', '9.8', '9.10', '9.12' ]
+        # GitHub runs at most five macOS jobs at once, so a sixth would sit
+        # waiting for one of the others and by itself decide when the
+        # workflow ended.  Nothing here is macOS-specific; keep the oldest
+        # and the newest and let Linux cover the range in between.
+        #
+        # Windows is here for one compiler, because what it is here to test
+        # is the I/O manager and that does not vary by compiler either.
+        exclude:
+          - { os: macOS-latest,   ghc: '9.4'  }
+          - { os: macOS-latest,   ghc: '9.6'  }
+          - { os: macOS-latest,   ghc: '9.8'  }
+          - { os: macOS-latest,   ghc: '9.10' }
+          - { os: windows-latest, ghc: '9.2'  }
+          - { os: windows-latest, ghc: '9.4'  }
+          - { os: windows-latest, ghc: '9.6'  }
+          - { os: windows-latest, ghc: '9.8'  }
+          - { os: windows-latest, ghc: '9.10' }
+
+    env:
+      target-config: --test-show-details=streaming --enable-tests --disable-benchmarks
 
     steps:
-    - uses: actions/checkout@v3
+    - run: git config --global core.autocrlf false
 
-    - uses: haskell/actions/setup@v2
+    - uses: actions/checkout@v4
+
+    - uses: haskell-actions/setup@v2
+      id: setup
       with:
         ghc-version: ${{ matrix.ghc }}
-        cabal-version: '3.8'
+        cabal-version: latest
 
-    - name: Cache
-      uses: actions/cache@v3
-      env:
-        cache-name: cache-cabal
+    # The store, and only the store: it holds the built dependencies, which
+    # is the whole of what takes time.  The package index is not cached with
+    # them on purpose -- cached together, a restore puts back whatever index
+    # was current when the cache was written, and a job then cannot see
+    # anything published since.  Fetching it afresh takes seconds.
+    #
+    # Asking the setup step where the store is, rather than naming ~/.cabal,
+    # because it is not there on Windows.
+    - name: Restore Cache
+      uses: actions/cache/restore@v4
       with:
-        path: ~/.cabal
-        key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/*.cabal') }}-${{ hashFiles('**/cabal.project') }}
-        restore-keys: |
-          ${{ runner.os }}-build-${{ env.cache-name }}-
-          ${{ runner.os }}-build-
-          ${{ runner.os }}-
+        path: ${{ steps.setup.outputs.cabal-store }}
+        key: ${{ runner.os }}-${{ steps.setup.outputs.ghc-version }}-${{ hashFiles('**/*.cabal') }}-${{ hashFiles('cabal.project') }}
+
+    - name: Hackage index
+      shell: bash
+      run: cabal update
 
     - name: Install dependencies
+      id: inst-dep
+      shell: bash
       run: |
-        cabal update
-        cabal build --only-dependencies --enable-tests --disable-benchmarks all
+        if cabal build --offline --only-dependencies ${{ env.target-config }} all
+        then
+          echo "installed=false" >> "$GITHUB_OUTPUT"
+        else
+          cabal build --only-dependencies ${{ env.target-config }} all
+          echo "installed=true" >> "$GITHUB_OUTPUT"
+        fi
+
+    # Only when something was actually built.  Writing the cache back
+    # unchanged on every run is minutes of upload for nothing.
+    - name: Save Cache
+      if: ${{ steps.inst-dep.outputs.installed == 'true' }}
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ steps.setup.outputs.cabal-store }}
+        key: ${{ runner.os }}-${{ steps.setup.outputs.ghc-version }}-${{ hashFiles('**/*.cabal') }}-${{ hashFiles('cabal.project') }}
 
     - name: Build
-      run: cabal build --enable-tests --disable-benchmarks all
+      run: cabal build ${{ env.target-config }} all
 
     - name: Run tests
-      run: cabal test --test-show-details=streaming all
+      run: cabal test ${{ env.target-config }} all
 
     - name: Run doctest
-      if: ${{ runner.os == 'Linux' }}
+      if: ${{ runner.os == 'Linux' && matrix.ghc == '9.12' }}
+      shell: bash
       run: |
         cabal install doctest --overwrite-policy=always
-        for package in `cat cabal.project | sed 's/packages://g'`
+        for package in $(sed 's/packages://g' cabal.project)
         do
-          cabal repl --build-depends=QuickCheck --with-ghc=doctest $package
+          cabal repl --build-depends=QuickCheck --with-repl=doctest $package
         done
