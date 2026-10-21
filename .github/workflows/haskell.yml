@@ -47,6 +47,13 @@ jobs:
         ghc-version: ${{ matrix.ghc }}
         cabal-version: latest
 
+    # The macOS image selects Xcode 26.6, whose ld cannot read the SDK 27
+    # stubs that clang picks up from the Command Line Tools.  The Command
+    # Line Tools' own ld can, so link with them.
+    - name: Link with the Command Line Tools
+      if: ${{ runner.os == 'macOS' }}
+      run: sudo xcode-select -s /Library/Developer/CommandLineTools
+
     # The store, and only the store: it holds the built dependencies, which
     # is the whole of what takes time.  The package index is not cached with
     # them on purpose -- cached together, a restore puts back whatever index
