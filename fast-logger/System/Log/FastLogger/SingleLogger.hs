@@ -7,6 +7,7 @@ module System.Log.FastLogger.SingleLogger (
 
 import Control.Concurrent (MVar, forkIO, newEmptyMVar, putMVar, takeMVar)
 import Control.Concurrent.STM
+import qualified Control.Exception as E
 import GHC.Conc.Sync (labelThread)
 
 import System.Log.FastLogger.FileIO
@@ -58,9 +59,21 @@ writer bufsize buf fdref tvar ref = loop (0 :: Int)
     go (F mvar cont : msgs) = do
         putMVar mvar ()
         if cont then go msgs else return False
-    go (L msg@(LogStr len _) : msgs)
-        | len <= bufsize = writeLogStr buf fdref msg >> go msgs
-        | otherwise = writeBigLogStr fdref msg >> go msgs
+    go (L msg@(LogStr len _) : msgs) = do
+        dropOnSyncException $
+            if len <= bufsize
+                then writeLogStr buf fdref msg
+                else writeBigLogStr fdref msg
+        go msgs
+
+-- If writing fails (e.g. ENOSPC or EPIPE), the message is dropped
+-- so that the writer thread keeps running and flushes do not block.
+dropOnSyncException :: IO () -> IO ()
+dropOnSyncException act = act `E.catch` handler
+  where
+    handler e = case E.fromException e of
+        Just (E.SomeAsyncException _) -> E.throwIO e
+        Nothing -> return ()
 
 ----------------------------------------------------------------
 

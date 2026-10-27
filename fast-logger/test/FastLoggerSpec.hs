@@ -17,6 +17,11 @@ import Data.Monoid ((<>))
 #endif
 import Data.String (IsString (fromString))
 import System.Directory (doesFileExist, removeFile)
+#if !defined(mingw32_HOST_OS)
+import qualified GHC.IO.FD as FD
+import GHC.IO.IOMode (IOMode (ReadMode))
+#endif
+import System.Timeout (timeout)
 import Text.Printf (printf)
 
 import Test.Hspec
@@ -52,6 +57,7 @@ spec = do
 
     describe "fastlogger 1" $ do
         it "maintains the ordering of log messages" logOrdering
+        it "survives write errors" survivesWriteErrors
 
 tempFile :: FilePath
 tempFile = "test/temp.txt"
@@ -113,3 +119,17 @@ logOrdering = flip finally (cleanup tempFile) $ do
   where
     mktag :: Int -> String
     mktag t = "thread id: " <> show t <> " "
+
+survivesWriteErrors :: IO ()
+#if defined(mingw32_HOST_OS)
+survivesWriteErrors = pendingWith "POSIX only"
+#else
+survivesWriteErrors = do
+    -- Writing to a read-only FD fails with EBADF.
+    (fd, _) <- FD.openFile "LICENSE" ReadMode False
+    lgrset <- newFDLoggerSet 512 (Just 1) Nothing fd
+    let msg = toLogStr (BS.replicate 100 'x') <> "\n"
+    mapM_ (\_ -> pushLogStr lgrset msg) [1 .. 100 :: Int]
+    timeout 3000000 (flushLogStr lgrset) `shouldReturn` Just ()
+    timeout 3000000 (rmLoggerSet lgrset) `shouldReturn` Just ()
+#endif

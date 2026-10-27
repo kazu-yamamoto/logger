@@ -1,3 +1,8 @@
+## 3.2.9
+
+* The writer thread of SingleLogger survives write errors such as
+  ENOSPC and EPIPE. The failed messages are dropped.
+
 ## 3.2.8
 
 * Take another road under the Windows native I/O manager
