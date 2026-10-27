@@ -15,10 +15,17 @@ module Network.Wai.Logger.Apache (
 #define MIN_VERSION_wai(x,y,z) 1
 #endif
 
+import qualified Data.ByteString as B
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Internal as BI
+import qualified Data.ByteString.Unsafe as BU
+import Data.Char (isSpace)
 import Data.List (find)
 import Data.Maybe (fromMaybe)
+import Data.Word (Word8)
+import Foreign.Ptr (Ptr)
+import Foreign.Storable (pokeByteOff)
 #if MIN_VERSION_base(4,5,0)
 import Data.Monoid ((<>), First (..))
 #else
@@ -74,15 +81,15 @@ apacheLogStr
     -> Maybe Integer
     -> LogStr
 apacheLogStr ipsrc userget tmstr req status msize =
-    toLogStr (getSourceIP ipsrc req)
+    toLogStr (escapeLogItem (getSourceIP ipsrc req))
         <> " - "
-        <> maybe "-" toLogStr (userget req)
+        <> maybe "-" escapeUser (userget req)
         <> " ["
         <> toLogStr tmstr
         <> "] \""
-        <> toLogStr (requestMethod req)
+        <> toLogStr (escapeLogItem (requestMethod req))
         <> " "
-        <> toLogStr path
+        <> toLogStr (escapeLogItem path)
         <> " "
         <> toLogStr (show (httpVersion req))
         <> "\" "
@@ -90,9 +97,9 @@ apacheLogStr ipsrc userget tmstr req status msize =
         <> " "
         <> toLogStr (maybe "-" show msize)
         <> " \""
-        <> toLogStr (fromMaybe "" mr)
+        <> toLogStr (escapeLogItem (fromMaybe "" mr))
         <> "\" \""
-        <> toLogStr (fromMaybe "" mua)
+        <> toLogStr (escapeLogItem (fromMaybe "" mua))
         <> "\"\n"
   where
     path = rawPathInfo req <> rawQueryString req
@@ -118,19 +125,19 @@ serverpushLogStr
     -> Integer
     -> LogStr
 serverpushLogStr ipsrc userget tmstr req path size =
-    toLogStr (getSourceIP ipsrc req)
+    toLogStr (escapeLogItem (getSourceIP ipsrc req))
         <> " - "
-        <> maybe "-" toLogStr (userget req)
+        <> maybe "-" escapeUser (userget req)
         <> " ["
         <> toLogStr tmstr
         <> "] \"PUSH "
-        <> toLogStr path
+        <> toLogStr (escapeLogItem path)
         <> " HTTP/2\" 200 "
         <> toLogStr (show size)
         <> " \""
-        <> toLogStr ref
+        <> toLogStr (escapeLogItem ref)
         <> "\" \""
-        <> toLogStr (fromMaybe "" mua)
+        <> toLogStr (escapeLogItem (fromMaybe "" mua))
         <> "\"\n"
   where
     ref = rawPathInfo req
@@ -142,6 +149,64 @@ serverpushLogStr ipsrc userget tmstr req path size =
 #else
     mua = lookup "user-agent" $ requestHeaders req
 #endif
+
+escapeUser :: ToLogStr user => user -> LogStr
+escapeUser = toLogStr . escapeLogItem . fromLogStr . toLogStr
+
+-- | Escaping a request-derived field as Apache's @ap_escape_logitem@ does.
+--   No copy is made if nothing needs to be escaped.
+--
+-- >>> escapeLogItem "Mozilla/5.0"
+-- "Mozilla/5.0"
+-- >>> escapeLogItem "a\"b\\c\r\n\x01\x7f\xe3"
+-- "a\\\"b\\\\c\\r\\n\\x01\\x7f\\xe3"
+escapeLogItem :: ByteString -> ByteString
+escapeLogItem bs
+    | extra == 0 = bs
+    | otherwise = BI.unsafeCreate (len + extra) $ \p -> fill p 0 0
+  where
+    len = B.length bs
+    extra = B.foldl' (\n w -> n + escapeLen w) 0 bs
+    fill :: Ptr Word8 -> Int -> Int -> IO ()
+    fill p i j
+        | i >= len = return ()
+        | otherwise = do
+            let w = BU.unsafeIndex bs i
+            case escapeLen w of
+                0 -> do
+                    pokeByteOff p j w
+                    fill p (i + 1) (j + 1)
+                1 -> do
+                    pokeByteOff p j backslash
+                    pokeByteOff p (j + 1) (escapeChar w)
+                    fill p (i + 1) (j + 2)
+                _ -> do
+                    pokeByteOff p j backslash
+                    pokeByteOff p (j + 1) (0x78 :: Word8) -- 'x'
+                    pokeByteOff p (j + 2) (hex (w `div` 16))
+                    pokeByteOff p (j + 3) (hex (w `mod` 16))
+                    fill p (i + 1) (j + 4)
+    backslash = 0x5c :: Word8
+    hex :: Word8 -> Word8
+    hex n
+        | n < 10 = 0x30 + n
+        | otherwise = 0x57 + n -- lower case as Apache
+
+-- Number of extra bytes needed to escape a byte.
+escapeLen :: Word8 -> Int
+escapeLen w
+    | w == 0x22 || w == 0x5c = 1 -- '"' and '\\'
+    | w >= 0x20 && w < 0x7f = 0
+    | w >= 0x08 && w <= 0x0d && w /= 0x0c = 1 -- \b \t \n \v \r
+    | otherwise = 3
+
+escapeChar :: Word8 -> Word8
+escapeChar 0x08 = 0x62 -- b
+escapeChar 0x09 = 0x74 -- t
+escapeChar 0x0a = 0x6e -- n
+escapeChar 0x0b = 0x76 -- v
+escapeChar 0x0d = 0x72 -- r
+escapeChar w = w -- '"' and '\\'
 
 getSourceIP :: IPAddrSource -> Request -> ByteString
 getSourceIP FromSocket = getSourceFromSocket
@@ -232,14 +297,19 @@ getSourceFromFallback req = fromMaybe (getSourceFromSocket req) $ getSource req
 -- >>> getSource defaultRequest { requestHeaders = [ ("X-Forwarded-For", "5.6.7.8, 10.11.12.13, 1.2.3.4") ] }
 -- Just "5.6.7.8"
 getSource :: Request -> Maybe ByteString
-getSource = getSourceFromHeaders [("x-real-ip", id), ("x-forwarded-for", firstIpInXFF)]
+getSource =
+    getSourceFromHeaders
+        [("x-real-ip", firstIpInXFF), ("x-forwarded-for", firstIpInXFF)]
 
 -- | Pull out the first IP in a comma-separated list of X-Forwarded-For IPs.
+--   Leading white spaces are skipped and the IP ends at a white space.
 --
 -- >>> firstIpInXFF "1.2.3.4, 5.6.7.8, 10.11.12.13"
 -- "1.2.3.4"
+-- >>> firstIpInXFF " 1.2.3.4 , 5.6.7.8"
+-- "1.2.3.4"
 --
--- If there are no commas, just return the whole input ByteString:
+-- If there are no commas or white spaces, just return the whole input ByteString:
 --
 -- >>> firstIpInXFF "5.6.7.8"
 -- "5.6.7.8"
@@ -249,7 +319,7 @@ getSource = getSourceFromHeaders [("x-real-ip", id), ("x-forwarded-for", firstIp
 -- >>> firstIpInXFF "hello, world"
 -- "hello"
 firstIpInXFF :: ByteString -> ByteString
-firstIpInXFF = BS.takeWhile (/= ',')
+firstIpInXFF = BS.takeWhile (\c -> c /= ',' && not (isSpace c)) . BS.dropWhile isSpace
 
 getSourceFromHeaders
     :: [(HeaderName, ByteString -> ByteString)] -> Request -> Maybe ByteString
