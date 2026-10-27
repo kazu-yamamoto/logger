@@ -12,6 +12,7 @@ synopsis:      A logging system for WAI
 description:   A logging system for WAI(Web Application Interface)
 category:      Web, Yesod
 build-type:    Simple
+extra-source-files: ChangeLog.md
 
 source-repository head
     type:     git
