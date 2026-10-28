@@ -5,7 +5,7 @@ module System.Log.FastLogger.SingleLogger (
     newSingleLogger,
 ) where
 
-import Control.Concurrent (MVar, forkIO, newEmptyMVar, putMVar, takeMVar)
+import Control.Concurrent (MVar, forkIO, newEmptyMVar, putMVar, takeMVar, withMVar)
 import Control.Concurrent.STM
 import GHC.Conc.Sync (labelThread)
 
@@ -41,10 +41,11 @@ writer
     :: BufSize
     -> Buffer
     -> IORef FD
+    -> MVar ()
     -> TVar Int
     -> IORef (LogStr, Q)
     -> IO ()
-writer bufsize buf fdref tvar ref = loop (0 :: Int)
+writer bufsize buf fdref fdlock tvar ref = loop (0 :: Int)
   where
     loop cnt = do
         cnt' <- atomically $ do
@@ -58,19 +59,22 @@ writer bufsize buf fdref tvar ref = loop (0 :: Int)
     go (F mvar cont : msgs) = do
         putMVar mvar ()
         if cont then go msgs else return False
-    go (L msg@(LogStr len _) : msgs)
-        | len <= bufsize = writeLogStr buf fdref msg >> go msgs
-        | otherwise = writeBigLogStr fdref msg >> go msgs
+    go (L msg@(LogStr len _) : msgs) = do
+        withMVar fdlock $ \_ ->
+            if len <= bufsize
+                then writeLogStr buf fdref msg
+                else writeBigLogStr fdref msg
+        go msgs
 
 ----------------------------------------------------------------
 
 -- | Creating `SingleLogger`.
-newSingleLogger :: BufSize -> IORef FD -> IO SingleLogger
-newSingleLogger bufsize fdref = do
+newSingleLogger :: BufSize -> IORef FD -> MVar () -> IO SingleLogger
+newSingleLogger bufsize fdref fdlock = do
     tvar <- newTVarIO 0
     ref <- newIORef (mempty, [])
     buf <- getBuffer bufsize
-    tid <- forkIO $ writer bufsize buf fdref tvar ref
+    tid <- forkIO $ writer bufsize buf fdref fdlock tvar ref
     labelThread tid "FastLogger single logger's writer"
     let wakeup = atomically $ modifyTVar' tvar (+ 1)
         flush cont = do
