@@ -7,16 +7,18 @@ module FastLoggerSpec (spec) where
 import Control.Applicative ((<$>))
 #endif
 import Control.Concurrent (getNumCapabilities)
-import Control.Concurrent.Async (forConcurrently_)
+import Control.Concurrent.Async (concurrently, forConcurrently_)
 import Control.Exception (finally)
 import Control.Monad (forM_, when)
 import qualified Data.ByteString.Char8 as BS
+import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.List (sort)
 #if !MIN_VERSION_base(4,11,0)
 import Data.Monoid ((<>))
 #endif
 import Data.String (IsString (fromString))
-import System.Directory (doesFileExist, removeFile)
+import System.Directory (doesFileExist, removeFile, renameFile)
+import System.Timeout (timeout)
 import Text.Printf (printf)
 
 import Test.Hspec
@@ -52,6 +54,12 @@ spec = do
 
     describe "fastlogger 1" $ do
         it "maintains the ordering of log messages" logOrdering
+
+    describe "renewLoggerSet" $ do
+        it "does not close the FD under the single logger's writer" $
+            renewWhileLogging (Just 1)
+        it "does not close the FD under the multi logger's writers" $
+            renewWhileLogging Nothing
 
 tempFile :: FilePath
 tempFile = "test/temp.txt"
@@ -113,3 +121,38 @@ logOrdering = flip finally (cleanup tempFile) $ do
   where
     mktag :: Int -> String
     mktag t = "thread id: " <> show t <> " "
+
+-- Rotates the way 'tryRotate' does while messages are being written.
+-- An FD closed under a writer makes a write fail with EBADF.
+renewWhileLogging :: Maybe Int -> IO ()
+#if defined(mingw32_HOST_OS)
+-- An open file cannot be renamed under the POSIX I/O manager.
+renewWhileLogging _ = pendingWith "renaming an open file"
+#else
+renewWhileLogging mn = flip finally (mapM_ cleanup files) $ do
+    mapM_ cleanup files
+    lgrset <- newFileLoggerSetN 64 mn tempFile
+    renewed <- newIORef False
+    let logger i = do
+            pushLogStr lgrset (toLogStr (show i) <> "\n")
+            fin <- readIORef renewed
+            if fin && i >= 20000 then return i else logger (i + 1)
+        renewer = do
+            forM_ backups $ \backup -> do
+                renameFile tempFile backup
+                renewLoggerSet lgrset
+            writeIORef renewed True
+    res <- timeout 30000000 $ do
+        (pushed, _) <- concurrently (logger (1 :: Int)) renewer
+        flushLogStr lgrset
+        rmLoggerSet lgrset
+        return pushed
+    case res of
+        Nothing -> expectationFailure "flushing or removing the logger set hung"
+        Just pushed -> do
+            xs <- concatMap BS.lines <$> mapM BS.readFile files
+            length xs `shouldBe` pushed
+  where
+    backups = [tempFile <> "." <> show i | i <- [1 .. 500 :: Int]]
+    files = tempFile : backups
+#endif

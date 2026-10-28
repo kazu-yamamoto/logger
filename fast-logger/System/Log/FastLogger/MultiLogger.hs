@@ -33,6 +33,7 @@ data MultiLogger = MultiLogger
     , mlgrMBuffer :: MVar Buffer
     , mlgrBufSize :: BufSize
     , mlgrFdRef :: IORef FD
+    , mlgrFdLock :: MVar ()
     }
 
 instance Loggers MultiLogger where
@@ -47,8 +48,8 @@ newMLogger = MLogger <$> newIORef mempty
 
 -- | Creating `MultiLogger`.
 --   The first argument is the number of the internal builders.
-newMultiLogger :: Int -> BufSize -> IORef FD -> IO MultiLogger
-newMultiLogger n bufsize fdref = do
+newMultiLogger :: Int -> BufSize -> IORef FD -> MVar () -> IO MultiLogger
+newMultiLogger n bufsize fdref fdlock = do
     mbuf <- getBuffer bufsize >>= newMVar
     arr <- listArray (0, n - 1) <$> replicateM n newMLogger
     return $
@@ -57,6 +58,7 @@ newMultiLogger n bufsize fdref = do
             , mlgrMBuffer = mbuf
             , mlgrBufSize = bufsize
             , mlgrFdRef = fdref
+            , mlgrFdLock = fdlock
             }
 
 ----------------------------------------------------------------
@@ -121,8 +123,10 @@ stopLoggers ml@MultiLogger{..} = do
 
 writeLogStr' :: MultiLogger -> LogStr -> IO ()
 writeLogStr' MultiLogger{..} logstr =
-    withMVar mlgrMBuffer $ \buf -> writeLogStr buf mlgrFdRef logstr
+    withMVar mlgrMBuffer $ \buf ->
+        withMVar mlgrFdLock $ \_ -> writeLogStr buf mlgrFdRef logstr
 
 writeBigLogStr' :: MultiLogger -> LogStr -> IO ()
 writeBigLogStr' MultiLogger{..} logstr =
-    withMVar mlgrMBuffer $ \_ -> writeBigLogStr mlgrFdRef logstr
+    withMVar mlgrMBuffer $ \_ ->
+        withMVar mlgrFdLock $ \_ -> writeBigLogStr mlgrFdRef logstr
