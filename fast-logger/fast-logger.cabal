@@ -66,6 +66,7 @@ test-suite spec
     build-tools:      hspec-discover >=2.6
     hs-source-dirs:   test
     other-modules:
+        ClosedSpec
         FastLoggerSpec
         RotateSpec
 

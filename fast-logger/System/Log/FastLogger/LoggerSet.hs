@@ -30,6 +30,7 @@ module System.Log.FastLogger.LoggerSet (
 
 import Control.Concurrent (getNumCapabilities)
 import Control.Debounce (debounceAction, defaultDebounceSettings, mkDebounce, debounceThreadName)
+import System.IO.Error (illegalOperationErrorType, ioeSetErrorString, mkIOError)
 
 import System.Log.FastLogger.FileIO
 import System.Log.FastLogger.IO
@@ -116,7 +117,7 @@ newFDLoggerSet size mn mfile fd = do
     flush <-
         mkDebounce
             defaultDebounceSettings
-                { debounceAction = flushLogStrRaw logger
+                { debounceAction = whenOpen fdref $ flushLogStrRaw logger
                 , debounceThreadName = "Loggerset of FastLogger (Debounce)"
                 }
     return $
@@ -130,14 +131,23 @@ newFDLoggerSet size mn mfile fd = do
 -- | Writing a log message to the corresponding buffer.
 --   If the buffer becomes full, the log messages in the buffer
 --   are written to its corresponding file, stdout, or stderr.
+--   This throws an 'IOError' after 'rmLoggerSet'.
 pushLogStr :: LoggerSet -> LogStr -> IO ()
-pushLogStr LoggerSet{..} logmsg = case lgrsetLogger of
-    SL sl -> do
-        pushLog sl logmsg
-        lgrsetDebounce
-    ML ml -> do
-        pushLog ml logmsg
-        lgrsetDebounce
+pushLogStr LoggerSet{..} logmsg = do
+    fd <- readIORef lgrsetFdRef
+    unless (isFDValid fd) $ ioError removed
+    case lgrsetLogger of
+        SL sl -> do
+            pushLog sl logmsg
+            lgrsetDebounce
+        ML ml -> do
+            pushLog ml logmsg
+            lgrsetDebounce
+  where
+    removed =
+        ioeSetErrorString
+            (mkIOError illegalOperationErrorType "pushLogStr" Nothing lgrsetFilePath)
+            "LoggerSet already removed"
 
 -- | Same as 'pushLogStr' but also appends a newline.
 pushLogStrLn :: LoggerSet -> LogStr -> IO ()
@@ -152,8 +162,17 @@ pushLogStrLn loggerSet logStr = pushLogStr loggerSet (logStr <> "\n")
 --   courtesy of the auto-update package. Since version 2.2.2, this
 --   function can be used to force flushing outside of the debounced
 --   flush calls.
+--
+--   This does nothing after 'rmLoggerSet'.
 flushLogStr :: LoggerSet -> IO ()
-flushLogStr LoggerSet{..} = flushLogStrRaw lgrsetLogger
+flushLogStr LoggerSet{..} = whenOpen lgrsetFdRef $ flushLogStrRaw lgrsetLogger
+
+-- The loggers are stopped by 'rmLoggerSet', which invalidates the FD,
+-- and using them after that blocks forever.
+whenOpen :: IORef FD -> IO () -> IO ()
+whenOpen fdref act = do
+    fd <- readIORef fdref
+    when (isFDValid fd) act
 
 flushLogStrRaw :: Logger -> IO ()
 flushLogStrRaw (SL sl) = flushAllLog sl
@@ -170,7 +189,7 @@ renewLoggerSet LoggerSet{..} = case lgrsetFilePath of
         closeFD oldfd
 
 -- | Flushing the buffers, closing the internal file information
---   and freeing the buffers.
+--   and freeing the buffers.  This does nothing if called again.
 rmLoggerSet :: LoggerSet -> IO ()
 rmLoggerSet LoggerSet{..} = do
     fd <- readIORef lgrsetFdRef
