@@ -184,9 +184,13 @@ renewLoggerSet :: LoggerSet -> IO ()
 renewLoggerSet LoggerSet{..} = case lgrsetFilePath of
     Nothing -> return ()
     Just file -> do
-        newfd <- openFileFD file
-        oldfd <- atomicModifyIORef' lgrsetFdRef (\fd -> (newfd, fd))
-        closeFD oldfd
+        -- A removed 'LoggerSet' has no writer to hand the FD to.
+        valid <- isFDValid <$> readIORef lgrsetFdRef
+        when valid $ do
+            newfd <- openFileFD file
+            case lgrsetLogger of
+                SL sl -> replaceFD sl newfd
+                ML ml -> replaceFD ml newfd
 
 -- | Flushing the buffers, closing the internal file information
 --   and freeing the buffers.  This does nothing if called again.
@@ -197,8 +201,9 @@ rmLoggerSet LoggerSet{..} = do
         case lgrsetLogger of
             SL sl -> stopLoggers sl
             ML ml -> stopLoggers ml
-        when (isJust lgrsetFilePath) $ closeFD fd
-        writeIORef lgrsetFdRef invalidFD
+        -- Read again: the FD may have been replaced while stopping.
+        fd' <- atomicModifyIORef' lgrsetFdRef (\x -> (invalidFD, x))
+        when (isJust lgrsetFilePath) $ closeFD fd'
 
 -- | Replacing the file path in 'LoggerSet' and returning a new
 --   'LoggerSet' and the old file path.

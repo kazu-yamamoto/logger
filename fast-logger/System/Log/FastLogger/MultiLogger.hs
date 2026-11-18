@@ -39,6 +39,7 @@ instance Loggers MultiLogger where
     stopLoggers = System.Log.FastLogger.MultiLogger.stopLoggers
     pushLog = System.Log.FastLogger.MultiLogger.pushLog
     flushAllLog = System.Log.FastLogger.MultiLogger.flushAllLog
+    replaceFD = System.Log.FastLogger.MultiLogger.replaceFD
 
 ----------------------------------------------------------------
 
@@ -126,3 +127,12 @@ writeLogStr' MultiLogger{..} logstr =
 writeBigLogStr' :: MultiLogger -> LogStr -> IO ()
 writeBigLogStr' MultiLogger{..} logstr =
     withMVar mlgrMBuffer $ \_ -> writeBigLogStr mlgrFdRef logstr
+
+----------------------------------------------------------------
+
+-- | Replacing the FD.  Writers hold 'mlgrMBuffer' while using the
+--   FD, so the old one is not closed under them.
+replaceFD :: MultiLogger -> FD -> IO ()
+replaceFD MultiLogger{..} newfd = withMVar mlgrMBuffer $ \_ -> do
+    oldfd <- atomicModifyIORef' mlgrFdRef (\fd -> (newfd, fd))
+    closeFD oldfd
