@@ -65,7 +65,10 @@ test-suite spec
     main-is:          Spec.hs
     build-tools:      hspec-discover >=2.6
     hs-source-dirs:   test
-    other-modules:    FastLoggerSpec
+    other-modules:
+        FastLoggerSpec
+        RotateSpec
+
     default-language: Haskell2010
     ghc-options:      -Wall -threaded -rtsopts -with-rtsopts=-N
     build-depends:

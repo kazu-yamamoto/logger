@@ -85,15 +85,25 @@ check file = do
 -- native one the file is a 'System.IO.Handle', which is shared for
 -- deletion, and it does.
 rotate :: FileLogSpec -> IO ()
-rotate spec = mapM_ move srcdsts
+rotate spec
+    | n <= 0 = return ()
+    | otherwise = do
+        k <- firstMissing 0
+        mapM_ (\i -> move (backup (i - 1)) (backup i)) [k, k - 1 .. 1]
+        move path (backup 0)
   where
     path = log_file spec
     n = log_backup_number spec
-    dsts' = reverse . ("" :) . map (('.' :) . show) $ [0 .. n - 1]
-    dsts = map (path ++) dsts'
-    srcs = drop 1 dsts
-    srcdsts = zip srcs dsts
-    move (src, dst) = do
+    backup :: Int -> FilePath
+    backup i = path ++ "." ++ show i
+    -- Only the backups before the first missing one need shifting,
+    -- so a huge 'log_backup_number' costs nothing.
+    firstMissing i
+        | i >= n - 1 = return (n - 1)
+        | otherwise = do
+            exist <- doesFileExist (backup i)
+            if exist then firstMissing (i + 1) else return i
+    move src dst = do
         exist <- doesFileExist src
         when exist $ renameFile src dst
 
