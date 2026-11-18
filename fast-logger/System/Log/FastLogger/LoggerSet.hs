@@ -28,7 +28,7 @@ module System.Log.FastLogger.LoggerSet (
     replaceLoggerSet,
 ) where
 
-import Control.Concurrent (getNumCapabilities)
+import Control.Concurrent (MVar, getNumCapabilities, newMVar, withMVar)
 import Control.Debounce (debounceAction, defaultDebounceSettings, mkDebounce, debounceThreadName)
 
 import System.Log.FastLogger.FileIO
@@ -54,6 +54,8 @@ data Logger = SL SingleLogger | ML MultiLogger
 data LoggerSet = LoggerSet
     { lgrsetFilePath :: Maybe FilePath
     , lgrsetFdRef :: IORef FD
+    , lgrsetFdLock :: MVar ()
+    -- ^ Held while writing to the FD and while replacing or closing it.
     , lgrsetLogger :: Logger
     , lgrsetDebounce :: IO ()
     }
@@ -106,13 +108,14 @@ newFDLoggerSet size mn mfile fd = do
         Just n' -> return n'
         Nothing -> getNumCapabilities
     fdref <- newIORef fd
+    fdlock <- newMVar ()
     let bufsiz = max 1 size
     logger <-
         if n == 1 && mn == Just 1
             then
-                SL <$> S.newSingleLogger bufsiz fdref
+                SL <$> S.newSingleLogger bufsiz fdref fdlock
             else do
-                ML <$> M.newMultiLogger n bufsiz fdref
+                ML <$> M.newMultiLogger n bufsiz fdref fdlock
     flush <-
         mkDebounce
             defaultDebounceSettings
@@ -123,6 +126,7 @@ newFDLoggerSet size mn mfile fd = do
         LoggerSet
             { lgrsetFilePath = mfile
             , lgrsetFdRef = fdref
+            , lgrsetFdLock = fdlock
             , lgrsetLogger = logger
             , lgrsetDebounce = flush
             }
@@ -164,7 +168,7 @@ flushLogStrRaw (ML ml) = flushAllLog ml
 renewLoggerSet :: LoggerSet -> IO ()
 renewLoggerSet LoggerSet{..} = case lgrsetFilePath of
     Nothing -> return ()
-    Just file -> do
+    Just file -> withMVar lgrsetFdLock $ \_ -> do
         newfd <- openFileFD file
         oldfd <- atomicModifyIORef' lgrsetFdRef (\fd -> (newfd, fd))
         closeFD oldfd
@@ -178,8 +182,9 @@ rmLoggerSet LoggerSet{..} = do
         case lgrsetLogger of
             SL sl -> stopLoggers sl
             ML ml -> stopLoggers ml
-        when (isJust lgrsetFilePath) $ closeFD fd
-        writeIORef lgrsetFdRef invalidFD
+        withMVar lgrsetFdLock $ \_ -> do
+            fd' <- atomicModifyIORef' lgrsetFdRef (\x -> (invalidFD, x))
+            when (isJust lgrsetFilePath) $ closeFD fd'
 
 -- | Replacing the file path in 'LoggerSet' and returning a new
 --   'LoggerSet' and the old file path.
