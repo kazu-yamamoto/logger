@@ -37,11 +37,13 @@ toBufIOWith buf size io builder = loop $ BBE.runBuilder builder
   where
     loop writer = do
         (len, next) <- writer buf size
-        io buf len
+        -- Empty steps occur, e.g. for an empty builder or around a chunk.
+        when (len > 0) $ io buf len
         case next of
             Done -> return ()
             More minSize writer'
                 | size < minSize -> error "toBufIOWith: More: minSize"
                 | otherwise -> loop writer'
-            Chunk (PS fptr off siz) writer' ->
-                withForeignPtr fptr $ \ptr -> io (ptr `plusPtr` off) siz >> loop writer'
+            Chunk (PS fptr off siz) writer' -> do
+                when (siz > 0) $ withForeignPtr fptr $ \ptr -> io (ptr `plusPtr` off) siz
+                loop writer'
