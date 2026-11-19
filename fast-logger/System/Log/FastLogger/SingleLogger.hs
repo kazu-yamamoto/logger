@@ -18,7 +18,9 @@ import System.Log.FastLogger.Write
 
 ----------------------------------------------------------------
 
-data Ent = F (MVar ()) Bool | L LogStr
+-- The writer thread is the only one touching the FD, so 'R' makes
+-- it replace the FD instead of locking around each write.
+data Ent = F (MVar ()) Bool | L LogStr | R FD
 type Q = [Ent] -- writer queue
 
 -- | A non-scale but time-ordered logger.
@@ -29,12 +31,14 @@ data SingleLogger = SingleLogger
     , slgrBuffer :: Buffer
     , slgrBufSize :: BufSize
     , slgrFdRef :: IORef FD
+    , slgrReplace :: FD -> IO ()
     }
 
 instance Loggers SingleLogger where
     stopLoggers = System.Log.FastLogger.SingleLogger.stopLoggers
     pushLog = System.Log.FastLogger.SingleLogger.pushLog
     flushAllLog = System.Log.FastLogger.SingleLogger.flushAllLog
+    replaceFD = System.Log.FastLogger.SingleLogger.replaceFD
 
 ----------------------------------------------------------------
 
@@ -59,6 +63,10 @@ writer bufsize buf fdref tvar ref = loop (0 :: Int)
     go (F mvar cont : msgs) = do
         putMVar mvar ()
         if cont then go msgs else return False
+    go (R newfd : msgs) = do
+        oldfd <- atomicModifyIORef' fdref (\fd -> (newfd, fd))
+        dropOnSyncException $ closeFD oldfd
+        go msgs
     go (L msg@(LogStr len _) : msgs) = do
         dropOnSyncException $
             if len <= bufsize
@@ -92,6 +100,10 @@ newSingleLogger bufsize fdref = do
             atomicModifyIORef' ref (\(old, q) -> ((mempty, fin : L old : q), ()))
             wakeup
             takeMVar mvar
+        -- Not waiting: the writer may be far behind the pushers.
+        replace newfd = do
+            atomicModifyIORef' ref (\(old, q) -> ((mempty, R newfd : L old : q), ()))
+            wakeup
     return $
         SingleLogger
             { slgrRef = ref
@@ -100,6 +112,7 @@ newSingleLogger bufsize fdref = do
             , slgrBuffer = buf
             , slgrBufSize = bufsize
             , slgrFdRef = fdref
+            , slgrReplace = replace
             }
 
 ----------------------------------------------------------------
@@ -126,3 +139,8 @@ stopLoggers :: SingleLogger -> IO ()
 stopLoggers SingleLogger{..} = do
     slgrFlush False
     freeBuffer slgrBuffer
+
+-- | Replacing the FD after the messages pushed so far are written.
+--   This returns before that happens.
+replaceFD :: SingleLogger -> FD -> IO ()
+replaceFD SingleLogger{..} = slgrReplace
