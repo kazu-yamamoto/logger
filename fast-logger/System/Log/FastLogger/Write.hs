@@ -43,3 +43,5 @@ class Loggers a where
     stopLoggers :: a -> IO ()
     pushLog :: a -> LogStr -> IO ()
     flushAllLog :: a -> IO ()
+    -- | Replacing the FD and closing the old one, which is not in use.
+    replaceFD :: a -> FD -> IO ()
