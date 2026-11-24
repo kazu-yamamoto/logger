@@ -1,3 +1,16 @@
+## 3.3.0
+
+`pushLogStr` now throws an `IOError` after `rmLoggerSet`.
+
+* Replace the FD where writes are already serialized
+  [#227](https://github.com/kazu-yamamoto/logger/pull/227)
+* Skip empty writes in toBufIOWith
+  [#230](https://github.com/kazu-yamamoto/logger/pull/230)
+* Define the behavior of a removed LoggerSet
+  [#229](https://github.com/kazu-yamamoto/logger/pull/229)
+* Make rotate cost proportional to the existing backups
+  [#228](https://github.com/kazu-yamamoto/logger/pull/228)
+
 ## 3.2.9
 
 * The writer thread of SingleLogger survives write errors such as
